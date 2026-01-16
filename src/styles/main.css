@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基础样式 */
+:root {
+  --transition-fast: 150ms;
+  --transition-normal: 200ms;
+  --transition-slow: 300ms;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary-400/40 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary-400/60;
+}
+
+/* 暗色主题滚动条 */
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-dark-600/60;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  @apply bg-dark-500/80;
+}
+
+/* 选中文本样式 */
+::selection {
+  @apply bg-accent-500/30;
+}
+
+/* 输入框焦点样式 */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply outline-none ring-2 ring-accent-500/50;
+}
+
+/* 按钮过渡效果 */
+button {
+  @apply transition-all duration-150;
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-lg;
+}
+
+/* 淡入动画 */
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) ease-out;
+}
+
+/* 列表项动画 */
+.list-item-enter-active,
+.list-item-leave-active {
+  transition: all var(--transition-normal) ease;
+}
+
+.list-item-enter-from,
+.list-item-leave-to {
+  opacity: 0;
+  transform: translateX(-10px);
+}

@@ -1,0 +1,43 @@
+[package]
+name = "open-switch"
+version = "0.7.0"
+edition = "2021"
+description = "Open Switch - Coding Agent 配置管理工具"
+authors = ["moguw <weiyiding0@gmail.com>"]
+license = "MIT"
+repository = ""
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 框架
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 异步运行时
+tokio = { version = "1.41", features = ["full"] }
+
+# HTTP 客户端 (用于站点检测)
+reqwest = { version = "0.12", features = ["json"] }
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "2.0"
+
+# 系统路径
+dirs = "5.0"
+
+# 时间处理
+chrono = "0.4"
+
+# URL 解析
+url = "2.5"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

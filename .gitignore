@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+target/
+dist/
+
+# Lock files (regenerated on build)
+Cargo.lock
+bun.lock
+package-lock.json
+
+# Config files with sensitive data
+.opencode/opencode.json
+
+# IDE
+.vscode/
+.idea/
+
+# Tauri
+src-tauri/target/
+
+# Misc
+docs/
+*.log
