@@ -18,68 +18,87 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="h-full flex flex-col rounded-xl bg-cream-50 dark:bg-dark-800 border border-cream-300 dark:border-dark-700 overflow-hidden">
-    <!-- 标题栏 -->
-    <div class="flex items-center justify-between px-4 py-3 border-b border-cream-300 dark:border-dark-700">
-      <h3 class="font-semibold text-sm">Providers</h3>
-      <span class="text-xs text-primary-500 dark:text-dark-400">({{ providers.length }})</span>
+  <div class="flex h-full flex-col rounded-lg border border-border bg-surface/30 backdrop-blur-sm overflow-hidden shadow-sm">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b border-border bg-surface/50">
+      <h3 class="font-bold text-xs uppercase tracking-wider text-muted-foreground">Providers</h3>
+      <span class="text-[10px] font-mono text-muted-foreground bg-surface border border-border px-1.5 py-0.5 rounded shadow-sm">
+        {{ providers.length }}
+      </span>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="flex items-center gap-2 px-3 py-2 border-b border-cream-200 dark:border-dark-700/50">
+    <!-- Toolbar -->
+    <div class="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/50 backdrop-blur-sm">
       <button
         @click="emit('add')"
-        class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors"
+        class="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm active:scale-95"
       >
-        + 添加
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>New</span>
       </button>
       <button
         @click="emit('apply')"
         :disabled="!selected"
-        class="px-3 py-1.5 text-xs font-medium rounded-lg border border-cream-400 dark:border-dark-600 hover:bg-cream-200 dark:hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-surface hover:bg-surface-hover hover:border-accent/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 group"
+        title="Apply Configuration"
       >
-        应用
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="group-hover:text-accent transition-colors"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <span>Apply</span>
       </button>
     </div>
 
-    <!-- 列表 -->
-    <div class="flex-1 overflow-auto">
-      <div v-if="providers.length === 0" class="p-4 text-center text-sm text-primary-500 dark:text-dark-400">
-        暂无 Provider
+    <!-- List -->
+    <div class="flex-1 overflow-auto p-2 scrollbar-thin">
+      <div v-if="providers.length === 0" class="flex h-32 flex-col items-center justify-center gap-2 text-muted-foreground">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="opacity-20"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+        <p class="text-xs">No providers found</p>
       </div>
-      <ul v-else class="p-2 space-y-1">
+      <ul v-else class="space-y-1">
         <li
           v-for="provider in providers"
           :key="provider.name"
           @click="emit('select', provider.name)"
-          class="group px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150"
+          class="group relative flex cursor-pointer flex-col gap-1 rounded-md border px-3 py-2.5 transition-all duration-200"
           :class="[
             provider.name === selected
-              ? 'bg-accent-100 dark:bg-accent-900/30 border border-accent-300 dark:border-accent-700'
-              : 'hover:bg-cream-200 dark:hover:bg-dark-700/50 border border-transparent'
+              ? 'bg-accent/5 border-accent/40 shadow-[0_0_10px_-4px_rgba(245,158,11,0.2)]'
+              : 'bg-transparent border-transparent hover:bg-surface-hover hover:border-border'
           ]"
         >
+          <!-- Selection Marker -->
+          <div v-if="provider.name === selected" class="absolute left-0 top-2 bottom-2 w-0.5 bg-accent rounded-r-full"></div>
+
           <div class="flex items-center justify-between">
-            <span class="font-medium text-sm truncate">{{ provider.name }}</span>
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm tracking-tight transition-colors" :class="{ 'text-accent': provider.name === selected }">
+                {{ provider.name }}
+              </span>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
               <button
                 @click.stop="emit('edit', provider.name)"
-                class="p-1 rounded hover:bg-cream-300 dark:hover:bg-dark-600"
-                title="编辑"
+                class="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary transition-colors"
+                title="Edit"
               >
-                ✏️
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
               </button>
               <button
                 @click.stop="emit('delete', provider.name)"
-                class="p-1 rounded hover:bg-error-500/20"
-                title="删除"
+                class="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                title="Delete"
               >
-                🗑️
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
             </div>
           </div>
-          <div class="mt-1 flex items-center gap-2 text-xs text-primary-500 dark:text-dark-400">
-            <span>{{ provider.model_count }} 模型</span>
+          
+          <div class="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+             <span class="flex items-center gap-1">
+               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+               {{ provider.model_count }} models
+             </span>
           </div>
         </li>
       </ul>

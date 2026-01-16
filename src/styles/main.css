@@ -1,18 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 基础样式 */
-:root {
-  --transition-fast: 150ms;
-  --transition-normal: 200ms;
-  --transition-slow: 300ms;
+@layer base {
+  :root {
+    --background: #ffffff;
+    --surface: #f4f4f5;
+    --surface-hover: #e4e4e7;
+    --border: #e4e4e7;
+    
+    --primary: #18181b;
+    --primary-foreground: #fafafa;
+    
+    --secondary: #f4f4f5;
+    --secondary-foreground: #18181b;
+    
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+    
+    --accent: #d97706; /* Amber 600 */
+    --accent-foreground: #ffffff;
+    
+    --destructive: #ef4444;
+    --destructive-foreground: #fafafa;
+    
+    --ring: #d97706;
+    
+    --radius: 0.5rem;
+    
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: #09090b; /* Zinc 950 */
+    --surface: #18181b; /* Zinc 900 */
+    --surface-hover: #27272a; /* Zinc 800 */
+    --border: #27272a;
+    
+    --primary: #fafafa;
+    --primary-foreground: #18181b;
+    
+    --secondary: #27272a;
+    --secondary-foreground: #fafafa;
+    
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+    
+    --accent: #f59e0b; /* Amber 500 */
+    --accent-foreground: #000000;
+    
+    --destructive: #7f1d1d;
+    --destructive-foreground: #fef2f2;
+    
+    --ring: #f59e0b;
+  }
 }
 
-/* 滚动条样式 */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-primary antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .bg-grid-tech {
+    background-size: 40px 40px;
+    background-image: var(--grid-pattern-light, linear-gradient(to right, #e4e4e7 1px, transparent 1px), linear-gradient(to bottom, #e4e4e7 1px, transparent 1px));
+    mask-image: linear-gradient(to bottom, transparent, 10%, white, 90%, transparent);
+  }
+  
+  .dark .bg-grid-tech {
+    background-image: var(--grid-pattern, linear-gradient(to right, #27272a 1px, transparent 1px), linear-gradient(to bottom, #27272a 1px, transparent 1px));
+  }
+
+  .glass {
+    @apply bg-background/80 backdrop-blur-md border border-border/50;
+  }
+
+  .glass-card {
+    @apply bg-surface/40 backdrop-blur-sm border border-border/60 hover:border-accent/30 transition-colors duration-300;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+  }
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -20,57 +105,21 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-primary-400/40 rounded-full;
+  @apply bg-border rounded-full transition-colors;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary-400/60;
+  @apply bg-muted-foreground/50;
 }
 
-/* 暗色主题滚动条 */
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-dark-600/60;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  @apply bg-dark-500/80;
-}
-
-/* 选中文本样式 */
+/* Selection */
 ::selection {
-  @apply bg-accent-500/30;
+  @apply bg-accent/20 text-accent;
 }
 
-/* 输入框焦点样式 */
+/* Input Focus */
 input:focus,
 textarea:focus,
 select:focus {
-  @apply outline-none ring-2 ring-accent-500/50;
-}
-
-/* 按钮过渡效果 */
-button {
-  @apply transition-all duration-150;
-}
-
-/* 卡片悬停效果 */
-.card-hover {
-  @apply transition-all duration-200 hover:shadow-lg;
-}
-
-/* 淡入动画 */
-.animate-fade-in {
-  animation: fadeIn var(--transition-normal) ease-out;
-}
-
-/* 列表项动画 */
-.list-item-enter-active,
-.list-item-leave-active {
-  transition: all var(--transition-normal) ease;
-}
-
-.list-item-enter-from,
-.list-item-leave-to {
-  opacity: 0;
-  transform: translateX(-10px);
+  @apply outline-none ring-1 ring-accent border-accent;
 }
