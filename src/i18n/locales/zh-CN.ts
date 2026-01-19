@@ -201,18 +201,47 @@ export default {
 
   // 备份页面
   backup: {
-    title: '备份与恢复',
-    featureTitle: '配置备份功能',
-    featureDesc: '备份功能支持将您的 Coding Agent 配置备份到 WebDAV 服务器。',
-    supportedTypes: '支持的备份类型',
-    openCodeConfig: 'OpenCode 配置',
-    mcpConfig: 'MCP 服务器配置',
-    usage: '使用说明',
-    usageDesc: '由于备份涉及网络操作，请使用命令行模式执行备份/恢复：',
-    createBackup: '创建备份',
-    restoreBackup: '恢复备份',
-    tipTitle: '提示',
-    tipContent: '备份功能需要配置 WebDAV 服务器。您可以使用坚果云、NextCloud 等支持 WebDAV 的服务。'
+    title: '备份与导入',
+    exportTitle: '导出备份',
+    exportDesc: '将当前所有配置导出为一个 JSON 文件，可用于迁移到其他设备或备份保存。',
+    exportBtn: '导出备份文件',
+    exporting: '导出中...',
+    exportSuccess: '导出成功！包含 {providers} 个服务商, {models} 个模型, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill',
+    exportFailed: '导出失败',
+    
+    importTitle: '导入配置',
+    importDesc: '从备份文件导入配置，可选择性地导入服务商、MCP、规则和 Skill。',
+    selectFile: '选择备份文件',
+    importing: '导入中...',
+    importBtn: '开始导入',
+    importSuccess: '导入成功！导入了 {providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill',
+    importPartial: '部分导入成功：{providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill ({errors} 个错误)',
+    importFailed: '导入失败',
+    previewFailed: '读取备份文件失败',
+    
+    backupVersion: '备份版本',
+    backupTime: '备份时间',
+    providers: '服务商',
+    models: '模型',
+    rules: '规则',
+    items: '项',
+    
+    importOptions: '导入选项',
+    importProviders: '导入服务商配置',
+    importMcp: '导入 MCP 服务器',
+    importRules: '导入规则',
+    importSkills: '导入 Skills',
+    overwriteExisting: '覆盖已存在的配置',
+    overwriteHint: '勾选后，已存在的同名配置将被覆盖；否则将跳过已存在的配置',
+    
+    providerPreview: '服务商预览',
+    
+    whatIncluded: '备份包含哪些内容？',
+    includeProviders: '服务商配置（包含 API Key、URL、模型列表）',
+    includeMcp: 'MCP 服务器配置',
+    includeRules: '全局规则文件',
+    includeSkills: '全局 Skill 文件',
+    securityWarning: '备份文件包含敏感的 API Key 信息，请妥善保管！'
   },
 
   // Skill 页面

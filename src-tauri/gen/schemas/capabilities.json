@@ -1,1 +1,1 @@
-{"shell-capability":{"identifier":"shell-capability","description":"允许应用使用 shell 插件打开外部链接","local":true,"windows":["main"],"permissions":["shell:allow-open"]}}
+{"dialog-capability":{"identifier":"dialog-capability","description":"允许应用使用文件对话框进行备份和导入","local":true,"windows":["main"],"permissions":["dialog:allow-open","dialog:allow-save"]},"shell-capability":{"identifier":"shell-capability","description":"允许应用使用 shell 插件打开外部链接","local":true,"windows":["main"],"permissions":["shell:allow-open"]}}

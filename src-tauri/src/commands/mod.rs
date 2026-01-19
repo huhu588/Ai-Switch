@@ -1,6 +1,6 @@
-// Tauri Commands 模块
-// 暴露给前端调用的 API
+// Tauri Commands module
 
+pub mod backup;
 pub mod provider;
 pub mod model;
 pub mod mcp;
@@ -8,6 +8,7 @@ pub mod skill;
 pub mod rule;
 pub mod status;
 
+pub use backup::*;
 pub use provider::*;
 pub use model::*;
 pub use mcp::*;

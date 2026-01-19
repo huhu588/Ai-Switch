@@ -201,18 +201,47 @@ export default {
 
   // Backup page
   backup: {
-    title: 'Backup & Restore',
-    featureTitle: 'Configuration Backup',
-    featureDesc: 'Backup feature supports backing up your Coding Agent configuration to a WebDAV server.',
-    supportedTypes: 'Supported Backup Types',
-    openCodeConfig: 'OpenCode Configuration',
-    mcpConfig: 'MCP Server Configuration',
-    usage: 'Usage',
-    usageDesc: 'Since backup involves network operations, please use command line mode for backup/restore:',
-    createBackup: 'Create backup',
-    restoreBackup: 'Restore backup',
-    tipTitle: 'Tip',
-    tipContent: 'Backup feature requires a WebDAV server. You can use services that support WebDAV like Nutstore, NextCloud, etc.'
+    title: 'Backup & Import',
+    exportTitle: 'Export Backup',
+    exportDesc: 'Export all current configurations to a JSON file for migration to other devices or backup.',
+    exportBtn: 'Export Backup File',
+    exporting: 'Exporting...',
+    exportSuccess: 'Export successful! Contains {providers} providers, {models} models, {mcp} MCP, {rules} rules, {skills} Skills',
+    exportFailed: 'Export failed',
+    
+    importTitle: 'Import Configuration',
+    importDesc: 'Import configurations from a backup file. You can selectively import providers, MCP, rules and Skills.',
+    selectFile: 'Select Backup File',
+    importing: 'Importing...',
+    importBtn: 'Start Import',
+    importSuccess: 'Import successful! Imported {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills',
+    importPartial: 'Partial import: {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills ({errors} errors)',
+    importFailed: 'Import failed',
+    previewFailed: 'Failed to read backup file',
+    
+    backupVersion: 'Backup Version',
+    backupTime: 'Backup Time',
+    providers: 'Providers',
+    models: 'Models',
+    rules: 'Rules',
+    items: 'items',
+    
+    importOptions: 'Import Options',
+    importProviders: 'Import Provider Configurations',
+    importMcp: 'Import MCP Servers',
+    importRules: 'Import Rules',
+    importSkills: 'Import Skills',
+    overwriteExisting: 'Overwrite existing configurations',
+    overwriteHint: 'When checked, existing configurations with the same name will be overwritten; otherwise they will be skipped',
+    
+    providerPreview: 'Provider Preview',
+    
+    whatIncluded: 'What is included in the backup?',
+    includeProviders: 'Provider configurations (including API Keys, URLs, model lists)',
+    includeMcp: 'MCP server configurations',
+    includeRules: 'Global rule files',
+    includeSkills: 'Global Skill files',
+    securityWarning: 'Backup file contains sensitive API Key information, please keep it safe!'
   },
 
   // Skill page

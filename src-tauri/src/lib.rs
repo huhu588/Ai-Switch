@@ -16,6 +16,7 @@ pub fn run() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(config_manager))
         .invoke_handler(tauri::generate_handler![
             // Provider commands
@@ -62,6 +63,11 @@ pub fn run() {
             commands::get_status,
             commands::get_version,
             commands::get_local_ip,
+            // Backup commands
+            commands::create_backup,
+            commands::export_backup,
+            commands::preview_backup,
+            commands::import_backup,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时出错");
