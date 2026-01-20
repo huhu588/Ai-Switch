@@ -340,8 +340,9 @@ fn sync_providers_to_file(
         if let Some(provider) = config.get_provider(name) {
             if let Ok(mut value) = serde_json::to_value(provider) {
                 if let Some(obj) = value.as_object_mut() {
-                    // 移除 model_type 字段，opencode 不识别这个字段
+                    // 移除 model_type 和 enabled 字段，opencode 不识别这些字段
                     obj.remove("model_type");
+                    obj.remove("enabled");
                     
                     // 根据 auto_add_v1_suffix 和协议类型决定是否添加 /v1 后缀
                     let is_anthropic = obj.get("npm")

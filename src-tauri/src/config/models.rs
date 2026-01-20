@@ -132,7 +132,7 @@ pub struct OpenCodeProvider {
     // model_type 用于内部分类（同步到 opencode 时会被移除）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_type: Option<String>, // 模型厂家: claude, codex, gemini
-    // 是否启用（禁用的 provider 不会被应用到配置）
+    // 是否启用（禁用的 provider 不会被应用到配置，同步到 opencode 时会被移除）
     #[serde(default = "default_enabled")]
     pub enabled: bool,
     // 是否自动添加 /v1 后缀 (内部字段，不同步到 opencode.json)
