@@ -105,7 +105,8 @@ const groupedSkills = computed(() => {
 })
 
 // 位置标签（使用 computed 以支持 i18n 动态切换）
-const locationLabels = computed(() => ({
+// 添加 Record<string, string> 类型注解，以支持 v-for 遍历时的字符串索引访问
+const locationLabels = computed((): Record<string, string> => ({
   'GlobalOpenCode': t('skills.locationLabels.GlobalOpenCode'),
   'GlobalClaude': t('skills.locationLabels.GlobalClaude'),
   'ProjectOpenCode': t('skills.locationLabels.ProjectOpenCode'),
@@ -1045,6 +1046,8 @@ onMounted(() => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  /* 添加标准属性以兼容现代浏览器 */
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
