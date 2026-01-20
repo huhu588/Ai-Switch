@@ -317,6 +317,18 @@ export default {
     mcpServers: 'MCP Servers',
     count: '{count}',
     configPaths: 'Config Paths',
-    openCode: 'OpenCode'
+    openCode: 'OpenCode',
+    // Update related
+    checkUpdate: 'Check for Updates',
+    checking: 'Checking...',
+    noUpdates: 'You are using the latest version',
+    updateAvailable: 'Update Available',
+    updateVersion: 'New Version',
+    downloading: 'Downloading...',
+    installing: 'Installing...',
+    updateLater: 'Later',
+    updateNow: 'Update Now',
+    updateNotes: 'Release Notes',
+    downloadProgress: 'Download Progress'
   }
 }

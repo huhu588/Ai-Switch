@@ -3,8 +3,26 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import SvgIcon from '@/components/SvgIcon.vue'
+import UpdateDialog from '@/components/UpdateDialog.vue'
 
 const { t } = useI18n()
+
+// 更新相关
+const updateDialogRef = ref<InstanceType<typeof UpdateDialog> | null>(null)
+const isCheckingUpdate = ref(false)
+const updateMessage = ref('')
+
+async function checkForUpdates() {
+  isCheckingUpdate.value = true
+  updateMessage.value = ''
+  try {
+    await updateDialogRef.value?.checkForUpdate()
+  } catch (e) {
+    updateMessage.value = t('status.noUpdates')
+  } finally {
+    isCheckingUpdate.value = false
+  }
+}
 
 interface AppStatus {
   has_global_config: boolean
@@ -60,8 +78,27 @@ onMounted(() => {
           </h3>
           <div class="grid grid-cols-2 gap-4">
             <div class="bg-surface rounded-lg p-4">
-              <div class="text-2xl font-bold">v{{ version }}</div>
-              <div class="text-xs text-muted-foreground">{{ t('status.currentVersion') }}</div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-2xl font-bold">v{{ version }}</div>
+                  <div class="text-xs text-muted-foreground">{{ t('status.currentVersion') }}</div>
+                </div>
+                <button
+                  @click="checkForUpdates"
+                  :disabled="isCheckingUpdate"
+                  class="px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <svg v-if="isCheckingUpdate" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {{ isCheckingUpdate ? t('status.checking') : t('status.checkUpdate') }}
+                </button>
+              </div>
+              <p v-if="updateMessage" class="text-xs text-emerald-400 mt-2">{{ updateMessage }}</p>
             </div>
             <div class="bg-surface rounded-lg p-4">
               <div class="text-2xl font-bold">{{ status.provider_count }}</div>
@@ -119,5 +156,8 @@ onMounted(() => {
         </section>
       </div>
     </div>
+
+    <!-- 更新对话框 -->
+    <UpdateDialog ref="updateDialogRef" />
   </div>
 </template>

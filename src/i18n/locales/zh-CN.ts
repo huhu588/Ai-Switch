@@ -317,6 +317,18 @@ export default {
     mcpServers: 'MCP 服务器',
     count: '{count} 个',
     configPaths: '配置路径',
-    openCode: 'OpenCode'
+    openCode: 'OpenCode',
+    // 更新相关
+    checkUpdate: '检查更新',
+    checking: '检查中...',
+    noUpdates: '当前已是最新版本',
+    updateAvailable: '发现新版本',
+    updateVersion: '新版本',
+    downloading: '下载中...',
+    installing: '安装中...',
+    updateLater: '稍后更新',
+    updateNow: '立即更新',
+    updateNotes: '更新内容',
+    downloadProgress: '下载进度'
   }
 }
