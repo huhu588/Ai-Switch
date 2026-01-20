@@ -4,7 +4,7 @@
  */
 
 // API 协议类型
-export type ApiProtocol = 'anthropic' | 'openai'
+export type ApiProtocol = 'anthropic' | 'openai' | 'openai-compatible'
 
 // Claude 模型定义
 export interface ClaudeModel {
@@ -82,9 +82,9 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     name: '智谱 AI',
     websiteUrl: 'https://open.bigmodel.cn',
     apiKeyUrl: 'https://www.bigmodel.cn/glm-coding?ic=LOLVYRGC8E',
-    baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
-    defaultProtocol: 'openai',
-    supportedProtocols: ['openai', 'anthropic'],
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    defaultProtocol: 'openai-compatible',
+    supportedProtocols: ['openai-compatible', 'openai'],
     models: [
       { id: 'glm-4.7', name: 'GLM-4.7' },
       { id: 'glm-4.6', name: 'GLM-4.6' },
@@ -123,7 +123,22 @@ export function getPresetByName(name: string): ProviderPreset | undefined {
 
 // 获取协议显示名称
 export function getProtocolDisplayName(protocol: ApiProtocol): string {
-  return protocol === 'anthropic' ? 'Anthropic 协议' : 'OpenAI 协议'
+  const map: Record<ApiProtocol, string> = {
+    'anthropic': 'Anthropic 协议',
+    'openai': 'OpenAI 协议',
+    'openai-compatible': 'OpenAI 兼容协议',
+  }
+  return map[protocol]
+}
+
+// 根据协议获取对应的 npm 包名
+export function getNpmPackageByProtocol(protocol: ApiProtocol): string {
+  const map: Record<ApiProtocol, string> = {
+    'anthropic': '@ai-sdk/anthropic',
+    'openai': '@ai-sdk/openai',
+    'openai-compatible': '@ai-sdk/openai-compatible',
+  }
+  return map[protocol]
 }
 
 // 获取分类显示名称

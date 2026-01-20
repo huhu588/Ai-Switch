@@ -6,6 +6,7 @@ import { open as openUrl } from '@tauri-apps/plugin-shell'
 import { 
   PROVIDER_PRESETS, 
   getModelsByType,
+  getNpmPackageByProtocol,
   type ApiProtocol
 } from '@/config/providerPresets'
 import { MODEL_TYPES, type ModelType } from '@/config/modelTypes'
@@ -145,7 +146,12 @@ watch(() => props.visible, async (visible) => {
       if (provider) {
         // 根据 npm 包推断协议
         const npm = provider.npm || ''
-        const inferredProtocol = npm.includes('openai') ? 'openai' : 'anthropic'
+        let inferredProtocol: ApiProtocol = 'anthropic'
+        if (npm.includes('openai-compatible')) {
+          inferredProtocol = 'openai-compatible'
+        } else if (npm.includes('openai')) {
+          inferredProtocol = 'openai'
+        }
         
         form.value = {
           name: props.editing,
@@ -213,7 +219,7 @@ async function save() {
     
     if (props.editing) {
       // 根据协议选择 npm 包
-      const npm = form.value.protocol === 'openai' ? '@ai-sdk/openai' : '@ai-sdk/anthropic'
+      const npm = getNpmPackageByProtocol(form.value.protocol)
       
       await invoke('update_provider', {
         name: props.editing,
@@ -230,7 +236,7 @@ async function save() {
     } else {
       // 添加 Provider
       // 根据协议选择 npm 包
-      const npm = form.value.protocol === 'openai' ? '@ai-sdk/openai' : '@ai-sdk/anthropic'
+      const npm = getNpmPackageByProtocol(form.value.protocol)
       
       await invoke('add_provider', {
         input: {
