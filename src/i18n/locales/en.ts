@@ -26,7 +26,7 @@ export default {
   nav: {
     providers: 'Providers',
     mcp: 'Mcp/Rules',
-    skill: 'Skill',
+    skills: 'skills',
     backup: 'Backup',
     status: 'Status'
   },
@@ -209,16 +209,16 @@ export default {
     exportDesc: 'Export all current configurations to a JSON file for migration to other devices or backup.',
     exportBtn: 'Export Backup File',
     exporting: 'Exporting...',
-    exportSuccess: 'Export successful! Contains {providers} providers, {models} models, {mcp} MCP, {rules} rules, {skills} Skills',
+    exportSuccess: 'Export successful! Contains {providers} providers, {models} models, {mcp} MCP, {rules} rules, {skills} skills',
     exportFailed: 'Export failed',
     
     importTitle: 'Import Configuration',
-    importDesc: 'Import configurations from a backup file. You can selectively import providers, MCP, rules and Skills.',
+    importDesc: 'Import configurations from a backup file. You can selectively import providers, MCP, rules and skills.',
     selectFile: 'Select Backup File',
     importing: 'Importing...',
     importBtn: 'Start Import',
-    importSuccess: 'Import successful! Imported {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills',
-    importPartial: 'Partial import: {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills ({errors} errors)',
+    importSuccess: 'Import successful! Imported {providers} providers, {mcp} MCP, {rules} rules, {skills} skills',
+    importPartial: 'Partial import: {providers} providers, {mcp} MCP, {rules} rules, {skills} skills ({errors} errors)',
     importFailed: 'Import failed',
     previewFailed: 'Failed to read backup file',
     
@@ -243,17 +243,17 @@ export default {
     includeProviders: 'Provider configurations (including API Keys, URLs, model lists)',
     includeMcp: 'MCP server configurations',
     includeRules: 'Global rule files',
-    includeSkills: 'Global Skill files',
+    includeSkills: 'Global Skills files',
     securityWarning: 'Backup file contains sensitive API Key information, please keep it safe!'
   },
 
-  // Skill page
-  skill: {
+  // Skills page
+  skills: {
     title: 'Skills',
-    addRecommended: 'Add Recommended Skill',
+    addRecommended: 'Add Recommended Skills',
     refresh: 'Refresh',
-    noSkills: 'No skills installed',
-    installFirst: 'Install your first Skill',
+    noSkills: 'No Skills installed',
+    installFirst: 'Install your first Skills',
     recommended: 'Recommended Skills',
     installLocation: 'Install Location',
     selected: '{count} selected',
@@ -261,7 +261,28 @@ export default {
     installAll: 'Install All',
     installed: 'Installed',
     view: 'View Content',
-    deleteConfirm: "Are you sure you want to delete Skill '{name}'?"
+    deleteConfirm: "Are you sure you want to delete Skills '{name}'?",
+    // Discover Skills
+    discover: 'Skills Hub',
+    discoverTitle: 'Skills Hub',
+    discovering: 'Fetching Skills from repositories...',
+    noSkillsFound: 'No Skills found',
+    installSelected: 'Install Selected',
+    searchPlaceholder: 'Search by name or description...',
+    viewSource: 'View Source',
+    noDescription: 'No description available',
+    // Repository management
+    manageRepos: 'Manage Repos',
+    repoManagement: 'Skills Repository Management',
+    addRepo: 'Add Repository',
+    repoUrlPlaceholder: 'Enter GitHub repo URL, e.g. https://github.com/user/skills',
+    repoUrlHint: 'Supports any GitHub repository with a skills directory',
+    builtin: 'Built-in',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    enable: 'Enable',
+    disable: 'Disable',
+    noRepos: 'No Skills repositories'
   },
 
   // Rule page

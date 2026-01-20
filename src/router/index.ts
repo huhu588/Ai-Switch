@@ -15,8 +15,8 @@ const router = createRouter({
       component: () => import('@/views/McpView.vue')
     },
     {
-      path: '/skill',
-      name: 'skill',
+      path: '/skills',
+      name: 'skills',
       component: () => import('@/views/SkillView.vue')
     },
     {

@@ -47,12 +47,20 @@ pub fn run() {
             commands::get_recommended_mcp_servers,
             commands::add_recommended_mcp_servers,
             commands::check_mcp_server_health,
-            // Skill commands
+            // skills commands
             commands::get_installed_skills,
             commands::get_recommended_skills,
-            commands::install_skill,
-            commands::delete_skill,
-            commands::read_skill_content,
+            commands::install_skills,
+            commands::delete_skills,
+            commands::read_skills_content,
+            // skills repository commands
+            commands::get_skills_repos,
+            commands::add_skills_repo,
+            commands::delete_skills_repo,
+            commands::toggle_skills_repo,
+            commands::toggle_skills_repo_enabled,
+            commands::fetch_skills_from_repo,
+            commands::discover_skills,
             // Rule commands
             commands::get_installed_rules,
             commands::get_recommended_rules,

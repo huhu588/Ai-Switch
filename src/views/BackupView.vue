@@ -51,7 +51,7 @@ interface ExportedRule {
   file_ext?: string
 }
 
-interface ExportedSkill {
+interface Exportedskills {
   name: string
   location: string
   content: string
@@ -64,7 +64,7 @@ interface BackupData {
   providers: ExportedProvider[]
   mcp_servers: ExportedMcpServer[]
   rules: ExportedRule[]
-  skills: ExportedSkill[]
+  skills: Exportedskills[]
 }
 
 interface ExportStats {
@@ -334,7 +334,7 @@ function maskApiKey(key: string): string {
           </div>
           <div class="bg-surface rounded-lg p-3 text-center">
             <div class="text-2xl font-bold text-green-500">{{ previewStats.skills }}</div>
-            <div class="text-xs text-muted-foreground">Skills</div>
+            <div class="text-xs text-muted-foreground">skills</div>
           </div>
         </div>
         

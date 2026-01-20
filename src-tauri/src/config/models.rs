@@ -99,7 +99,7 @@ pub struct OpenCodePermission {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edit: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub skill: Option<String>,
+    pub skills: Option<String>,
 }
 
 /// OpenCode 配置文件结构 (匹配新版 opencode 格式)

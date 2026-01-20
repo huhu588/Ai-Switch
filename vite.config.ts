@@ -19,9 +19,32 @@ export default defineConfig({
       ignored: ['**/src-tauri/**']
     }
   },
+  // 优化依赖预构建
+  optimizeDeps: {
+    include: [
+      'vue',
+      'vue-router',
+      'pinia',
+      'vue-i18n',
+      '@tauri-apps/api',
+      '@tauri-apps/plugin-dialog',
+      '@tauri-apps/plugin-shell',
+      '@tauri-apps/plugin-updater',
+      '@tauri-apps/plugin-process'
+    ]
+  },
   build: {
     target: ['es2021', 'chrome100', 'safari13'],
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
-    sourcemap: !!process.env.TAURI_DEBUG
+    sourcemap: !!process.env.TAURI_DEBUG,
+    // 优化构建
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'tauri-vendor': ['@tauri-apps/api']
+        }
+      }
+    }
   }
 })

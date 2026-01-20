@@ -26,7 +26,7 @@ export default {
   nav: {
     providers: '服务商',
     mcp: 'Mcp/规则',
-    skill: 'Skill',
+    skills: 'skills',
     backup: '备份',
     status: '状态'
   },
@@ -209,16 +209,16 @@ export default {
     exportDesc: '将当前所有配置导出为一个 JSON 文件，可用于迁移到其他设备或备份保存。',
     exportBtn: '导出备份文件',
     exporting: '导出中...',
-    exportSuccess: '导出成功！包含 {providers} 个服务商, {models} 个模型, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill',
+    exportSuccess: '导出成功！包含 {providers} 个服务商, {models} 个模型, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills',
     exportFailed: '导出失败',
     
     importTitle: '导入配置',
-    importDesc: '从备份文件导入配置，可选择性地导入服务商、MCP、规则和 Skill。',
+    importDesc: '从备份文件导入配置，可选择性地导入服务商、MCP、规则和 skills。',
     selectFile: '选择备份文件',
     importing: '导入中...',
     importBtn: '开始导入',
-    importSuccess: '导入成功！导入了 {providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill',
-    importPartial: '部分导入成功：{providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skill ({errors} 个错误)',
+    importSuccess: '导入成功！导入了 {providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills',
+    importPartial: '部分导入成功：{providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills ({errors} 个错误)',
     importFailed: '导入失败',
     previewFailed: '读取备份文件失败',
     
@@ -243,25 +243,46 @@ export default {
     includeProviders: '服务商配置（包含 API Key、URL、模型列表）',
     includeMcp: 'MCP 服务器配置',
     includeRules: '全局规则文件',
-    includeSkills: '全局 Skill 文件',
+    includeSkills: '全局 Skills 文件',
     securityWarning: '备份文件包含敏感的 API Key 信息，请妥善保管！'
   },
 
-  // Skill 页面
-  skill: {
-    title: 'Skill 技能',
-    addRecommended: '添加推荐 Skill',
+  // Skills 页面
+  skills: {
+    title: 'Skills 技能',
+    addRecommended: '添加推荐 Skills',
     refresh: '刷新',
-    noSkills: '暂无已安装的 Skill',
-    installFirst: '安装第一个 Skill',
-    recommended: '推荐 Skill',
+    noSkills: '暂无已安装的 Skills',
+    installFirst: '安装第一个 Skills',
+    recommended: '推荐 Skills',
     installLocation: '安装位置',
     selected: '已选择 {count} 个',
     installing: '安装中...',
     installAll: '安装全部',
     installed: '已安装',
     view: '查看内容',
-    deleteConfirm: "确定要删除 Skill '{name}' 吗？"
+    deleteConfirm: "确定要删除 Skills '{name}' 吗？",
+    // 发现技能
+    discover: 'Skills库',
+    discoverTitle: 'Skills库',
+    discovering: '正在从仓库获取技能列表...',
+    noSkillsFound: '未找到可用的技能',
+    installSelected: '安装选中',
+    searchPlaceholder: '搜索技能名称或描述...',
+    viewSource: '查看源码',
+    noDescription: '暂无描述',
+    // 仓库管理
+    manageRepos: '仓库管理',
+    repoManagement: 'skills仓库管理',
+    addRepo: '添加仓库',
+    repoUrlPlaceholder: '输入 GitHub 仓库 URL，如 https://github.com/user/skills',
+    repoUrlHint: '支持任何包含 skills 目录的 GitHub 仓库',
+    builtin: '内置',
+    enabled: '已启用',
+    disabled: '已禁用',
+    enable: '启用',
+    disable: '禁用',
+    noRepos: '暂无技能仓库'
   },
 
   // 规则页面

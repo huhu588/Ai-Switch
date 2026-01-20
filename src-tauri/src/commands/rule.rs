@@ -190,10 +190,10 @@ pub fn get_installed_rules() -> Vec<InstalledRule> {
                     for entry in entries.flatten() {
                         let path = entry.path();
                         if path.is_dir() {
-                            // 检查 SKILL.md 或规则文件
+                            // 检查 SKILL.md 文件 - 这是 skills，不是规则，跳过
                             let skill_md = path.join("SKILL.md");
                             if skill_md.exists() {
-                                continue; // 这是 Skill，不是规则
+                                continue; // 这是 skills，不是规则
                             }
                             
                             // 检查其他 .md 文件作为规则
@@ -223,7 +223,7 @@ pub fn get_installed_rules() -> Vec<InstalledRule> {
                                                     location: location_key.to_string(),
                                                     path: sub_path.to_string_lossy().to_string(),
                                                     description: parse_rule_description(&content),
-                                                    rule_type: "claude_skill".to_string(),
+                                                    rule_type: "claude_skills".to_string(),
                                                     enabled: !is_disabled,
                                                 });
                                             }

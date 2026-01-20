@@ -31,8 +31,8 @@ const navItems = computed(() => [
     icon: 'terminal' // 终端/MCP 图标
   },
   {
-    name: t('nav.skill'),
-    path: '/skill',
+    name: t('nav.skills'),
+    path: '/skills',
     icon: 'layers' // 层级/技能图标
   },
   { 

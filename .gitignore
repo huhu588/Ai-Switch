@@ -27,5 +27,4 @@ docs/
 
 # Tauri signing keys (NEVER commit these!)
 *.key
-~/.tauri/
-~\.tauri\
+.tauri/

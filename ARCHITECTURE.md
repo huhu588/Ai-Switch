@@ -1,7 +1,7 @@
 # Open Switch 架构设计
 
 ## 概述
-Open Switch 是一个用于管理 OpenCode 配置的桌面应用工具，支持多 Provider、MCP 服务器、技能 (Skill)、规则 (Rule) 的统一管理，以及配置的备份与恢复。
+Open Switch 是一个用于管理 OpenCode 配置的桌面应用工具，支持多 Provider、MCP 服务器、技能 (skills)、规则 (Rule) 的统一管理，以及配置的备份与恢复。
 
 ## 技术栈
 
@@ -53,7 +53,7 @@ src/
 ├── views/                   # 页面视图
 │   ├── ProvidersView.vue    # Provider 管理页
 │   ├── McpView.vue          # MCP 服务器管理页
-│   ├── SkillView.vue        # 技能管理页
+│   ├── skillsView.vue        # 技能管理页
 │   ├── BackupView.vue       # 备份恢复页
 │   └── StatusView.vue       # 状态信息页
 │
@@ -92,7 +92,7 @@ src-tauri/src/
 │   ├── provider.rs          # Provider 相关命令
 │   ├── model.rs             # Model 相关命令
 │   ├── mcp.rs               # MCP 服务器命令
-│   ├── skill.rs             # Skill 管理命令
+│   ├── skills.rs             # skills 管理命令
 │   ├── rule.rs              # Rule 管理命令
 │   ├── backup.rs            # 备份导入导出命令
 │   └── status.rs            # 状态信息命令
@@ -183,14 +183,14 @@ pub struct ConfigManager {
 | `get_recommended_mcp_servers` | 获取推荐 MCP 服务器 |
 | `check_mcp_server_health` | 检查服务器健康状态 |
 
-### Skill 命令
+### skills 命令
 | 命令 | 说明 |
 |------|------|
 | `get_installed_skills` | 获取已安装技能 |
 | `get_recommended_skills` | 获取推荐技能 |
-| `install_skill` | 安装技能 |
-| `delete_skill` | 删除技能 |
-| `read_skill_content` | 读取技能内容 |
+| `install_skills` | 安装技能 |
+| `delete_skills` | 删除技能 |
+| `read_skills_content` | 读取技能内容 |
 
 ### Rule 命令
 | 命令 | 说明 |
@@ -250,7 +250,7 @@ interface State {
 |------|------|------|
 | `/` | ProvidersView | Provider 和 Model 管理 (默认页) |
 | `/mcp` | McpView | MCP 服务器管理 |
-| `/skill` | SkillView | Skill 技能管理 |
+| `/skills` | skillsView | skills 技能管理 |
 | `/backup` | BackupView | 备份与恢复 |
 | `/status` | StatusView | 状态信息 |
 

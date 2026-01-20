@@ -1,5 +1,5 @@
 // Backup and Import module
-// Supports exporting and importing providers, MCP, rules, and Skills
+// Supports exporting and importing providers, MCP, rules, and skills
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -75,9 +75,9 @@ fn default_file_ext() -> String {
     "md".to_string()
 }
 
-/// Exported Skill data
+/// Exported skills data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportedSkill {
+pub struct Exportedskills {
     pub name: String,
     pub location: String,
     pub content: String,
@@ -92,7 +92,7 @@ pub struct BackupData {
     pub providers: Vec<ExportedProvider>,
     pub mcp_servers: Vec<ExportedMcpServer>,
     pub rules: Vec<ExportedRule>,
-    pub skills: Vec<ExportedSkill>,
+    pub skills: Vec<Exportedskills>,
 }
 
 /// Export statistics
@@ -130,12 +130,12 @@ pub struct ImportResult {
     pub errors: Vec<String>,
 }
 
-fn get_skill_paths() -> Vec<(PathBuf, String)> {
+fn get_skills_paths() -> Vec<(PathBuf, String)> {
     let mut paths = Vec::new();
     // 与 opencode CLI 保持一致，所有平台使用 ~/.config/opencode
     if let Some(home_dir) = dirs::home_dir() {
         paths.push((
-            home_dir.join(".config").join("opencode").join("skill"),
+            home_dir.join(".config").join("opencode").join("skills"),
             "global_opencode".to_string(),
         ));
         paths.push((
@@ -253,8 +253,8 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
         }
     }
     
-    let mut skills: Vec<ExportedSkill> = Vec::new();
-    for (base_path, location) in get_skill_paths() {
+    let mut skills: Vec<Exportedskills> = Vec::new();
+    for (base_path, location) in get_skills_paths() {
         if !base_path.exists() {
             continue;
         }
@@ -262,14 +262,14 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
-                    let skill_file = path.join("SKILL.md");
-                    if skill_file.exists() {
+                    let skills_file = path.join("SKILL.md");
+                    if skills_file.exists() {
                         let name = path.file_name()
                             .and_then(|n| n.to_str())
                             .unwrap_or("unknown")
                             .to_string();
-                        if let Ok(content) = fs::read_to_string(&skill_file) {
-                            skills.push(ExportedSkill {
+                        if let Ok(content) = fs::read_to_string(&skills_file) {
+                            skills.push(Exportedskills {
                                 name,
                                 location: location.clone(),
                                 content,
@@ -496,30 +496,30 @@ pub fn import_backup(
     }
     
     if options.import_skills {
-        for skill in &backup.skills {
+        for skills in &backup.skills {
             // 与 opencode CLI 保持一致，所有平台使用 ~/.config/opencode
-            let base_path = match skill.location.as_str() {
-                "global_opencode" => dirs::home_dir().map(|d| d.join(".config").join("opencode").join("skill")),
+            let base_path = match skills.location.as_str() {
+                "global_opencode" => dirs::home_dir().map(|d| d.join(".config").join("opencode").join("skills")),
                 "global_claude" => dirs::home_dir().map(|d| d.join(".claude").join("skills")),
                 _ => None,
             };
             
             if let Some(base) = base_path {
-                let skill_dir = base.join(&skill.name);
-                if let Err(e) = fs::create_dir_all(&skill_dir) {
+                let skills_dir = base.join(&skills.name);
+                if let Err(e) = fs::create_dir_all(&skills_dir) {
                     result.errors.push(format!("Create dir failed: {}", e));
                     continue;
                 }
                 
-                let skill_file = skill_dir.join("SKILL.md");
-                if skill_file.exists() && !options.overwrite_existing {
+                let skills_file = skills_dir.join("SKILL.md");
+                if skills_file.exists() && !options.overwrite_existing {
                     result.skills_skipped += 1;
                     continue;
                 }
                 
-                match fs::write(&skill_file, &skill.content) {
+                match fs::write(&skills_file, &skills.content) {
                     Ok(_) => result.skills_imported += 1,
-                    Err(e) => result.errors.push(format!("Skill '{}': {}", skill.name, e)),
+                    Err(e) => result.errors.push(format!("skills '{}': {}", skills.name, e)),
                 }
             }
         }
