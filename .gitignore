@@ -24,3 +24,8 @@ src-tauri/target/
 # Misc
 docs/
 *.log
+
+# Tauri signing keys (NEVER commit these!)
+*.key
+~/.tauri/
+~\.tauri\
