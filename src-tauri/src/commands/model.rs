@@ -202,107 +202,16 @@ pub async fn fetch_site_models(
         )
     };
 
-    // #region agent log
-    {
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        let log_path = r#"e:\项目仓库\研究仓库\OpencodeNewbie\Open Switch\.cursor\debug.log"#;
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        let run_id = std::env::var("DEBUG_RUN_ID").unwrap_or_else(|_| "run1".to_string());
-        let base_url_str = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-        let npm_str = npm.clone().unwrap_or_default().replace('\\', "\\\\").replace('"', "\\\"");
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
-            let _ = writeln!(
-                file,
-                "{{\"sessionId\":\"debug-session\",\"runId\":\"{}\",\"hypothesisId\":\"H1\",\"location\":\"model.rs:fetch_site_models\",\"message\":\"fetch input\",\"data\":{{\"provider\":\"{}\",\"baseUrl\":\"{}\",\"modelType\":\"{}\",\"npm\":\"{}\"}},\"timestamp\":{}}}",
-                run_id,
-                provider_name,
-                base_url_str,
-                model_type,
-                npm_str,
-                ts
-            );
-        }
-    }
-    // #endregion
-    
+    // 检查是否匹配预设模型
     let preset = resolve_preset_models(&base_url, &model_type, npm.as_deref());
-    if let Some((source, models)) = preset {
-        // #region agent log
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            let log_path = r#"e:\项目仓库\研究仓库\OpencodeNewbie\Open Switch\.cursor\debug.log"#;
-            let ts = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
-            let run_id = std::env::var("DEBUG_RUN_ID").unwrap_or_else(|_| "run1".to_string());
-            if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
-                let _ = writeln!(
-                    file,
-                    "{{\"sessionId\":\"debug-session\",\"runId\":\"{}\",\"hypothesisId\":\"H2\",\"location\":\"model.rs:fetch_site_models\",\"message\":\"preset selected\",\"data\":{{\"source\":\"{}\",\"modelCount\":{}}},\"timestamp\":{}}}",
-                    run_id,
-                    source,
-                    models.len(),
-                    ts
-                );
-            }
-        }
-        // #endregion
+    if let Some((_source, models)) = preset {
         return Ok(models);
     }
 
-    // #region agent log
-    {
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        let log_path = r#"e:\项目仓库\研究仓库\OpencodeNewbie\Open Switch\.cursor\debug.log"#;
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        let run_id = std::env::var("DEBUG_RUN_ID").unwrap_or_else(|_| "run1".to_string());
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
-            let _ = writeln!(
-                file,
-                "{{\"sessionId\":\"debug-session\",\"runId\":\"{}\",\"hypothesisId\":\"H2\",\"location\":\"model.rs:fetch_site_models\",\"message\":\"detector selected\",\"data\":{{}},\"timestamp\":{}}}",
-                run_id,
-                ts
-            );
-        }
-    }
-    // #endregion
-    
     // OpenAI 协议: 调用检测器获取模型列表
     let detector = Detector::new();
     let result = detector.detect_site(&base_url, &api_key).await;
 
-    // #region agent log
-    {
-        use std::fs::OpenOptions;
-        use std::io::Write;
-        let log_path = r#"e:\项目仓库\研究仓库\OpencodeNewbie\Open Switch\.cursor\debug.log"#;
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        let run_id = std::env::var("DEBUG_RUN_ID").unwrap_or_else(|_| "run1".to_string());
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(log_path) {
-            let _ = writeln!(
-                file,
-                "{{\"sessionId\":\"debug-session\",\"runId\":\"{}\",\"hypothesisId\":\"H3\",\"location\":\"model.rs:fetch_site_models\",\"message\":\"detect_site result\",\"data\":{{\"isAvailable\":{},\"modelCount\":{}}},\"timestamp\":{}}}",
-                run_id,
-                result.is_available,
-                result.available_models.len(),
-                ts
-            );
-        }
-    }
-    // #endregion
     if result.is_available {
         Ok(result.available_models)
     } else {
