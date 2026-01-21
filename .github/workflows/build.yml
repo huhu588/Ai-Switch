@@ -77,6 +77,13 @@ jobs:
         with:
           targets: aarch64-apple-darwin
 
+      # Rust 编译缓存 - 大幅加速后续构建
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+
       - name: Install dependencies
         run: npm ci
 
@@ -117,6 +124,13 @@ jobs:
         with:
           targets: x86_64-apple-darwin
 
+      # Rust 编译缓存 - 大幅加速后续构建
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+
       - name: Install dependencies
         run: npm ci
 
@@ -154,6 +168,13 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      # Rust 编译缓存 - 大幅加速后续构建
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
 
       - name: Install dependencies
         run: npm ci
