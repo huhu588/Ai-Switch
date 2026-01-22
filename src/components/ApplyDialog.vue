@@ -39,12 +39,12 @@ watch(() => props.visible, async (visible) => {
     try {
       // 检查第一个 provider 是否已应用到全局/项目配置
       const status = await invoke<{ in_global: boolean; in_project: boolean }>('check_provider_applied', {
-        providerName: props.providerNames[0]
+        provider_name: props.providerNames[0]
       })
       // 检查对话框是否仍然打开
       if (!props.visible) return
       applyToGlobal.value = status.in_global
-      applyToProject.value = status.in_project || true // 默认勾选项目配置
+      applyToProject.value = status.in_project
     } catch (e) {
       if (!props.visible) return
       console.error('检查配置状态失败:', e)

@@ -60,7 +60,7 @@ async function save() {
 
   try {
     await invoke('add_model', {
-      providerName: props.providerName,
+      provider_name: props.providerName,
       input: {
         id: form.value.id,
         name: form.value.name || form.value.id,

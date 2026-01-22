@@ -1,14 +1,99 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watchEffect, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { listen } from '@tauri-apps/api/event'
+import { getCurrent, onOpenUrl } from '@tauri-apps/plugin-deep-link'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
+import DeepLinkDialog from '@/components/DeepLinkDialog.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { t, locale } = useI18n()
+
+// 深链接对话框引用
+const deepLinkDialogRef = ref<InstanceType<typeof DeepLinkDialog> | null>(null)
+let unlistenDeepLink: (() => void) | null = null
+let unlistenSingleInstance: (() => void) | null = null
+let isProcessingDeepLink = false // 防止并发处理深链接
+
+// 处理深链接的统一方法（带并发保护）
+async function handleDeepLinkUrl(url: string) {
+  // 如果正在处理深链接，忽略新的请求
+  if (isProcessingDeepLink) {
+    if (import.meta.env.DEV) {
+      console.log('深链接处理中，忽略:', url)
+    }
+    return
+  }
+  
+  isProcessingDeepLink = true
+  
+  try {
+    if (import.meta.env.DEV) {
+      console.log('收到深链接:', url)
+    }
+    // 先导航到首页，确保用户能看到对话框
+    await router.push('/')
+    // 等待一帧确保路由完成
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    // 然后打开对话框处理深链接
+    await deepLinkDialogRef.value?.handleDeepLink(url)
+  } finally {
+    isProcessingDeepLink = false
+  }
+}
+
+// 设置深链接监听器
+async function setupDeepLinkListener() {
+  // 1. 首先检查是否有初始深链接（应用通过深链接启动的情况）
+  // 使用 plugin API 直接获取，避免事件丢失问题
+  try {
+    const initialUrls = await getCurrent()
+    if (initialUrls && initialUrls.length > 0) {
+      // 延迟处理，确保组件已完全挂载
+      // 只处理第一个 URL，避免多个对话框同时打开的竞态条件
+      setTimeout(() => {
+        handleDeepLinkUrl(initialUrls[0])
+      }, 100)
+    }
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.error('获取初始深链接失败:', e)
+    }
+  }
+  
+  // 2. 监听后续的深链接事件（应用已运行时收到的深链接）
+  // onOpenUrl 仅在 macOS/iOS/Android 上工作
+  try {
+    unlistenDeepLink = await onOpenUrl((urls: string[]) => {
+      // 只处理第一个 URL
+      if (urls.length > 0) {
+        handleDeepLinkUrl(urls[0])
+      }
+    })
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.error('设置深链接监听器失败:', e)
+    }
+  }
+  
+  // 3. 监听 single-instance 插件发送的事件（Windows/Linux 上深链接触发）
+  // 在 Windows/Linux 上，OS 会启动新实例并将 URL 作为 CLI 参数
+  // single-instance 插件会检测到并发送 deep-link-received 事件给第一个实例
+  try {
+    unlistenSingleInstance = await listen<string>('deep-link-received', (event) => {
+      handleDeepLinkUrl(event.payload)
+    })
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.error('设置单实例深链接监听器失败:', e)
+    }
+  }
+}
 
 // 关闭确认对话框状态
 const showCloseDialog = ref(false)
@@ -163,6 +248,8 @@ onMounted(async () => {
   initTheme()
   // 设置关闭事件监听器
   await setupCloseListener()
+  // 设置深链接监听器
+  await setupDeepLinkListener()
   try {
     version.value = await invoke<string>('get_version')
   } catch (e) {
@@ -179,6 +266,12 @@ onMounted(async () => {
 onUnmounted(() => {
   if (unlistenClose) {
     unlistenClose()
+  }
+  if (unlistenDeepLink) {
+    unlistenDeepLink()
+  }
+  if (unlistenSingleInstance) {
+    unlistenSingleInstance()
   }
 })
 </script>
@@ -338,5 +431,8 @@ onUnmounted(() => {
         </div>
       </div>
     </Teleport>
+    
+    <!-- 深链接确认对话框 -->
+    <DeepLinkDialog ref="deepLinkDialogRef" />
   </div>
 </template>

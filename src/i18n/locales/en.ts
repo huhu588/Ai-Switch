@@ -461,5 +461,23 @@ export default {
         desc: 'Multimodal content viewing'
       }
     }
+  },
+
+  // Deep Link Configuration
+  deepLink: {
+    title: 'Add Provider',
+    subtitle: 'Via Deep Link',
+    confirmMessage: 'Do you want to add the following provider configuration?',
+    providerName: 'Provider Name',
+    baseUrl: 'Base URL',
+    apiKey: 'API Key',
+    modelType: 'API Protocol',
+    customModels: 'Custom Models',
+    description: 'Description',
+    securityNote: 'Please confirm this configuration is from a trusted source. The API Key will be saved to your local config file.',
+    confirm: 'Confirm Add',
+    adding: 'Adding...',
+    success: 'Provider added successfully!',
+    error: 'Failed to add'
   }
 }

@@ -68,6 +68,11 @@
       "endpoints": [
         "https://github.com/huhu588/Open-switch/releases/latest/download/latest.json"
       ]
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["openswitch"]
+      }
     }
   }
 }

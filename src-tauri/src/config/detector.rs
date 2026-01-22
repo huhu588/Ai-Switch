@@ -31,7 +31,7 @@ impl Detector {
             client: Client::builder()
                 .timeout(Duration::from_secs(30))
                 .build()
-                .unwrap(),
+                .expect("构建 HTTP 客户端失败，这通常不应该发生"),
         }
     }
 

@@ -257,7 +257,7 @@ async function save() {
           if (modelDef) {
             try {
               await invoke('add_model', {
-                providerName: form.value.name,
+                provider_name: form.value.name,
                 input: {
                   id: modelDef.id,
                   name: modelDef.name,
@@ -275,7 +275,7 @@ async function save() {
         for (const modelName of customModels.value) {
           try {
             await invoke('add_model', {
-              providerName: form.value.name,
+              provider_name: form.value.name,
               input: {
                 id: modelName,
                 name: modelName,

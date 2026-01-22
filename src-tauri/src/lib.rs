@@ -9,7 +9,7 @@ use config::ConfigManager;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    Manager,
+    Emitter, Manager,
 };
 
 /// 托盘图标状态包装器（用于在应用生命周期内保持托盘图标存活）
@@ -23,6 +23,21 @@ pub fn run() {
         .expect("初始化配置管理器失败");
     
     tauri::Builder::default()
+        // 单实例插件必须首先注册，以便在第二个实例启动时能够正确拦截
+        // 这对于 Windows/Linux 上的深链接功能至关重要
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // 单实例模式：当第二个实例启动时，将参数传递给第一个实例
+            // 这对于深链接很重要，因为 Windows/Linux 上深链接会启动新进程
+            if let Some(url) = argv.iter().find(|arg| arg.starts_with("openswitch://")) {
+                let _ = app.emit("deep-link-received", url.clone());
+            }
+            // 聚焦主窗口
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -77,6 +92,12 @@ pub fn run() {
             
             // 将托盘图标存储到应用状态中，防止被释放
             app.manage(TrayState(tray));
+            
+            // 深链接处理说明：
+            // 初始深链接和后续深链接都由前端通过 @tauri-apps/plugin-deep-link 直接处理
+            // - 初始深链接：前端使用 getCurrent() API 获取
+            // - 后续深链接：前端使用 onOpenUrl() API 监听
+            // 这样可以避免在 setup 阶段发送事件时前端监听器尚未注册的问题
             
             Ok(())
         })
@@ -155,6 +176,9 @@ pub fn run() {
             commands::save_ohmy_config,
             commands::install_and_configure,
             commands::uninstall_ohmy,
+            // Deep link commands
+            commands::parse_deep_link,
+            commands::generate_deep_link,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时出错");

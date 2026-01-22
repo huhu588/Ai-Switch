@@ -9,6 +9,7 @@ pub mod rule;
 pub mod status;
 pub mod settings;
 pub mod ohmy;
+pub mod deeplink;
 
 pub use backup::*;
 pub use provider::*;
@@ -19,3 +20,4 @@ pub use rule::*;
 pub use status::*;
 pub use settings::*;
 pub use ohmy::*;
+pub use deeplink::*;

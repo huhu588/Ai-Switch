@@ -22,7 +22,6 @@ src-tauri/.opencode/
 src-tauri/target/
 
 # Misc
-docs/
 *.log
 
 # Tauri signing keys (NEVER commit these!)

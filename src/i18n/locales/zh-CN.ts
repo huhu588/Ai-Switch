@@ -461,5 +461,23 @@ export default {
         desc: '多模态内容查看'
       }
     }
+  },
+
+  // 深链接配置
+  deepLink: {
+    title: '添加服务商',
+    subtitle: '通过深链接配置',
+    confirmMessage: '是否添加以下服务商配置？',
+    providerName: '服务商名称',
+    baseUrl: 'Base URL',
+    apiKey: 'API Key',
+    modelType: 'API 协议',
+    customModels: '自定义模型',
+    description: '描述',
+    securityNote: '请确认此配置来自可信来源。API Key 将被保存到本地配置文件中。',
+    confirm: '确认添加',
+    adding: '添加中...',
+    success: '服务商添加成功！',
+    error: '添加失败'
   }
 }

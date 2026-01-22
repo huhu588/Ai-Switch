@@ -59,7 +59,7 @@ export const useProvidersStore = defineStore('providers', () => {
     
     try {
       models.value = await invoke<ModelItem[]>('get_models', {
-        providerName: selectedProvider.value
+        provider_name: selectedProvider.value
       })
     } catch (e) {
       console.error('加载模型失败:', e)
@@ -117,7 +117,7 @@ export const useProvidersStore = defineStore('providers', () => {
   }) {
     if (!selectedProvider.value) return
     await invoke('add_model', {
-      providerName: selectedProvider.value,
+      provider_name: selectedProvider.value,
       input
     })
     await loadModels()
@@ -128,8 +128,8 @@ export const useProvidersStore = defineStore('providers', () => {
   async function deleteModel(modelId: string) {
     if (!selectedProvider.value) return
     await invoke('delete_model', {
-      providerName: selectedProvider.value,
-      modelId
+      provider_name: selectedProvider.value,
+      model_id: modelId
     })
     if (selectedModel.value === modelId) {
       selectedModel.value = null
@@ -142,7 +142,7 @@ export const useProvidersStore = defineStore('providers', () => {
   async function fetchSiteModels(): Promise<string[]> {
     if (!selectedProvider.value) return []
     return await invoke<string[]>('fetch_site_models', {
-      providerName: selectedProvider.value
+      provider_name: selectedProvider.value
     })
   }
 
@@ -150,8 +150,8 @@ export const useProvidersStore = defineStore('providers', () => {
   async function addModelsBatch(modelIds: string[]) {
     if (!selectedProvider.value) return
     await invoke('add_models_batch', {
-      providerName: selectedProvider.value,
-      modelIds
+      provider_name: selectedProvider.value,
+      model_ids: modelIds
     })
     await loadModels()
     await loadProviders()

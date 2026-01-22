@@ -1,6 +1,6 @@
 # Open Switch - OpenCode 配置管理工具
 
-OpenCode 配置管理工具，支持多 Provider 和 Model 管理(该项目为二开，参考opcd和cc switch)
+OpenCode 配置管理工具，支持多 Provider 和 Model 管理(该项目为ai二开，参考opcd和cc switch，全程cursor和warp开发完成)
 
 ## 支持
 
@@ -20,12 +20,13 @@ npm run tauri build
 
 ## 功能
 
-- 🔄 多 Provider 配置管理
-- 🤖 模型列表管理与站点检测
-- 💾 WebDAV 云同步备份
-- 🎨 现代化桌面应用界面
-- 📁 项目配置优先（可独立管理项目级配置）
-- 🔧 MCP 服务器配置管理
+-  多 Provider 配置管理
+-  模型列表管理与站点检测
+-  WebDAV 云同步备份
+-  现代化桌面应用界面
+-  项目配置优先（可独立管理项目级配置）
+-  MCP 服务器配置管理
+-  深链接一键配置 Provider
 
 ## 配置说明
 
