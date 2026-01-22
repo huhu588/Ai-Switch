@@ -8,6 +8,7 @@ pub mod skills;
 pub mod rule;
 pub mod status;
 pub mod settings;
+pub mod ohmy;
 
 pub use backup::*;
 pub use provider::*;
@@ -17,3 +18,4 @@ pub use skills::*;
 pub use rule::*;
 pub use status::*;
 pub use settings::*;
+pub use ohmy::*;

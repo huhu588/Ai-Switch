@@ -27,6 +27,7 @@ export default {
     providers: '服务商',
     mcp: 'Mcp/规则',
     skills: 'skills',
+    ohmy: 'oh-my-opencode',
     backup: '备份',
     status: '状态'
   },
@@ -379,5 +380,86 @@ export default {
     closeQuit: '退出',
     closeDialogTitle: '关闭窗口',
     closeDialogMessage: '是否最小化到系统托盘？'
+  },
+
+  // oh-my-opencode 配置页面
+  ohmy: {
+    title: 'oh-my-opencode 配置',
+    subtitle: '为 7 个 Agent 配置模型，一键安装并自动配置',
+    installed: '已安装',
+    notInstalled: '未安装',
+    loadFailed: '加载状态失败',
+    
+    // 快速设置
+    quickSet: '快速设置',
+    quickSetDesc: '为所有 Agent 设置相同的模型',
+    selectModelForAll: '选择模型（应用到全部）',
+    
+    // 模型选择
+    selectModel: '选择模型',
+    usage: '用法示例',
+    yourModels: '您配置的模型',
+    freeModels: 'OpenCode Zen 免费模型',
+    
+    // 无模型提示
+    noModels: '未找到可用模型',
+    noModelsDesc: '请先在"服务商"页面添加 Provider 和模型，然后再配置 oh-my-opencode。',
+    
+    // 安装相关
+    installAndConfigure: '安装并配置 oh-my-opencode',
+    installing: '安装中...',
+    installLog: '安装日志',
+    installSuccess: 'oh-my-opencode 安装配置成功！',
+    installFailed: '安装失败，请查看日志',
+    startingInstall: '开始安装...',
+    
+    // 保存配置
+    saveConfig: '保存配置',
+    saved: '配置已保存',
+    saveFailed: '保存失败',
+    refresh: '刷新',
+    
+    // 卸载相关
+    uninstall: '卸载',
+    uninstalling: '卸载中...',
+    confirmUninstall: '确定要卸载 oh-my-opencode 吗？这将删除配置文件和插件注册。',
+    uninstallSuccess: 'oh-my-opencode 卸载成功！',
+    uninstallFailed: '卸载失败，请查看日志',
+    
+    // Agent 介绍（备用，主要使用后端返回的数据）
+    agents: {
+      sisyphus: {
+        name: 'Sisyphus',
+        desc: '主要编排者'
+      },
+      oracle: {
+        name: 'Oracle',
+        desc: '架构设计、代码审查和策略制定',
+        usage: 'Ask @oracle to review this design and propose an architecture'
+      },
+      librarian: {
+        name: 'Librarian',
+        desc: '多仓库分析、文档查找和实现示例',
+        usage: 'Ask @librarian how this is implemented—why does the behavior keep changing?'
+      },
+      explore: {
+        name: 'Explore',
+        desc: '快速代码库探索和模式匹配',
+        usage: 'Ask @explore for the policy on this feature'
+      },
+      frontend: {
+        name: 'Frontend',
+        desc: '前端 UI/UX 开发',
+        usage: '委托构建精美的用户界面'
+      },
+      documentWriter: {
+        name: 'Document Writer',
+        desc: '技术文档编写'
+      },
+      multimodalLooker: {
+        name: 'Multimodal Looker',
+        desc: '多模态内容查看'
+      }
+    }
   }
 }

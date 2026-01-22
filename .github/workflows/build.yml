@@ -33,14 +33,14 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli
 
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - name: Install SVG converter
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
 
       - name: Generate icons from SVG
         run: |
           cd src-tauri/icons
-          # 使用 ImageMagick 将 SVG 转为 PNG
-          convert -background none -density 384 app-icon.svg -resize 1024x1024 icon.png
+          # 使用 rsvg-convert 将 SVG 转为 PNG，避免 ImageMagick 的安全策略限制
+          rsvg-convert -w 1024 -h 1024 app-icon.svg -o icon.png
           # 回到项目根目录，使用 Tauri CLI 生成全平台图标
           cd ../..
           npx @tauri-apps/cli icon src-tauri/icons/icon.png

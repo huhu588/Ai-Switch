@@ -9,24 +9,11 @@ use config::ConfigManager;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    Manager,
 };
-use tauri_plugin_store::StoreExt;
 
 /// 托盘图标状态包装器（用于在应用生命周期内保持托盘图标存活）
 pub struct TrayState(pub TrayIcon);
-
-/// 获取当前关闭行为设置
-fn get_close_action_from_store(app: &tauri::AppHandle) -> commands::CloseAction {
-    if let Ok(store) = app.store("settings.json") {
-        if let Some(value) = store.get("app_settings") {
-            if let Ok(settings) = serde_json::from_value::<commands::AppSettings>(value.clone()) {
-                return settings.close_action;
-            }
-        }
-    }
-    commands::CloseAction::Ask
-}
 
 /// 运行 Tauri 应用
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -43,17 +30,20 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(Mutex::new(config_manager))
         .setup(|app| {
-            // 创建托盘菜单
+            // 创建托盘菜单（开发和生产模式都需要托盘图标以支持最小化到托盘功能）
             let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
             
-            // 创建托盘图标
+            // 创建托盘图标（安全处理图标不存在的情况）
+            let icon = app.default_window_icon()
+                .ok_or_else(|| Box::<dyn std::error::Error>::from("未找到应用图标，请检查 tauri.conf.json 中的 icon 配置"))?
+                .clone();
             let tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon)
                 .tooltip("Open Switch")
                 .menu(&menu)
-                .menu_on_left_click(false)
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
                         "show" => {
@@ -90,29 +80,8 @@ pub fn run() {
             
             Ok(())
         })
-        .on_window_event(|window, event| {
-            // 处理窗口关闭事件
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let app = window.app_handle();
-                let close_action = get_close_action_from_store(app);
-                
-                match close_action {
-                    commands::CloseAction::Tray => {
-                        // 隐藏窗口而不是关闭
-                        let _ = window.hide();
-                        api.prevent_close();
-                    }
-                    commands::CloseAction::Ask => {
-                        // 发送事件到前端让用户选择
-                        let _ = window.emit("close-requested", ());
-                        api.prevent_close();
-                    }
-                    commands::CloseAction::Quit => {
-                        // 直接退出，不阻止关闭
-                    }
-                }
-            }
-        })
+        // 注意：窗口关闭事件由前端通过 onCloseRequested API 处理
+        // 前端会调用 get_close_action 获取设置，然后调用 handle_close_choice 执行操作
         .invoke_handler(tauri::generate_handler![
             // Provider commands
             commands::get_providers,
@@ -177,6 +146,15 @@ pub fn run() {
             commands::get_close_action,
             commands::set_close_action,
             commands::handle_close_choice,
+            // oh-my-opencode commands
+            commands::check_ohmy_status,
+            commands::get_available_models,
+            commands::get_agent_infos,
+            commands::install_bun,
+            commands::install_ohmy,
+            commands::save_ohmy_config,
+            commands::install_and_configure,
+            commands::uninstall_ohmy,
         ])
         .run(tauri::generate_context!())
         .expect("运行 Tauri 应用时出错");

@@ -27,6 +27,7 @@ export default {
     providers: 'Providers',
     mcp: 'Mcp/Rules',
     skills: 'skills',
+    ohmy: 'oh-my-opencode',
     backup: 'Backup',
     status: 'Status'
   },
@@ -379,5 +380,86 @@ export default {
     closeQuit: 'Quit',
     closeDialogTitle: 'Close Window',
     closeDialogMessage: 'Minimize to system tray?'
+  },
+
+  // oh-my-opencode configuration page
+  ohmy: {
+    title: 'oh-my-opencode Configuration',
+    subtitle: 'Configure models for 7 Agents, install and auto-configure with one click',
+    installed: 'Installed',
+    notInstalled: 'Not Installed',
+    loadFailed: 'Failed to load status',
+    
+    // Quick set
+    quickSet: 'Quick Setup',
+    quickSetDesc: 'Set the same model for all Agents',
+    selectModelForAll: 'Select model (apply to all)',
+    
+    // Model selection
+    selectModel: 'Select Model',
+    usage: 'Usage',
+    yourModels: 'Your Configured Models',
+    freeModels: 'OpenCode Zen Free Models',
+    
+    // No models warning
+    noModels: 'No available models found',
+    noModelsDesc: 'Please add Providers and models in the "Providers" page first, then configure oh-my-opencode.',
+    
+    // Installation
+    installAndConfigure: 'Install & Configure oh-my-opencode',
+    installing: 'Installing...',
+    installLog: 'Installation Log',
+    installSuccess: 'oh-my-opencode installed and configured successfully!',
+    installFailed: 'Installation failed, check the log',
+    startingInstall: 'Starting installation...',
+    
+    // Save config
+    saveConfig: 'Save Configuration',
+    saved: 'Configuration saved',
+    saveFailed: 'Failed to save',
+    refresh: 'Refresh',
+    
+    // Uninstall
+    uninstall: 'Uninstall',
+    uninstalling: 'Uninstalling...',
+    confirmUninstall: 'Are you sure you want to uninstall oh-my-opencode? This will remove the config file and plugin registration.',
+    uninstallSuccess: 'oh-my-opencode uninstalled successfully!',
+    uninstallFailed: 'Uninstall failed, check the log',
+    
+    // Agent descriptions (fallback, mainly use backend data)
+    agents: {
+      sisyphus: {
+        name: 'Sisyphus',
+        desc: 'Main orchestrator'
+      },
+      oracle: {
+        name: 'Oracle',
+        desc: 'Architecture design, code review and strategy planning',
+        usage: 'Ask @oracle to review this design and propose an architecture'
+      },
+      librarian: {
+        name: 'Librarian',
+        desc: 'Multi-repo analysis, documentation lookup and implementation examples',
+        usage: 'Ask @librarian how this is implemented—why does the behavior keep changing?'
+      },
+      explore: {
+        name: 'Explore',
+        desc: 'Fast codebase exploration and pattern matching',
+        usage: 'Ask @explore for the policy on this feature'
+      },
+      frontend: {
+        name: 'Frontend',
+        desc: 'Frontend UI/UX development',
+        usage: 'Delegate to build beautiful user interfaces'
+      },
+      documentWriter: {
+        name: 'Document Writer',
+        desc: 'Technical documentation writing'
+      },
+      multimodalLooker: {
+        name: 'Multimodal Looker',
+        desc: 'Multimodal content viewing'
+      }
+    }
   }
 }

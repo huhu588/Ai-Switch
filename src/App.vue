@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watchEffect, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 
@@ -12,23 +12,84 @@ const { t, locale } = useI18n()
 
 // 关闭确认对话框状态
 const showCloseDialog = ref(false)
+const closeDialogRef = ref<HTMLElement | null>(null)
+const isClosing = ref(false) // 防止重复关闭操作
 let unlistenClose: (() => void) | null = null
 
-// 处理关闭请求（当设置为"询问"时触发）
+// 对话框打开时自动聚焦以支持 Escape 键
+watch(showCloseDialog, (isOpen) => {
+  if (isOpen) {
+    nextTick(() => {
+      closeDialogRef.value?.focus()
+    })
+  }
+})
+
+// 处理关闭请求（使用 Tauri 2.0 的内置 onCloseRequested API）
 async function setupCloseListener() {
-  unlistenClose = await listen('close-requested', () => {
-    showCloseDialog.value = true
+  const appWindow = getCurrentWindow()
+  unlistenClose = await appWindow.onCloseRequested(async (event) => {
+    // 如果对话框已经打开或正在处理关闭，忽略新的关闭请求（防止状态混乱）
+    if (showCloseDialog.value || isClosing.value) {
+      event.preventDefault()
+      return
+    }
+    
+    // 先阻止关闭，然后根据设置决定是否真正关闭
+    event.preventDefault()
+    
+    // 立即设置 isClosing 标志，防止并发关闭请求竞争
+    isClosing.value = true
+    
+    try {
+      // 获取当前关闭行为设置
+      const closeAction = await invoke<string>('get_close_action')
+      
+      if (closeAction === 'quit') {
+        // 直接退出
+        await invoke('handle_close_choice', { choice: 'quit' })
+      } else if (closeAction === 'tray') {
+        // 最小化到托盘
+        await invoke('handle_close_choice', { choice: 'tray' })
+        // 操作完成后重置标志，允许后续关闭请求
+        isClosing.value = false
+      } else {
+        // 询问用户（默认行为）
+        showCloseDialog.value = true
+        // 对话框模式下重置标志（对话框本身会阻止新请求）
+        isClosing.value = false
+      }
+    } catch (e) {
+      console.error('处理关闭请求失败:', e)
+      // 发生错误时重置标志并显示询问对话框
+      isClosing.value = false
+      showCloseDialog.value = true
+    }
   })
 }
 
 // 关闭对话框操作（统一由后端处理窗口操作）
 async function handleCloseChoice(choice: 'tray' | 'quit') {
-  showCloseDialog.value = false
+  if (isClosing.value) return // 防止重复操作
+  isClosing.value = true
+  
   try {
     await invoke('handle_close_choice', { choice })
+    // 操作成功后清除对话框状态
+    showCloseDialog.value = false
+    // 重置关闭标志（对于 'tray'，用户可能从托盘恢复窗口后再次关闭；对于 'quit'，应用会退出所以这不重要）
+    isClosing.value = false
   } catch (e) {
     console.error('处理关闭选择失败:', e)
+    // 操作失败时恢复状态，允许用户重试
+    isClosing.value = false
   }
+}
+
+// 取消关闭对话框（用户点击外部或按 Escape）
+function cancelCloseDialog() {
+  showCloseDialog.value = false
+  // 不执行任何关闭操作，窗口保持打开
 }
 
 // 动态更新文档标题
@@ -56,6 +117,11 @@ const navItems = computed(() => [
     name: t('nav.skills'),
     path: '/skills',
     icon: 'layers' // 层级/技能图标
+  },
+  {
+    name: t('nav.ohmy'),
+    path: '/ohmy',
+    icon: 'robot' // oh-my-opencode 图标
   },
   { 
     name: t('nav.backup'),
@@ -213,7 +279,7 @@ onUnmounted(() => {
       </header>
 
       <!-- Page View -->
-      <div class="flex-1 overflow-hidden p-6">
+      <div class="flex-1 overflow-auto p-6">
         <router-view v-slot="{ Component }">
           <transition 
             enter-active-class="transition-all duration-300 ease-out"
@@ -235,6 +301,10 @@ onUnmounted(() => {
       <div 
         v-if="showCloseDialog" 
         class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+        @click.self="cancelCloseDialog"
+        @keydown.escape="cancelCloseDialog"
+        tabindex="0"
+        ref="closeDialogRef"
       >
         <div class="bg-background border border-border rounded-2xl w-[400px] overflow-hidden shadow-2xl">
           <div class="px-6 py-4 border-b border-border">
@@ -244,6 +314,12 @@ onUnmounted(() => {
             <p class="text-muted-foreground">{{ t('settings.closeDialogMessage') }}</p>
           </div>
           <div class="px-6 py-4 border-t border-border flex justify-end gap-2">
+            <button
+              @click="cancelCloseDialog"
+              class="px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover text-muted-foreground text-sm transition-all"
+            >
+              {{ t('common.cancel') }}
+            </button>
             <button
               @click="handleCloseChoice('tray')"
               class="px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover text-foreground text-sm transition-all flex items-center gap-2"
