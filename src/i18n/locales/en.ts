@@ -366,5 +366,18 @@ export default {
     updateNow: 'Update Now',
     updateNotes: 'Release Notes',
     downloadProgress: 'Download Progress'
+  },
+
+  // App Settings
+  settings: {
+    title: 'App Settings',
+    description: 'Customize application behavior',
+    closeAction: 'On Close',
+    closeActionDesc: 'Choose what happens when you click the close button',
+    closeAsk: 'Ask',
+    closeTray: 'Tray',
+    closeQuit: 'Quit',
+    closeDialogTitle: 'Close Window',
+    closeDialogMessage: 'Minimize to system tray?'
   }
 }

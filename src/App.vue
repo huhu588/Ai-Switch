@@ -1,13 +1,35 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 
 const route = useRoute()
 const { t, locale } = useI18n()
+
+// 关闭确认对话框状态
+const showCloseDialog = ref(false)
+let unlistenClose: (() => void) | null = null
+
+// 处理关闭请求（当设置为"询问"时触发）
+async function setupCloseListener() {
+  unlistenClose = await listen('close-requested', () => {
+    showCloseDialog.value = true
+  })
+}
+
+// 关闭对话框操作（统一由后端处理窗口操作）
+async function handleCloseChoice(choice: 'tray' | 'quit') {
+  showCloseDialog.value = false
+  try {
+    await invoke('handle_close_choice', { choice })
+  } catch (e) {
+    console.error('处理关闭选择失败:', e)
+  }
+}
 
 // 动态更新文档标题
 watchEffect(() => {
@@ -73,6 +95,8 @@ function initTheme() {
 
 onMounted(async () => {
   initTheme()
+  // 设置关闭事件监听器
+  await setupCloseListener()
   try {
     version.value = await invoke<string>('get_version')
   } catch (e) {
@@ -83,6 +107,12 @@ onMounted(async () => {
     localIp.value = await invoke<string>('get_local_ip')
   } catch (e) {
     localIp.value = '127.0.0.1'
+  }
+})
+
+onUnmounted(() => {
+  if (unlistenClose) {
+    unlistenClose()
   }
 })
 </script>
@@ -199,5 +229,38 @@ onMounted(async () => {
         </router-view>
       </div>
     </main>
+    
+    <!-- 关闭确认对话框（全局） -->
+    <Teleport to="body">
+      <div 
+        v-if="showCloseDialog" 
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      >
+        <div class="bg-background border border-border rounded-2xl w-[400px] overflow-hidden shadow-2xl">
+          <div class="px-6 py-4 border-b border-border">
+            <h2 class="text-lg font-semibold">{{ t('settings.closeDialogTitle') }}</h2>
+          </div>
+          <div class="p-6">
+            <p class="text-muted-foreground">{{ t('settings.closeDialogMessage') }}</p>
+          </div>
+          <div class="px-6 py-4 border-t border-border flex justify-end gap-2">
+            <button
+              @click="handleCloseChoice('tray')"
+              class="px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover text-foreground text-sm transition-all flex items-center gap-2"
+            >
+              <SvgIcon name="monitor" :size="14" />
+              {{ t('settings.closeTray') }}
+            </button>
+            <button
+              @click="handleCloseChoice('quit')"
+              class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-all flex items-center gap-2"
+            >
+              <SvgIcon name="close" :size="14" />
+              {{ t('settings.closeQuit') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

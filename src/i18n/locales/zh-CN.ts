@@ -366,5 +366,18 @@ export default {
     updateNow: '立即更新',
     updateNotes: '更新内容',
     downloadProgress: '下载进度'
+  },
+
+  // 应用设置
+  settings: {
+    title: '应用设置',
+    description: '自定义应用程序的行为',
+    closeAction: '关闭窗口时',
+    closeActionDesc: '选择点击关闭按钮时的默认行为',
+    closeAsk: '询问',
+    closeTray: '托盘',
+    closeQuit: '退出',
+    closeDialogTitle: '关闭窗口',
+    closeDialogMessage: '是否最小化到系统托盘？'
   }
 }

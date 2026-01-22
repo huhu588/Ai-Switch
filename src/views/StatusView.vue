@@ -12,6 +12,30 @@ const updateDialogRef = ref<InstanceType<typeof UpdateDialog> | null>(null)
 const isCheckingUpdate = ref(false)
 const updateMessage = ref('')
 
+// 关闭行为设置
+type CloseAction = 'ask' | 'tray' | 'quit'
+const closeAction = ref<CloseAction>('ask')
+
+// 加载关闭行为设置
+async function loadCloseAction() {
+  try {
+    const action = await invoke<string>('get_close_action')
+    closeAction.value = action as CloseAction
+  } catch (e) {
+    console.error('加载关闭行为设置失败:', e)
+  }
+}
+
+// 保存关闭行为设置
+async function setCloseAction(action: CloseAction) {
+  try {
+    await invoke('set_close_action', { action })
+    closeAction.value = action
+  } catch (e) {
+    console.error('保存关闭行为设置失败:', e)
+  }
+}
+
 async function checkForUpdates() {
   isCheckingUpdate.value = true
   updateMessage.value = ''
@@ -55,6 +79,7 @@ async function loadStatus() {
 
 onMounted(() => {
   loadStatus()
+  loadCloseAction()
 })
 </script>
 
@@ -154,6 +179,60 @@ onMounted(() => {
             </div>
           </div>
         </section>
+      </div>
+    </div>
+
+    <!-- 应用设置 -->
+    <div class="rounded-xl bg-surface/30 border border-border p-6 mt-6">
+      <div class="flex items-center gap-3 mb-6">
+        <SvgIcon name="setting" :size="32" class="text-accent" />
+        <h2 class="text-xl font-semibold">{{ t('settings.title') }}</h2>
+      </div>
+      
+      <div class="space-y-4">
+        <p class="text-sm text-muted-foreground">{{ t('settings.description') }}</p>
+        
+        <!-- 关闭窗口时的行为 -->
+        <div class="bg-surface rounded-lg p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-medium">{{ t('settings.closeAction') }}</div>
+              <div class="text-xs text-muted-foreground mt-1">{{ t('settings.closeActionDesc') }}</div>
+            </div>
+            <div class="flex gap-2">
+              <button
+                @click="setCloseAction('ask')"
+                class="px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5"
+                :class="closeAction === 'ask' 
+                  ? 'bg-accent text-white' 
+                  : 'bg-surface-hover hover:bg-accent/20 text-foreground'"
+              >
+                <SvgIcon name="info" :size="14" />
+                {{ t('settings.closeAsk') }}
+              </button>
+              <button
+                @click="setCloseAction('tray')"
+                class="px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5"
+                :class="closeAction === 'tray' 
+                  ? 'bg-accent text-white' 
+                  : 'bg-surface-hover hover:bg-accent/20 text-foreground'"
+              >
+                <SvgIcon name="monitor" :size="14" />
+                {{ t('settings.closeTray') }}
+              </button>
+              <button
+                @click="setCloseAction('quit')"
+                class="px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5"
+                :class="closeAction === 'quit' 
+                  ? 'bg-accent text-white' 
+                  : 'bg-surface-hover hover:bg-accent/20 text-foreground'"
+              >
+                <SvgIcon name="close" :size="14" />
+                {{ t('settings.closeQuit') }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
