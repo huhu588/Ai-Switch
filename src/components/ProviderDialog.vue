@@ -116,7 +116,7 @@ function onModelTypeChange(typeId: ModelType) {
   // 根据模型提供商自动设置协议
   const protocolMap: Record<ModelType, ApiProtocol> = {
     'claude': 'anthropic',
-    'openai': 'openai',
+    'codex': 'openai',
     'gemini': 'openai',  // Gemini 使用 OpenAI 兼容协议
   }
   form.value.protocol = protocolMap[typeId] || 'anthropic'
@@ -164,10 +164,10 @@ watch(() => props.visible, async (visible) => {
         
         if (npm.includes('openai-compatible')) {
           inferredProtocol = 'openai-compatible'
-          inferredModelType = 'openai'
+          inferredModelType = 'codex'
         } else if (npm.includes('openai')) {
           inferredProtocol = 'openai'
-          inferredModelType = 'openai'
+          inferredModelType = 'codex'
         } else if (npm.includes('anthropic')) {
           inferredProtocol = 'anthropic'
           // 根据 provider 名称推断是 Claude 还是 Gemini
