@@ -25,8 +25,15 @@ const emit = defineEmits<{
   applied: []
 }>()
 
+// OpenCode 应用目标
 const applyToGlobal = ref(false)
 const applyToProject = ref(true)
+
+// CLI 工具应用目标
+const applyToClaudeCode = ref(false)
+const applyToCodex = ref(false)
+const applyToGemini = ref(false)
+
 const loading = ref(false)
 const checkingStatus = ref(false)
 const error = ref<string | null>(null)
@@ -35,6 +42,11 @@ watch(() => props.visible, async (visible) => {
   if (visible && props.providerNames.length > 0) {
     error.value = null
     checkingStatus.value = true
+    
+    // 重置 CLI 工具选项
+    applyToClaudeCode.value = false
+    applyToCodex.value = false
+    applyToGemini.value = false
     
     try {
       // 检查第一个 provider 是否已应用到全局/项目配置
@@ -64,7 +76,11 @@ function close() {
 
 async function apply() {
   if (props.providerNames.length === 0) return
-  if (!applyToGlobal.value && !applyToProject.value) {
+  
+  const hasOpenCodeTarget = applyToGlobal.value || applyToProject.value
+  const hasCliTarget = applyToClaudeCode.value || applyToCodex.value || applyToGemini.value
+  
+  if (!hasOpenCodeTarget && !hasCliTarget) {
     error.value = t('applyConfig.selectTarget')
     return
   }
@@ -73,13 +89,61 @@ async function apply() {
   error.value = null
 
   try {
-    await invoke('apply_config', {
-      input: {
-        provider_names: props.providerNames,
-        apply_to_global: applyToGlobal.value,
-        apply_to_project: applyToProject.value
+    // 1. 应用到 OpenCode（如果选中）
+    if (hasOpenCodeTarget) {
+      await invoke('apply_config', {
+        input: {
+          provider_names: props.providerNames,
+          apply_to_global: applyToGlobal.value,
+          apply_to_project: applyToProject.value
+        }
+      })
+    }
+    
+    // 2. 应用到 CLI 工具（只取第一个 provider）
+    if (hasCliTarget && props.providerNames.length > 0) {
+      const providerName = props.providerNames[0]
+      // 从后端获取完整的 provider 信息（包含 api_key）
+      const providerConfig = await invoke<{
+        name: string
+        api_key: string
+        base_url: string
+        model_type: string
+      }>('get_provider_for_apply', { providerName })
+      
+      // 应用到 Claude Code
+      if (applyToClaudeCode.value) {
+        await invoke('apply_provider_to_claude_code', {
+          provider: {
+            api_key: providerConfig.api_key,
+            base_url: providerConfig.base_url || null,
+            model: null
+          }
+        })
       }
-    })
+      
+      // 应用到 Codex
+      if (applyToCodex.value) {
+        await invoke('apply_provider_to_codex', {
+          provider: {
+            api_key: providerConfig.api_key,
+            base_url: providerConfig.base_url || null
+          }
+        })
+      }
+      
+      // 应用到 Gemini
+      if (applyToGemini.value) {
+        await invoke('apply_provider_to_gemini', {
+          provider: {
+            api_key: providerConfig.api_key,
+            base_url: providerConfig.base_url || null,
+            model: null
+          }
+        })
+      }
+    }
+    
     emit('applied')
     close()
   } catch (e) {
@@ -112,22 +176,53 @@ async function apply() {
               <div v-for="name in providerNames" :key="name" class="font-mono">• {{ name }}</div>
             </div>
 
-            <div class="space-y-3">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" v-model="applyToProject" class="w-4 h-4 rounded border-border" />
-                <div>
-                  <div class="font-medium text-sm">{{ t('applyConfig.currentProject') }}</div>
-                  <div class="text-xs text-muted-foreground">{{ t('applyConfig.projectPath') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" v-model="applyToGlobal" class="w-4 h-4 rounded border-border" />
-                <div>
-                  <div class="font-medium text-sm">{{ t('applyConfig.globalConfig') }}</div>
-                  <div class="text-xs text-muted-foreground">~/.opencode/opencode.json</div>
-                  <div class="text-xs text-muted-foreground">~/.config/opencode/package.json</div>
-                </div>
-              </label>
+            <!-- OpenCode 配置 -->
+            <div class="space-y-2">
+              <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">OpenCode</div>
+              <div class="space-y-2 pl-1">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="applyToProject" class="w-4 h-4 rounded border-border" />
+                  <div>
+                    <div class="font-medium text-sm">{{ t('applyConfig.currentProject') }}</div>
+                    <div class="text-xs text-muted-foreground">{{ t('applyConfig.projectPath') }}</div>
+                  </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="applyToGlobal" class="w-4 h-4 rounded border-border" />
+                  <div>
+                    <div class="font-medium text-sm">{{ t('applyConfig.globalConfig') }}</div>
+                    <div class="text-xs text-muted-foreground">~/.opencode/opencode.json</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            <!-- CLI 工具配置 -->
+            <div class="space-y-2 pt-2 border-t border-border">
+              <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ t('applyConfig.cliTools') }}</div>
+              <div class="space-y-2 pl-1">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="applyToClaudeCode" class="w-4 h-4 rounded border-border" />
+                  <div>
+                    <div class="font-medium text-sm">Claude Code</div>
+                    <div class="text-xs text-muted-foreground">~/.claude/settings.json</div>
+                  </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="applyToCodex" class="w-4 h-4 rounded border-border" />
+                  <div>
+                    <div class="font-medium text-sm">Codex CLI</div>
+                    <div class="text-xs text-muted-foreground">~/.codex/config.toml</div>
+                  </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" v-model="applyToGemini" class="w-4 h-4 rounded border-border" />
+                  <div>
+                    <div class="font-medium text-sm">Gemini CLI</div>
+                    <div class="text-xs text-muted-foreground">~/.gemini/.env</div>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
 

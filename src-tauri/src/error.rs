@@ -16,6 +16,12 @@ pub enum AppError {
     #[error("配置错误: {0}")]
     Config(#[from] crate::config::ConfigError),
 
+    #[error("数据库错误: {0}")]
+    Database(String),
+
+    #[error("代理错误: {0}")]
+    Proxy(String),
+
     #[error("{0}")]
     Custom(String),
 }

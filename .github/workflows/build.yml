@@ -185,13 +185,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Upload MSI
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Open-Switch-windows
           path: |
             src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.msi.sig
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
 
   # 创建 Release（仅在 tag 推送时，手动触发不会创建 Release）
   release:
@@ -225,23 +227,37 @@ jobs:
           VERSION=${{ steps.get_version.outputs.VERSION }}
           REPO="${{ github.repository }}"
           
-          # 创建 latest.json
+          echo "=== Looking for signature files ==="
+          find artifacts -name "*.sig" -type f 2>/dev/null || echo "No .sig files found"
+          
+          # 读取 Windows NSIS 签名文件
+          WIN_SIG=""
+          # 尝试多种可能的路径
+          for sigfile in \
+            "artifacts/Open-Switch-windows/Open Switch_${VERSION}_x64-setup.nsis.sig" \
+            "artifacts/Open Switch_${VERSION}_x64-setup.nsis.sig" \
+            "artifacts/Open-Switch-windows/Open.Switch_${VERSION}_x64-setup.exe.sig" \
+            "artifacts/Open.Switch_${VERSION}_x64-setup.exe.sig"; do
+            if [ -f "$sigfile" ]; then
+              WIN_SIG=$(cat "$sigfile")
+              echo "Found Windows signature at: $sigfile"
+              break
+            fi
+          done
+          
+          if [ -z "$WIN_SIG" ]; then
+            echo "WARNING: No Windows signature file found!"
+          fi
+          
+          # 创建 latest.json (仅 Windows，macOS DMG 不支持自动更新)
           cat > artifacts/latest.json << EOF
           {
             "version": "${VERSION}",
             "notes": "Open Switch v${VERSION} 发布",
             "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "platforms": {
-              "darwin-aarch64": {
-                "signature": "",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_aarch64.dmg"
-              },
-              "darwin-x86_64": {
-                "signature": "",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_x64.dmg"
-              },
               "windows-x86_64": {
-                "signature": "",
+                "signature": "${WIN_SIG}",
                 "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_x64-setup.exe"
               }
             }

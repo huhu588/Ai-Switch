@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { type ModelItem, type BaseUrlItem, type UrlTestResult } from '@/stores/providers'
 import { 
   PROVIDER_PRESETS, 
   getModelsByType,
@@ -11,6 +12,7 @@ import {
 } from '@/config/providerPresets'
 import { MODEL_TYPES, type ModelType } from '@/config/modelTypes'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -30,15 +32,25 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+// ============================================================================
 // 表单数据
+// ============================================================================
+
 const form = ref({
   name: '',
   api_key: '',
-  base_url: '',
   description: '',
   protocol: 'anthropic' as ApiProtocol,
   model_type: 'claude' as ModelType,
 })
+
+// 多 URL 管理
+const baseUrls = ref<{ url: string; latency_ms: number | null; quality: string }[]>([])
+const activeBaseUrl = ref('')
+const newUrlInput = ref('')
+
+// URL 后缀控制
+const autoAddV1Suffix = ref(true)
 
 // 预设和模型相关
 const selectedPreset = ref<string>('自定义')
@@ -49,58 +61,304 @@ const selectedModels = ref<string[]>([])
 const customModelInput = ref('')
 const customModels = ref<string[]>([])
 
-// URL 后缀控制
-const autoAddV1Suffix = ref(true)
+// 编辑模式下的模型列表
+const existingModels = ref<ModelItem[]>([])
 
+// 状态
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showApiKey = ref(false)
+const testing = ref(false)
+const testingUrl = ref<string | null>(null)
 
-// 扁平化预设列表（排除自定义）
+// 自动选择最快 URL 开关
+const autoSelectFastestEnabled = ref(true)
+
+// 应用目标选择
+const applyTargets = ref<string[]>(['opencode'])
+
+// 删除确认对话框
+const showDeleteModelDialog = ref(false)
+const deleteModelTarget = ref<string | null>(null)
+
+// 根据 model_type 获取可选的应用目标
+const availableTargets = computed(() => {
+  const targets = [
+    { id: 'opencode', label: 'OpenCode', icon: 'code' }
+  ]
+  
+  switch (form.value.model_type) {
+    case 'claude':
+      targets.unshift({ id: 'claude_code', label: 'Claude Code', icon: 'claude' })
+      break
+    case 'codex':
+      targets.unshift({ id: 'codex', label: 'Codex CLI', icon: 'openai' })
+      break
+    case 'gemini':
+      targets.unshift({ id: 'gemini', label: 'Gemini CLI', icon: 'gemini' })
+      break
+  }
+  
+  return targets
+})
+
+// 根据选择的应用目标，判断是否需要添加模型
+const needsModels = computed(() => {
+  return applyTargets.value.includes('opencode')
+})
+
+// 获取模型提示信息
+const modelGuidance = computed(() => {
+  const targets = applyTargets.value
+  const hasOpencode = targets.includes('opencode')
+  const hasCli = targets.some(t => ['claude_code', 'codex', 'gemini'].includes(t))
+  
+  if (hasOpencode && hasCli) {
+    return {
+      type: 'info',
+      message: '需要添加模型。OpenCode 使用模型列表，CLI 工具将使用第一个模型作为默认模型。'
+    }
+  } else if (hasOpencode) {
+    return {
+      type: 'required',
+      message: 'OpenCode 需要模型列表才能正常工作，请添加至少一个模型。'
+    }
+  } else if (hasCli) {
+    return {
+      type: 'optional',
+      message: 'CLI 工具只需要 API Key 和 Base URL，模型可选（将使用工具默认模型）。'
+    }
+  }
+  return null
+})
+
+// ============================================================================
+// 计算属性
+// ============================================================================
+
 const flatPresets = computed(() => {
   return PROVIDER_PRESETS.filter(p => p.category !== 'custom')
 })
 
-// 当前选中的预设
 const currentPreset = computed(() => {
   return PROVIDER_PRESETS.find(p => p.name === selectedPreset.value)
 })
 
-// 当前预设支持的协议
 const supportedProtocols = computed(() => {
   return currentPreset.value?.supportedProtocols || ['anthropic', 'openai']
 })
 
-// 根据模型厂家获取模型列表（智谱 AI 使用预设自带的模型）
 const presetModels = computed(() => {
-  // 如果选择了智谱 AI，使用预设自带的 GLM 模型
   if (currentPreset.value?.name === '智谱 AI' && currentPreset.value.models.length > 0) {
     return currentPreset.value.models
   }
   return getModelsByType(form.value.model_type)
 })
 
-// 选择预设时自动填充
+// ============================================================================
+// 预设处理
+// ============================================================================
+
 function onPresetChange(presetName: string) {
   selectedPreset.value = presetName
   const preset = PROVIDER_PRESETS.find(p => p.name === presetName)
   if (preset) {
     form.value.name = preset.category === 'custom' ? '' : preset.name
-    form.value.base_url = preset.baseUrl
     form.value.protocol = preset.defaultProtocol
     form.value.description = preset.description || ''
-    // 智谱 AI 使用预设自带的模型，其他使用模型厂家的模型
+    
+    // 设置 base URL
+    if (preset.baseUrl) {
+      baseUrls.value = [{ url: preset.baseUrl, latency_ms: null, quality: 'untested' }]
+      activeBaseUrl.value = preset.baseUrl
+    }
+    
     if (preset.name === '智谱 AI' && preset.models.length > 0) {
       selectedModels.value = preset.models.map(m => m.id)
     } else {
       selectedModels.value = getModelsByType(form.value.model_type).map(m => m.id)
     }
-    // 智谱 AI 使用 v4，不需要添加 /v1 后缀
     autoAddV1Suffix.value = preset.name !== '智谱 AI'
   }
 }
 
-// 切换全选/取消全选模型
+function onModelTypeChange(typeId: ModelType) {
+  form.value.model_type = typeId
+  const protocolMap: Record<ModelType, ApiProtocol> = {
+    'claude': 'anthropic',
+    'codex': 'openai',
+    'gemini': 'openai',
+  }
+  form.value.protocol = protocolMap[typeId] || 'anthropic'
+}
+
+watch(() => form.value.model_type, (newType) => {
+  if (currentPreset.value?.name === '智谱 AI') return
+  selectedModels.value = presetModels.value.map(m => m.id)
+  
+  // 更新默认应用目标
+  const defaultTargets = ['opencode']
+  if (newType === 'claude') defaultTargets.unshift('claude_code')
+  else if (newType === 'codex') defaultTargets.unshift('codex')
+  else if (newType === 'gemini') defaultTargets.unshift('gemini')
+  applyTargets.value = defaultTargets
+})
+
+// ============================================================================
+// URL 管理
+// ============================================================================
+
+function addUrl() {
+  const url = newUrlInput.value.trim()
+  if (url && !baseUrls.value.some(u => u.url === url)) {
+    baseUrls.value.push({ url, latency_ms: null, quality: 'untested' })
+    if (!activeBaseUrl.value) {
+      activeBaseUrl.value = url
+    }
+    newUrlInput.value = ''
+  }
+}
+
+function removeUrl(url: string) {
+  if (baseUrls.value.length <= 1) return
+  baseUrls.value = baseUrls.value.filter(u => u.url !== url)
+  if (activeBaseUrl.value === url && baseUrls.value.length > 0) {
+    activeBaseUrl.value = baseUrls.value[0].url
+  }
+}
+
+function setActiveUrl(url: string) {
+  activeBaseUrl.value = url
+}
+
+function onUrlKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    addUrl()
+  }
+}
+
+// ============================================================================
+// 延迟测试
+// ============================================================================
+
+async function testSingleUrl(url: string) {
+  if (!form.value.api_key) {
+    error.value = '请先填写 API Key'
+    return
+  }
+  
+  testingUrl.value = url
+  
+  try {
+    const results = await invoke<{ results: UrlTestResult[] }>('test_provider_urls', {
+      providerName: form.value.name || 'test',
+      urls: [url],
+      apiKey: form.value.api_key,
+      modelType: form.value.model_type,
+      testCount: 3
+    })
+    
+    if (results.results.length > 0) {
+      const result = results.results[0]
+      const urlConfig = baseUrls.value.find(u => u.url === url)
+      if (urlConfig) {
+        urlConfig.latency_ms = result.latency_ms
+        urlConfig.quality = result.quality
+      }
+    }
+  } catch (e) {
+    console.error('测试失败:', e)
+    error.value = `测试失败: ${String(e)}`
+  } finally {
+    testingUrl.value = null
+  }
+}
+
+async function testAllUrls() {
+  if (!form.value.api_key) {
+    error.value = '请先填写 API Key'
+    return
+  }
+  
+  if (baseUrls.value.length === 0) {
+    error.value = '请先添加 URL'
+    return
+  }
+  
+  testing.value = true
+  error.value = null
+  
+  try {
+    const urls = baseUrls.value.map(u => u.url)
+    const results = await invoke<{ results: UrlTestResult[]; fastest_url: string | null }>('test_provider_urls', {
+      providerName: form.value.name || 'test',
+      urls,
+      apiKey: form.value.api_key,
+      modelType: form.value.model_type,
+      testCount: 3
+    })
+    
+    // 更新测试结果
+    for (const result of results.results) {
+      const urlConfig = baseUrls.value.find(u => u.url === result.url)
+      if (urlConfig) {
+        urlConfig.latency_ms = result.latency_ms
+        urlConfig.quality = result.quality
+      }
+    }
+    
+    // 如果启用了自动选择最快，则自动选择
+    if (autoSelectFastestEnabled.value) {
+      autoSelectFastest()
+    }
+  } catch (e) {
+    console.error('测试失败:', e)
+    error.value = `测试失败: ${String(e)}`
+  } finally {
+    testing.value = false
+  }
+}
+
+function autoSelectFastest() {
+  const tested = baseUrls.value.filter(u => u.latency_ms !== null)
+  if (tested.length === 0) {
+    error.value = '没有可用的测试结果'
+    return
+  }
+  
+  const fastest = tested.reduce((a, b) => 
+    (a.latency_ms || Infinity) < (b.latency_ms || Infinity) ? a : b
+  )
+  activeBaseUrl.value = fastest.url
+}
+
+function getQualityColor(quality: string) {
+  switch (quality) {
+    case 'excellent': return 'text-green-500'
+    case 'good': return 'text-blue-500'
+    case 'fair': return 'text-yellow-500'
+    case 'poor': return 'text-orange-500'
+    case 'failed': return 'text-red-500'
+    default: return 'text-gray-400'
+  }
+}
+
+function getQualityLabel(quality: string) {
+  switch (quality) {
+    case 'excellent': return '优秀'
+    case 'good': return '良好'
+    case 'fair': return '一般'
+    case 'poor': return '较差'
+    case 'failed': return '失败'
+    default: return '未测试'
+  }
+}
+
+// ============================================================================
+// 模型管理
+// ============================================================================
+
 function toggleAllModels() {
   if (selectedModels.value.length === presetModels.value.length) {
     selectedModels.value = []
@@ -109,27 +367,6 @@ function toggleAllModels() {
   }
 }
 
-// 切换模型提供商时的处理
-function onModelTypeChange(typeId: ModelType) {
-  form.value.model_type = typeId
-  
-  // 根据模型提供商自动设置协议
-  const protocolMap: Record<ModelType, ApiProtocol> = {
-    'claude': 'anthropic',
-    'codex': 'openai',
-    'gemini': 'openai',  // Gemini 使用 OpenAI 兼容协议
-  }
-  form.value.protocol = protocolMap[typeId] || 'anthropic'
-}
-
-// 监听模型厂家变化，更新选中的模型（智谱 AI 不受模型厂家影响）
-watch(() => form.value.model_type, () => {
-  // 智谱 AI 使用预设自带的模型，不需要更新
-  if (currentPreset.value?.name === '智谱 AI') return
-  selectedModels.value = presetModels.value.map(m => m.id)
-})
-
-// 添加自定义模型
 function addCustomModel() {
   const modelName = customModelInput.value.trim()
   if (modelName && !customModels.value.includes(modelName)) {
@@ -138,12 +375,10 @@ function addCustomModel() {
   }
 }
 
-// 移除自定义模型
 function removeCustomModel(modelName: string) {
   customModels.value = customModels.value.filter(m => m !== modelName)
 }
 
-// 按回车添加自定义模型
 function onCustomModelKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     e.preventDefault()
@@ -151,13 +386,58 @@ function onCustomModelKeydown(e: KeyboardEvent) {
   }
 }
 
-// 监听 editing 变化，加载数据
+// 编辑模式下删除模型
+function openDeleteModel(modelId: string) {
+  deleteModelTarget.value = modelId
+  showDeleteModelDialog.value = true
+}
+
+async function confirmDeleteModel() {
+  if (!deleteModelTarget.value || !props.editing) return
+  
+  try {
+    await invoke('delete_model', {
+      providerName: props.editing,
+      modelId: deleteModelTarget.value
+    })
+    existingModels.value = existingModels.value.filter(m => m.id !== deleteModelTarget.value)
+  } catch (e) {
+    console.error('删除模型失败:', e)
+    error.value = `删除模型失败: ${String(e)}`
+  }
+  
+  showDeleteModelDialog.value = false
+  deleteModelTarget.value = null
+}
+
+// 编辑模式下添加模型
+async function addModelToExisting() {
+  const modelName = customModelInput.value.trim()
+  if (!modelName || !props.editing) return
+  
+  try {
+    await invoke('add_model', {
+      providerName: props.editing,
+      input: { id: modelName, name: modelName }
+    })
+    existingModels.value.push({ id: modelName, name: modelName })
+    customModelInput.value = ''
+  } catch (e) {
+    console.error('添加模型失败:', e)
+    error.value = `添加模型失败: ${String(e)}`
+  }
+}
+
+// ============================================================================
+// 数据加载
+// ============================================================================
+
 watch(() => props.visible, async (visible) => {
   if (visible && props.editing) {
+    // 编辑模式
     try {
       const provider = await invoke<any>('get_provider', { name: props.editing })
       if (provider) {
-        // 根据 npm 包推断协议和模型提供商
         const npm = provider.npm || ''
         let inferredProtocol: ApiProtocol = 'anthropic'
         let inferredModelType: ModelType = 'claude'
@@ -170,9 +450,7 @@ watch(() => props.visible, async (visible) => {
           inferredModelType = 'codex'
         } else if (npm.includes('anthropic')) {
           inferredProtocol = 'anthropic'
-          // 根据 provider 名称推断是 Claude 还是 Gemini
-          const providerName = props.editing.toLowerCase()
-          if (providerName.includes('gemini')) {
+          if (props.editing.toLowerCase().includes('gemini')) {
             inferredModelType = 'gemini'
           } else {
             inferredModelType = 'claude'
@@ -182,44 +460,78 @@ watch(() => props.visible, async (visible) => {
         form.value = {
           name: props.editing,
           api_key: provider.options.api_key || '',
-          base_url: provider.options.base_url || '',
           description: provider.description || '',
-          protocol: inferredProtocol as ApiProtocol,
-          model_type: inferredModelType,
+          protocol: inferredProtocol,
+          model_type: provider.model_type || inferredModelType,
         }
+        
+        // 加载 base_urls
+        if (provider.options.base_urls && provider.options.base_urls.length > 0) {
+          baseUrls.value = provider.options.base_urls.map((u: BaseUrlItem) => ({
+            url: u.url,
+            latency_ms: u.latency_ms,
+            quality: u.quality || 'untested'
+          }))
+        } else {
+          baseUrls.value = [{ url: provider.options.base_url, latency_ms: null, quality: 'untested' }]
+        }
+        activeBaseUrl.value = provider.options.base_url
+        
         selectedPreset.value = '自定义'
         autoAddModels.value = false
+        
+        // 加载已有模型
+        const models = await invoke<ModelItem[]>('get_models', { providerName: props.editing })
+        existingModels.value = models
+        
+        // 设置默认应用目标（编辑模式下默认只应用到 opencode）
+        const modelType = provider.model_type || inferredModelType
+        const defaultTargets = ['opencode']
+        if (modelType === 'claude') defaultTargets.unshift('claude_code')
+        else if (modelType === 'codex') defaultTargets.unshift('codex')
+        else if (modelType === 'gemini') defaultTargets.unshift('gemini')
+        applyTargets.value = defaultTargets
       }
     } catch (e) {
       console.error('加载 Provider 失败:', e)
     }
   } else if (visible) {
-    // 添加模式，默认自定义配置
+    // 新增模式
     selectedPreset.value = '自定义'
     onPresetChange('自定义')
     form.value.api_key = ''
     form.value.model_type = props.defaultModelType
     autoAddModels.value = true
-    // 清空自定义模型
     customModels.value = []
     customModelInput.value = ''
+    baseUrls.value = []
+    activeBaseUrl.value = ''
+    existingModels.value = []
+    
+    // 设置默认应用目标
+    const defaultTargets = ['opencode']
+    if (props.defaultModelType === 'claude') defaultTargets.unshift('claude_code')
+    else if (props.defaultModelType === 'codex') defaultTargets.unshift('codex')
+    else if (props.defaultModelType === 'gemini') defaultTargets.unshift('gemini')
+    applyTargets.value = defaultTargets
   }
   error.value = null
 })
+
+// ============================================================================
+// 保存和关闭
+// ============================================================================
 
 function close() {
   emit('update:visible', false)
 }
 
-// 打开获取 API Key 的链接
 async function openApiKeyUrl() {
   if (currentPreset.value?.apiKeyUrl) {
     try {
       await openUrl(currentPreset.value.apiKeyUrl)
-      console.log('打开链接:', currentPreset.value.apiKeyUrl)
     } catch (e) {
       console.error('打开链接失败:', e)
-      // 尝试使用 window.open 作为后备方案
       if (typeof window !== 'undefined') {
         window.open(currentPreset.value.apiKeyUrl, '_blank')
       }
@@ -236,84 +548,138 @@ async function save() {
     error.value = t('provider.apiKeyRequired')
     return
   }
+  if (baseUrls.value.length === 0) {
+    error.value = '请至少添加一个 Base URL'
+    return
+  }
+  
+  // 检查是否需要模型
+  const hasModels = (autoAddModels.value && selectedModels.value.length > 0) || 
+                    customModels.value.length > 0 ||
+                    existingModels.value.length > 0
+  
+  if (applyTargets.value.includes('opencode') && !hasModels && !props.editing) {
+    error.value = 'OpenCode 需要至少一个模型，请添加模型或取消勾选 OpenCode'
+    return
+  }
 
   loading.value = true
   error.value = null
 
   try {
-    const baseUrl = form.value.base_url || 'https://api.anthropic.com'
+    const baseUrl = activeBaseUrl.value || baseUrls.value[0]?.url || ''
+    const npm = getNpmPackageByProtocol(form.value.protocol)
+    
+    // 如果有多个 URL，自动测试并选择最快的
+    if (baseUrls.value.length > 1) {
+      const untested = baseUrls.value.filter(u => u.latency_ms === null)
+      if (untested.length > 0) {
+        await testAllUrls()
+        autoSelectFastest()
+      }
+    }
     
     if (props.editing) {
-      // 根据协议选择 npm 包
-      const npm = getNpmPackageByProtocol(form.value.protocol)
-      
       await invoke('update_provider', {
         name: props.editing,
         input: {
           name: form.value.name,
           api_key: form.value.api_key,
-          base_url: baseUrl,
+          base_url: activeBaseUrl.value || baseUrl,
+          base_urls: baseUrls.value.map(u => u.url),
           description: form.value.description || null,
-          npm: npm,
+          npm,
           model_type: form.value.model_type,
           auto_add_v1_suffix: autoAddV1Suffix.value
         }
       })
     } else {
-      // 添加 Provider
-      // 根据协议选择 npm 包
-      const npm = getNpmPackageByProtocol(form.value.protocol)
-      
       await invoke('add_provider', {
         input: {
           name: form.value.name,
           api_key: form.value.api_key,
-          base_url: baseUrl,
+          base_url: activeBaseUrl.value || baseUrl,
+          base_urls: baseUrls.value.map(u => u.url),
           description: form.value.description || null,
           model_type: form.value.model_type,
-          npm: npm,
+          npm,
           auto_add_v1_suffix: autoAddV1Suffix.value
         }
       })
       
-      // 自动添加预设模型 + 自定义模型（一次性批量添加，避免多次读写配置导致失败）
+      // 添加模型
       const batchInputs: Array<{ id: string; name?: string | null }> = []
 
       if (autoAddModels.value && selectedModels.value.length > 0) {
         for (const modelId of selectedModels.value) {
           const modelDef = presetModels.value.find(m => m.id === modelId)
           if (modelDef) {
-            batchInputs.push({
-              id: modelDef.id,
-              name: modelDef.name,
-            })
+            batchInputs.push({ id: modelDef.id, name: modelDef.name })
           }
         }
       }
 
       if (customModels.value.length > 0) {
         for (const modelName of customModels.value) {
-          batchInputs.push({
-            id: modelName,
-            name: modelName,
-          })
+          batchInputs.push({ id: modelName, name: modelName })
         }
       }
 
       if (batchInputs.length > 0) {
-        try {
-          await invoke('add_models_batch_detailed', {
-            providerName: form.value.name,
-            inputs: batchInputs,
-          })
-        } catch (e) {
-          // 这里失败会导致“看起来没加上模型”，因此需要给出明确提示
-          console.warn('批量添加模型失败:', e)
-          error.value = `批量添加模型失败: ${String(e)}`
-          return
-        }
+        await invoke('add_models_batch_detailed', {
+          providerName: form.value.name,
+          inputs: batchInputs,
+        })
       }
     }
+    
+    // 应用到选中的目标
+    const activeUrl = activeBaseUrl.value || baseUrls.value[0]?.url || ''
+    const firstModelId = selectedModels.value[0] || customModels.value[0] || existingModels.value[0]?.id
+    
+    for (const target of applyTargets.value) {
+      try {
+        if (target === 'claude_code' && form.value.model_type === 'claude') {
+          await invoke('apply_provider_to_claude_code', {
+            provider: {
+              name: form.value.name,
+              api_key: form.value.api_key,
+              base_url: activeUrl || null,
+              model: firstModelId || null,
+              enabled: true,
+              description: form.value.description || null
+            }
+          })
+        } else if (target === 'codex' && form.value.model_type === 'codex') {
+          await invoke('apply_provider_to_codex', {
+            provider: {
+              name: form.value.name,
+              api_key: form.value.api_key,
+              base_url: activeUrl,
+              env_key: 'OPENAI_API_KEY',
+              enabled: true,
+              description: form.value.description || null
+            }
+          })
+        } else if (target === 'gemini' && form.value.model_type === 'gemini') {
+          await invoke('apply_provider_to_gemini', {
+            provider: {
+              name: form.value.name,
+              api_key: form.value.api_key,
+              base_url: activeUrl || null,
+              model: firstModelId || null,
+              enabled: true,
+              description: form.value.description || null
+            }
+          })
+        }
+        // 'opencode' 目标已经在上面的 add_provider/update_provider 中处理了
+      } catch (e) {
+        console.warn(`应用到 ${target} 失败:`, e)
+        // 不中断整个流程，只是警告
+      }
+    }
+    
     emit('saved')
     close()
   } catch (e) {
@@ -327,306 +693,364 @@ async function save() {
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" @click.self="close">
-        <div class="w-full max-w-md rounded-xl bg-background border border-border shadow-xl animate-slide-up">
-          <!-- 标题 -->
-          <div class="px-5 py-4 border-b border-border">
-            <h3 class="font-semibold text-lg">{{ editing ? t('provider.editProvider') : t('provider.addProvider') }}</h3>
+      <div v-if="visible" class="fixed inset-0 z-50 bg-background">
+        <!-- 全屏容器 -->
+        <div class="h-full flex flex-col">
+          <!-- 标题栏 -->
+          <div class="flex-shrink-0 px-6 py-4 border-b border-border flex items-center justify-between">
+            <h3 class="font-semibold text-xl">
+              {{ editing ? t('provider.editProvider') : t('provider.addProvider') }}
+              <span v-if="editing" class="text-muted-foreground font-normal">: {{ editing }}</span>
+            </h3>
+            <button @click="close" class="p-2 hover:bg-surface-hover rounded-lg transition-colors">
+              <SvgIcon name="close" :size="20" />
+            </button>
           </div>
 
-          <!-- 表单 -->
-          <div class="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-            <!-- 错误提示 -->
-            <div v-if="error" class="px-3 py-2 rounded-lg bg-error-500/10 border border-error-500/30 text-error-500 text-sm">
-              {{ error }}
-            </div>
+          <!-- 错误提示 -->
+          <div v-if="error" class="flex-shrink-0 mx-6 mt-4 px-4 py-3 rounded-lg bg-error-500/10 border border-error-500/30 text-error-500 text-sm">
+            {{ error }}
+          </div>
 
-            <!-- 预设选择 (仅新增时显示) -->
-            <div v-if="!editing">
-              <label class="block text-sm font-medium mb-2">{{ t('provider.preset') || '预设供应商' }}</label>
-              <div class="flex flex-wrap gap-2">
-                <!-- 自定义配置按钮 -->
-                <button
-                  type="button"
-                  @click="onPresetChange('自定义')"
-                  :class="[
-                    'px-3 py-1.5 text-sm rounded-full border-2 transition-all font-medium',
-                    selectedPreset === '自定义'
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover'
-                  ]"
-                >
-                  自定义配置
-                </button>
-                <!-- 预设供应商按钮 -->
-                <button
-                  v-for="preset in flatPresets"
-                  :key="preset.name"
-                  type="button"
-                  @click="onPresetChange(preset.name)"
-                  :class="[
-                    'px-3 py-1.5 text-sm rounded-full border-2 transition-all inline-flex items-center gap-1 font-medium',
-                    selectedPreset === preset.name
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover'
-                  ]"
-                >
-                  {{ preset.name }}
-                  <span v-if="preset.category === 'aggregator'" class="text-yellow-300 text-xs">★</span>
-                </button>
-              </div>
-              <p class="mt-2 text-xs text-muted-foreground">
-                💡 自定义配置需手动填写所有必要字段
-              </p>
-              <div v-if="currentPreset?.apiKeyUrl" class="mt-2 inline-block">
-                <button
-                  type="button"
-                  @click="openApiKeyUrl"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-                >
-                  <SvgIcon name="key" :size="16" />
-                  <span>获取 API Key</span>
-                  <SvgIcon name="link" :size="16" />
-                </button>
-              </div>
-            </div>
-
-            <!-- 模型厂家选择 -->
-            <div>
-              <label class="block text-sm font-medium mb-2">模型提供商</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="type in MODEL_TYPES"
-                  :key="type.id"
-                  type="button"
-                  @click="onModelTypeChange(type.id)"
-                  :class="[
-                    'flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border-2 transition-all font-medium',
-                    form.model_type === type.id
-                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                      : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover'
-                  ]"
-                >
-                  <SvgIcon :name="type.icon" :size="18" />
-                  <span>{{ type.name }}</span>
-                </button>
-              </div>
-              <p v-if="editing" class="mt-1.5 text-xs text-muted-foreground">
-                💡 切换模型提供商会自动更新协议配置
-              </p>
-            </div>
-
-            <!-- 名称 -->
-            <div>
-              <label class="block text-sm font-medium mb-1.5">{{ t('provider.name') }} *</label>
-              <input
-                v-model="form.name"
-                type="text"
-                :placeholder="t('provider.placeholder.name')"
-                :disabled="!!editing"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary disabled:opacity-60"
-              />
-            </div>
-
-            <!-- API Key -->
-            <div>
-              <label class="block text-sm font-medium mb-1.5">{{ t('provider.apiKey') }} *</label>
-              <div class="relative">
-                <input
-                  v-model="form.api_key"
-                  :type="showApiKey ? 'text' : 'password'"
-                  :placeholder="t('provider.placeholder.apiKey')"
-                  class="w-full px-3 py-2 pr-16 rounded-lg border border-border bg-surface text-primary font-mono"
-                />
-                <button
-                  type="button"
-                  @click="showApiKey = !showApiKey"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                >
-                  {{ showApiKey ? t('provider.hideApiKey') : t('provider.showApiKey') }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Base URL -->
-            <div>
-              <div class="flex items-center justify-between mb-1.5">
-                <label class="text-sm font-medium">{{ t('provider.baseUrl') }}</label>
-                <label class="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    v-model="autoAddV1Suffix"
-                    class="w-3.5 h-3.5 rounded text-accent-500"
-                  />
-                  <span class="text-xs text-muted-foreground">自动添加 /v1 后缀</span>
-                </label>
-              </div>
-              <input
-                v-model="form.base_url"
-                type="text"
-                :placeholder="t('provider.placeholder.baseUrl')"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary font-mono text-sm"
-              />
-            </div>
-
-            <!-- 协议选择 -->
-            <div>
-              <label class="block text-sm font-medium mb-1.5">{{ t('provider.protocol') || 'API 协议' }}</label>
-              <div class="flex gap-4">
-                <label 
-                  v-for="protocol in supportedProtocols" 
-                  :key="protocol"
-                  class="flex items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    :value="protocol"
-                    v-model="form.protocol"
-                    class="w-4 h-4 text-accent-500"
-                  />
-                  <span class="text-sm">
-                    {{ protocol === 'anthropic' ? 'Anthropic 协议' : 'OpenAI 协议' }}
-                  </span>
-                </label>
-              </div>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {{ form.protocol === 'anthropic' ? '使用 Anthropic 原生 API 格式' : '使用 OpenAI 兼容 API 格式' }}
-              </p>
-            </div>
-
-            <!-- 描述 -->
-            <div>
-              <label class="block text-sm font-medium mb-1.5">{{ t('provider.description') }}</label>
-              <input
-                v-model="form.description"
-                type="text"
-                :placeholder="t('provider.placeholder.description')"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary"
-              />
-            </div>
-
-            <!-- 模型配置 (仅新增时显示) -->
-            <div v-if="!editing" class="border-t border-border pt-4 space-y-4">
-              <!-- 自动添加预设模型 -->
-              <div>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    v-model="autoAddModels"
-                    class="w-4 h-4 rounded text-accent-500"
-                  />
-                  <span class="text-sm font-medium">自动添加预设模型</span>
-                </label>
-                
-                <!-- 预设模型选择列表 -->
-                <div v-if="autoAddModels" class="mt-3 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs text-muted-foreground">
-                      已选择 {{ selectedModels.length }} / {{ presetModels.length }} 个预设模型
-                    </span>
-                    <button 
-                      type="button"
-                      @click="toggleAllModels"
-                      class="text-xs text-accent-500 hover:underline"
-                    >
-                      {{ selectedModels.length === presetModels.length ? '取消全选' : '全选' }}
-                    </button>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 rounded-lg bg-surface">
-                    <label 
-                      v-for="model in presetModels" 
-                      :key="model.id"
-                      class="flex items-center gap-2 cursor-pointer text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        :value="model.id"
-                        v-model="selectedModels"
-                        class="w-3.5 h-3.5 rounded text-accent-500"
-                      />
-                      <span class="truncate" :title="model.name">{{ model.name }}</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- 自定义模型添加 -->
-              <div>
-                <label class="block text-sm font-medium mb-2">添加自定义模型</label>
-                <div class="flex gap-2">
-                  <input
-                    v-model="customModelInput"
-                    type="text"
-                    placeholder="输入模型名称，如 gpt-4o-mini"
-                    @keydown="onCustomModelKeydown"
-                    class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono"
-                  />
+          <!-- 主内容区 - 两栏布局 -->
+          <div class="flex-1 flex gap-6 p-6 min-h-0 overflow-hidden">
+            <!-- 左侧：基本信息和 URL 管理 -->
+            <div class="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2">
+              <!-- 预设选择 (仅新增时显示) -->
+              <div v-if="!editing" class="space-y-2">
+                <label class="block text-sm font-medium">{{ t('provider.preset') || '预设供应商' }}</label>
+                <div class="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    @click="addCustomModel"
-                    :disabled="!customModelInput.trim()"
-                    class="px-3 py-2 rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    @click="onPresetChange('自定义')"
+                    :class="['px-3 py-1.5 text-sm rounded-full border-2 transition-all font-medium',
+                      selectedPreset === '自定义'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover']"
                   >
-                    <SvgIcon name="plus" :size="16" />
+                    自定义配置
+                  </button>
+                  <button
+                    v-for="preset in flatPresets"
+                    :key="preset.name"
+                    type="button"
+                    @click="onPresetChange(preset.name)"
+                    :class="['px-3 py-1.5 text-sm rounded-full border-2 transition-all inline-flex items-center gap-1 font-medium',
+                      selectedPreset === preset.name
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover']"
+                  >
+                    {{ preset.name }}
+                    <span v-if="preset.category === 'aggregator'" class="text-yellow-300 text-xs">★</span>
                   </button>
                 </div>
-                <p class="mt-1 text-xs text-muted-foreground">
-                  输入模型名称后按回车或点击添加按钮
-                </p>
+                <div v-if="currentPreset?.apiKeyUrl" class="mt-2">
+                  <button type="button" @click="openApiKeyUrl"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md hover:shadow-lg">
+                    <SvgIcon name="key" :size="16" />
+                    <span>获取 API Key</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 模型提供商 -->
+              <div class="space-y-2">
+                <label class="block text-sm font-medium">模型提供商</label>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="type in MODEL_TYPES"
+                    :key="type.id"
+                    type="button"
+                    @click="onModelTypeChange(type.id)"
+                    :class="['flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-full border-2 transition-all font-medium',
+                      form.model_type === type.id
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover']"
+                  >
+                    <SvgIcon :name="type.icon" :size="18" />
+                    <span>{{ type.name }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 应用目标选择 -->
+              <div class="space-y-2">
+                <label class="block text-sm font-medium">应用到</label>
+                <div class="flex flex-wrap gap-3">
+                  <label
+                    v-for="target in availableTargets"
+                    :key="target.id"
+                    :class="['flex items-center gap-2 px-3 py-2 rounded-lg border-2 cursor-pointer transition-all',
+                      applyTargets.includes(target.id)
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-border hover:border-green-400 hover:bg-surface-hover']"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="target.id"
+                      v-model="applyTargets"
+                      class="w-4 h-4 rounded text-green-500"
+                    />
+                    <SvgIcon :name="target.icon" :size="18" />
+                    <span class="text-sm font-medium">{{ target.label }}</span>
+                  </label>
+                </div>
+                <p class="text-xs text-muted-foreground">选择要将此服务商配置应用到的工具</p>
+              </div>
+
+              <!-- 名称 -->
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium">{{ t('provider.name') }} *</label>
+                <input v-model="form.name" type="text" :placeholder="t('provider.placeholder.name')" :disabled="!!editing"
+                  class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary disabled:opacity-60" />
+              </div>
+
+              <!-- API Key -->
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium">{{ t('provider.apiKey') }} *</label>
+                <div class="relative">
+                  <input v-model="form.api_key" :type="showApiKey ? 'text' : 'password'" :placeholder="t('provider.placeholder.apiKey')"
+                    class="w-full px-3 py-2 pr-16 rounded-lg border border-border bg-surface text-primary font-mono" />
+                  <button type="button" @click="showApiKey = !showApiKey"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+                    {{ showApiKey ? t('provider.hideApiKey') : t('provider.showApiKey') }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Base URL 管理 -->
+              <div class="space-y-2 border-t border-border pt-4">
+                <div class="flex items-center justify-between">
+                  <label class="text-sm font-medium">Base URL 列表</label>
+                  <label class="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" v-model="autoAddV1Suffix" class="w-3.5 h-3.5 rounded text-accent-500" />
+                    <span class="text-xs text-muted-foreground">自动添加 /v1 后缀</span>
+                  </label>
+                </div>
                 
-                <!-- 自定义模型列表 -->
-                <div v-if="customModels.length > 0" class="mt-3">
-                  <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs text-muted-foreground">
-                      已添加 {{ customModels.length }} 个自定义模型
-                    </span>
-                    <button 
-                      type="button"
-                      @click="customModels = []"
-                      class="text-xs text-red-500 hover:underline"
-                    >
-                      清空全部
+                <!-- 添加 URL -->
+                <div class="flex gap-2">
+                  <input v-model="newUrlInput" type="text" placeholder="输入 Base URL，如 https://api.example.com"
+                    @keydown="onUrlKeydown"
+                    class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono" />
+                  <button type="button" @click="addUrl" :disabled="!newUrlInput.trim()"
+                    class="flex-shrink-0 px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center">
+                    <SvgIcon name="plus" :size="18" />
+                  </button>
+                </div>
+
+                <!-- URL 列表 -->
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+                  <div v-for="urlConfig in baseUrls" :key="urlConfig.url"
+                    :class="['p-3 rounded-lg border transition-all cursor-pointer',
+                      activeBaseUrl === urlConfig.url
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-border hover:border-accent-500/50']"
+                    @click="setActiveUrl(urlConfig.url)">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <div v-if="activeBaseUrl === urlConfig.url" class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                        <span class="text-sm font-mono truncate">{{ urlConfig.url }}</span>
+                      </div>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        <span v-if="urlConfig.latency_ms !== null" :class="['text-xs font-medium', getQualityColor(urlConfig.quality)]">
+                          {{ urlConfig.latency_ms }}ms · {{ getQualityLabel(urlConfig.quality) }}
+                        </span>
+                        <span v-else class="text-xs text-gray-400">未测试</span>
+                        <button type="button" @click.stop="testSingleUrl(urlConfig.url)" :disabled="testingUrl === urlConfig.url"
+                          class="p-1 hover:bg-surface-hover rounded transition-colors">
+<SvgIcon v-if="testingUrl === urlConfig.url" name="loading" :size="14" class="animate-spin" />
+                        <SvgIcon v-else name="activity" :size="14" />
+                        </button>
+                        <button v-if="baseUrls.length > 1" type="button" @click.stop="removeUrl(urlConfig.url)"
+                          class="p-1 hover:bg-red-500/20 text-red-500 rounded transition-colors">
+                          <SvgIcon name="close" :size="14" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 测试按钮和自动选择开关 -->
+                <div class="space-y-2">
+                  <div class="flex gap-2">
+                    <button type="button" @click="testAllUrls" :disabled="testing || baseUrls.length === 0"
+                      class="flex-1 px-3 py-2 text-sm rounded-lg border border-border hover:bg-surface-hover disabled:opacity-50 transition-colors">
+                      <span v-if="testing" class="flex items-center justify-center gap-2">
+                        <SvgIcon name="loading" :size="14" class="animate-spin" />
+                        测试中...
+                      </span>
+                      <span v-else>测试所有 URL</span>
                     </button>
                   </div>
-                  <div class="flex flex-wrap gap-2">
-                    <span
-                      v-for="model in customModels"
-                      :key="model"
-                      class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/20 text-violet-400 text-xs font-mono"
-                    >
-                      {{ model }}
-                      <button
-                        type="button"
-                        @click="removeCustomModel(model)"
-                        class="hover:text-red-400 transition-colors"
-                      >
-                        <SvgIcon name="close" :size="12" />
+                  <!-- 自动选择最快 URL 开关 -->
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      v-model="autoSelectFastestEnabled"
+                      class="w-4 h-4 rounded text-blue-500"
+                    />
+                    <span class="text-sm">自动选择最快 URL</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 协议选择 -->
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium">{{ t('provider.protocol') || 'API 协议' }}</label>
+                <div class="flex gap-4">
+                  <label v-for="protocol in supportedProtocols" :key="protocol" class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" :value="protocol" v-model="form.protocol" class="w-4 h-4 text-accent-500" />
+                    <span class="text-sm">{{ protocol === 'anthropic' ? 'Anthropic 协议' : 'OpenAI 协议' }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 描述 -->
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium">{{ t('provider.description') }}</label>
+                <input v-model="form.description" type="text" :placeholder="t('provider.placeholder.description')"
+                  class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary" />
+              </div>
+            </div>
+
+            <!-- 右侧：模型管理 -->
+            <div class="w-1/2 flex flex-col border-l border-border pl-6">
+              <h4 class="text-lg font-semibold mb-2">模型管理</h4>
+              
+              <!-- 模型提示信息 -->
+              <div v-if="modelGuidance && !editing" 
+                class="mb-4 px-3 py-2 rounded-lg text-sm"
+                :class="{
+                  'bg-blue-500/10 text-blue-600 border border-blue-500/30': modelGuidance.type === 'info',
+                  'bg-amber-500/10 text-amber-600 border border-amber-500/30': modelGuidance.type === 'required',
+                  'bg-gray-500/10 text-gray-500 border border-gray-500/30': modelGuidance.type === 'optional'
+                }">
+                {{ modelGuidance.message }}
+              </div>
+              
+              <!-- 编辑模式：显示已有模型 -->
+              <div v-if="editing" class="flex-1 flex flex-col gap-4 min-h-0">
+                <div class="flex-1 overflow-y-auto space-y-2">
+                  <div v-if="existingModels.length === 0" class="text-center py-8 text-muted-foreground">
+                    暂无模型
+                  </div>
+                  <div v-for="model in existingModels" :key="model.id"
+                    class="p-3 rounded-lg border border-border hover:border-accent-500/50 transition-all flex items-center justify-between">
+                    <div>
+                      <div class="font-medium text-sm">{{ model.name }}</div>
+                      <div class="text-xs text-muted-foreground font-mono">{{ model.id }}</div>
+                    </div>
+                    <button type="button" @click="openDeleteModel(model.id)"
+                      class="p-1.5 hover:bg-red-500/20 text-red-500 rounded transition-colors">
+                      <SvgIcon name="delete" :size="16" />
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- 添加模型 -->
+                <div class="flex-shrink-0 space-y-2 border-t border-border pt-4">
+                  <label class="block text-sm font-medium">添加模型</label>
+                  <div class="flex gap-2">
+                    <input v-model="customModelInput" type="text" placeholder="输入模型 ID"
+                      @keydown="e => e.key === 'Enter' && addModelToExisting()"
+                      class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono" />
+                    <button type="button" @click="addModelToExisting" :disabled="!customModelInput.trim()"
+                      class="px-4 py-2 rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors">
+                      添加
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 新增模式：选择预设模型 -->
+              <div v-else class="flex-1 flex flex-col gap-4 min-h-0 overflow-y-auto">
+                <!-- 自动添加预设模型 -->
+                <div>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" v-model="autoAddModels" class="w-4 h-4 rounded text-accent-500" />
+                    <span class="text-sm font-medium">自动添加预设模型</span>
+                    <span v-if="needsModels && !autoAddModels && customModels.length === 0" 
+                      class="text-xs text-amber-500">(推荐)</span>
+                  </label>
+                  
+                  <div v-if="autoAddModels" class="mt-3 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-muted-foreground">
+                        已选择 {{ selectedModels.length }} / {{ presetModels.length }} 个预设模型
+                      </span>
+                      <button type="button" @click="toggleAllModels" class="text-xs text-accent-500 hover:underline">
+                        {{ selectedModels.length === presetModels.length ? '取消全选' : '全选' }}
                       </button>
-                    </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 rounded-lg bg-surface">
+                      <label v-for="model in presetModels" :key="model.id" class="flex items-center gap-2 cursor-pointer text-sm">
+                        <input type="checkbox" :value="model.id" v-model="selectedModels" class="w-3.5 h-3.5 rounded text-accent-500" />
+                        <span class="truncate" :title="model.name">{{ model.name }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 自定义模型添加 -->
+                <div class="border-t border-border pt-4">
+                  <label class="block text-sm font-medium mb-2">添加自定义模型</label>
+                  <div class="flex gap-2">
+                    <input v-model="customModelInput" type="text" placeholder="输入模型名称，如 gpt-4o-mini"
+                      @keydown="onCustomModelKeydown"
+                      class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono" />
+                    <button type="button" @click="addCustomModel" :disabled="!customModelInput.trim()"
+                      class="px-3 py-2 rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors">
+                      <SvgIcon name="plus" :size="16" />
+                    </button>
+                  </div>
+                  
+                  <div v-if="customModels.length > 0" class="mt-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-xs text-muted-foreground">
+                        已添加 {{ customModels.length }} 个自定义模型
+                      </span>
+                      <button type="button" @click="customModels = []" class="text-xs text-red-500 hover:underline">
+                        清空全部
+                      </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <span v-for="model in customModels" :key="model"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/20 text-violet-400 text-xs font-mono">
+                        {{ model }}
+                        <button type="button" @click="removeCustomModel(model)" class="hover:text-red-400 transition-colors">
+                          <SvgIcon name="close" :size="12" />
+                        </button>
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 按钮 -->
-          <div class="px-5 py-4 flex justify-end gap-3 border-t border-border">
-            <button
-              @click="close"
-              :disabled="loading"
-              class="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-hover disabled:opacity-50 transition-colors"
-            >
+          <!-- 底部按钮 -->
+          <div class="flex-shrink-0 px-6 py-4 flex justify-end gap-3 border-t border-border">
+            <button @click="close" :disabled="loading"
+              class="px-6 py-2.5 text-sm font-medium rounded-lg border border-border hover:bg-surface-hover disabled:opacity-50 transition-colors">
               {{ t('common.cancel') }}
             </button>
-            <button
-              @click="save"
-              :disabled="loading"
-              class="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-            >
+            <button @click="save" :disabled="loading"
+              class="px-6 py-2.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-sm">
               {{ loading ? t('common.saving') : t('common.save') }}
             </button>
           </div>
         </div>
+
+        <!-- 删除模型确认对话框 -->
+        <ConfirmDialog
+          v-model:visible="showDeleteModelDialog"
+          :title="t('confirm.deleteTitle')"
+          :message="t('confirm.deleteModel', { name: deleteModelTarget })"
+          :confirm-text="t('common.delete')"
+          danger
+          @confirm="confirmDeleteModel"
+        />
       </div>
     </Transition>
   </Teleport>
@@ -635,7 +1059,7 @@ async function save() {
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.15s ease;
+  transition: opacity 0.2s ease;
 }
 .fade-enter-from,
 .fade-leave-to {

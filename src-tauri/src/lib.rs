@@ -2,15 +2,19 @@
 
 pub mod commands;
 pub mod config;
+pub mod database;
 pub mod error;
+pub mod proxy;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use config::ConfigManager;
+use database::Database;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
+use tokio::sync::RwLock;
 
 /// 托盘图标状态包装器（用于在应用生命周期内保持托盘图标存活）
 pub struct TrayState(pub TrayIcon);
@@ -20,6 +24,14 @@ pub struct TrayState(pub TrayIcon);
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化配置管理器
     let config_manager = ConfigManager::new()?;
+    
+    // 初始化数据库
+    let database = Database::open()
+        .map_err(|e| format!("数据库初始化失败: {e}"))?;
+    let db_arc = Arc::new(database);
+    
+    // 代理服务状态
+    let proxy_service_state = commands::ProxyServiceState(Arc::new(RwLock::new(None)));
     
     tauri::Builder::default()
         // 单实例插件必须首先注册，以便在第二个实例启动时能够正确拦截
@@ -43,6 +55,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(Mutex::new(config_manager))
+        .manage(db_arc)
+        .manage(proxy_service_state)
         .setup(|app| {
             // 创建托盘菜单（开发和生产模式都需要托盘图标以支持最小化到托盘功能）
             let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
@@ -106,6 +120,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Provider commands
             commands::get_providers,
             commands::get_provider,
+            commands::get_provider_for_apply,
             commands::add_provider,
             commands::update_provider,
             commands::delete_provider,
@@ -115,6 +130,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_deployed_providers,
             commands::remove_deployed_provider,
             commands::import_deployed_provider,
+            // Multi-URL management commands
+            commands::add_provider_base_url,
+            commands::remove_provider_base_url,
+            commands::set_active_base_url,
+            commands::update_url_latency,
+            commands::auto_select_fastest_base_url,
             // Model commands
             commands::get_models,
             commands::get_model,
@@ -135,6 +156,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_recommended_mcp_servers,
             commands::add_recommended_mcp_servers,
             commands::check_mcp_server_health,
+            commands::sync_mcp_to_apps,
+            commands::get_apps_mcp_status,
             // skills commands
             commands::get_installed_skills,
             commands::get_recommended_skills,
@@ -184,6 +207,82 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Deep link commands
             commands::parse_deep_link,
             commands::generate_deep_link,
+            // Claude Code commands
+            commands::get_claude_code_status,
+            commands::get_claude_code_settings,
+            commands::save_claude_code_settings,
+            commands::set_claude_code_api_key,
+            commands::set_claude_code_base_url,
+            commands::set_claude_code_model,
+            commands::apply_provider_to_claude_code,
+            commands::get_claude_code_mcp_servers,
+            commands::add_claude_code_mcp_server,
+            commands::remove_claude_code_mcp_server,
+            commands::sync_mcp_to_claude_code,
+            commands::get_claude_md,
+            commands::save_claude_md,
+            // Codex commands
+            commands::get_codex_status,
+            commands::get_codex_providers,
+            commands::add_codex_provider,
+            commands::remove_codex_provider,
+            commands::apply_provider_to_codex,
+            commands::get_codex_mcp_servers,
+            commands::add_codex_mcp_server,
+            commands::remove_codex_mcp_server,
+            commands::sync_mcp_to_codex,
+            commands::get_agents_md,
+            commands::save_agents_md,
+            // Gemini commands
+            commands::get_gemini_status,
+            commands::get_gemini_settings,
+            commands::save_gemini_settings,
+            commands::set_gemini_api_key,
+            commands::set_gemini_base_url,
+            commands::set_gemini_model,
+            commands::set_gemini_auth_mode,
+            commands::apply_provider_to_gemini,
+            commands::get_gemini_mcp_servers,
+            commands::add_gemini_mcp_server,
+            commands::remove_gemini_mcp_server,
+            commands::sync_mcp_to_gemini,
+            commands::get_gemini_md,
+            commands::save_gemini_md,
+            // Prompts commands
+            commands::get_prompts_status,
+            commands::get_prompt,
+            commands::save_prompt,
+            commands::sync_prompt,
+            commands::delete_prompt,
+            commands::get_prompt_presets,
+            // Speed test commands
+            commands::test_endpoint_latency,
+            commands::batch_test_endpoint,
+            commands::test_multiple_providers,
+            commands::test_provider_urls,
+            commands::test_and_auto_select_fastest,
+            // Usage statistics commands
+            commands::get_usage_summary,
+            commands::get_usage_trend,
+            commands::add_usage_record,
+            commands::clear_usage_stats,
+            commands::get_usage_by_provider,
+            // Proxy commands
+            commands::init_proxy_service,
+            commands::start_proxy,
+            commands::stop_proxy,
+            commands::get_proxy_status,
+            commands::is_proxy_running,
+            commands::start_proxy_with_takeover,
+            commands::stop_proxy_with_restore,
+            commands::get_takeover_status,
+            commands::set_takeover_for_app,
+            commands::get_proxy_config,
+            commands::update_proxy_config,
+            commands::get_proxy_usage_summary,
+            commands::get_proxy_usage_trend,
+            commands::get_provider_stats,
+            commands::clear_proxy_usage_stats,
         ])
         .run(tauri::generate_context!())?;
 

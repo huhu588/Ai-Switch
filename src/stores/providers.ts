@@ -2,16 +2,30 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
+// ============================================================================
 // 类型定义
+// ============================================================================
+
+// Base URL 配置
+export interface BaseUrlItem {
+  url: string
+  latency_ms: number | null
+  last_tested: string | null
+  quality: 'excellent' | 'good' | 'fair' | 'poor' | 'failed' | 'untested'
+}
+
+// Provider 列表项
 export interface ProviderItem {
   name: string
-  base_url: string
+  base_url: string           // 当前激活的 URL（向后兼容）
+  base_urls: BaseUrlItem[]   // 所有 URL 列表
   model_count: number
   description: string | null
   model_type: string
   enabled: boolean
 }
 
+// Model 列表项
 export interface ModelItem {
   id: string
   name: string
@@ -23,9 +37,28 @@ export interface ModelItem {
 export interface DeployedProviderItem {
   name: string
   base_url: string
-  model_count: number
-  source: string // "global" 或 "project"
+  model_count: number // -1 表示已配置但不是模型列表（如 Claude Code/Codex/Gemini）
+  source: string // "global", "project", "claude_code", "codex", "gemini"
   inferred_model_type?: string // 推断的模型类型
+  tool?: string // 所属工具: "opencode", "claude_code", "codex", "gemini"
+  current_model?: string // 当前使用的模型（适用于非 OpenCode 工具）
+}
+
+// URL 测试结果
+export interface UrlTestResult {
+  url: string
+  latency_ms: number | null
+  success: boolean
+  quality: string
+  error_message: string | null
+}
+
+// Provider URLs 测试结果
+export interface ProviderUrlsTestResult {
+  provider_name: string
+  results: UrlTestResult[]
+  fastest_url: string | null
+  fastest_latency_ms: number | null
 }
 
 export const useProvidersStore = defineStore('providers', () => {
@@ -91,6 +124,7 @@ export const useProvidersStore = defineStore('providers', () => {
     base_url: string
     npm?: string
     description?: string
+    model_type?: string
   }) {
     await invoke('add_provider', { input })
     await loadProviders()
@@ -189,6 +223,85 @@ export const useProvidersStore = defineStore('providers', () => {
     return await invoke<DeployedProviderItem[]>('get_deployed_providers')
   }
 
+  // 获取所有工具的已配置服务商（OpenCode + Claude Code + Codex + Gemini）
+  async function loadAllDeployedProviders(): Promise<DeployedProviderItem[]> {
+    const allProviders: DeployedProviderItem[] = []
+    
+    // 1. OpenCode 配置
+    try {
+      const opencodeProviders = await invoke<DeployedProviderItem[]>('get_deployed_providers')
+      allProviders.push(...opencodeProviders.map(p => ({ ...p, tool: 'opencode' })))
+    } catch (e) {
+      console.warn('加载 OpenCode 配置失败:', e)
+    }
+    
+    // 2. Claude Code 配置
+    // cc-switch 存储在 ~/.claude/settings.json，env.ANTHROPIC_BASE_URL 和 model 字段
+    try {
+      const status = await invoke<{ is_configured: boolean; has_api_key: boolean; api_key_masked?: string }>('get_claude_code_status')
+      if (status.is_configured && status.has_api_key) {
+        const settings = await invoke<{ env?: Record<string, string>; model?: string }>('get_claude_code_settings')
+        const baseUrl = settings.env?.['ANTHROPIC_BASE_URL'] || 'https://api.anthropic.com'
+        // Claude Code 只存储当前选择的模型，不是模型列表
+        // model_count 用 -1 表示"已配置"但不是模型列表
+        allProviders.push({
+          name: 'Claude Code',
+          base_url: baseUrl,
+          model_count: -1, // 特殊值表示已配置
+          source: 'claude_code',
+          tool: 'claude_code',
+          inferred_model_type: 'claude',
+          current_model: settings.model // 添加当前模型信息
+        } as DeployedProviderItem & { current_model?: string })
+      }
+    } catch (e) {
+      console.warn('加载 Claude Code 配置失败:', e)
+    }
+    
+    // 3. Codex CLI 配置
+    // cc-switch 存储在 ~/.codex/config.toml 的 [model_providers.xxx] 段
+    try {
+      const status = await invoke<{ is_configured: boolean; has_auth: boolean; provider_count: number }>('get_codex_status')
+      if (status.is_configured && status.provider_count > 0) {
+        const providers = await invoke<Record<string, { name?: string; base_url?: string }>>('get_codex_providers')
+        for (const [name, provider] of Object.entries(providers)) {
+          allProviders.push({
+            name: name || 'Codex Provider',
+            base_url: provider.base_url || 'https://api.openai.com/v1',
+            model_count: -1, // 已配置
+            source: 'codex',
+            tool: 'codex',
+            inferred_model_type: 'codex'
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('加载 Codex 配置失败:', e)
+    }
+    
+    // 4. Gemini CLI 配置
+    // cc-switch 存储在 ~/.gemini/.env 和 ~/.gemini/settings.json
+    try {
+      const status = await invoke<{ is_configured: boolean; has_api_key: boolean; base_url?: string }>('get_gemini_status')
+      if (status.is_configured && status.has_api_key) {
+        const settings = await invoke<{ model?: string }>('get_gemini_settings')
+        allProviders.push({
+          name: 'Gemini CLI',
+          base_url: status.base_url || 'https://generativelanguage.googleapis.com',
+          model_count: -1, // 已配置
+          source: 'gemini',
+          tool: 'gemini',
+          inferred_model_type: 'gemini',
+          current_model: settings.model
+        } as DeployedProviderItem & { current_model?: string })
+      }
+    } catch (e) {
+      console.warn('加载 Gemini 配置失败:', e)
+    }
+    
+    return allProviders
+  }
+
   // 从已部署的 opencode 配置中删除 Provider
   async function removeDeployedProvider(name: string, fromGlobal: boolean, fromProject: boolean) {
     await invoke('remove_deployed_provider', {
@@ -208,6 +321,101 @@ export const useProvidersStore = defineStore('providers', () => {
         model_type: modelType
       }
     })
+  }
+
+  // ============================================================================
+  // 多 Base URL 管理
+  // ============================================================================
+
+  // 添加 Base URL
+  async function addBaseUrl(providerName: string, url: string) {
+    await invoke('add_provider_base_url', {
+      input: {
+        provider_name: providerName,
+        url
+      }
+    })
+    await loadProviders()
+  }
+
+  // 删除 Base URL
+  async function removeBaseUrl(providerName: string, url: string) {
+    await invoke('remove_provider_base_url', {
+      input: {
+        provider_name: providerName,
+        url
+      }
+    })
+    await loadProviders()
+  }
+
+  // 设置激活的 Base URL
+  async function setActiveBaseUrl(providerName: string, url: string) {
+    await invoke('set_active_base_url', {
+      input: {
+        provider_name: providerName,
+        url
+      }
+    })
+    await loadProviders()
+  }
+
+  // 更新 URL 延迟测试结果
+  async function updateUrlLatency(providerName: string, url: string, latencyMs: number | null) {
+    await invoke('update_url_latency', {
+      input: {
+        provider_name: providerName,
+        url,
+        latency_ms: latencyMs
+      }
+    })
+    await loadProviders()
+  }
+
+  // 自动选择最快的 Base URL
+  async function autoSelectFastestUrl(providerName: string): Promise<string> {
+    const result = await invoke<string>('auto_select_fastest_base_url', {
+      providerName
+    })
+    await loadProviders()
+    return result
+  }
+
+  // ============================================================================
+  // 延迟测试
+  // ============================================================================
+
+  // 测试 Provider 的所有 URL
+  async function testProviderUrls(
+    providerName: string,
+    urls: string[],
+    apiKey: string | null,
+    modelType: string
+  ): Promise<ProviderUrlsTestResult> {
+    return await invoke<ProviderUrlsTestResult>('test_provider_urls', {
+      providerName,
+      urls,
+      apiKey,
+      modelType,
+      testCount: 3
+    })
+  }
+
+  // 测试并自动选择最快的 URL
+  async function testAndAutoSelectFastest(
+    providerName: string,
+    urls: string[],
+    apiKey: string | null,
+    modelType: string
+  ): Promise<ProviderUrlsTestResult> {
+    const result = await invoke<ProviderUrlsTestResult>('test_and_auto_select_fastest', {
+      providerName,
+      urls,
+      apiKey,
+      modelType
+    })
+    await loadProviders()
+    return result
   }
 
   return {
@@ -234,7 +442,17 @@ export const useProvidersStore = defineStore('providers', () => {
     applyConfig,
     toggleProvider,
     loadDeployedProviders,
+    loadAllDeployedProviders,
     removeDeployedProvider,
     importDeployedProvider,
+    // 多 URL 管理
+    addBaseUrl,
+    removeBaseUrl,
+    setActiveBaseUrl,
+    updateUrlLatency,
+    autoSelectFastestUrl,
+    // 延迟测试
+    testProviderUrls,
+    testAndAutoSelectFastest,
   }
 })

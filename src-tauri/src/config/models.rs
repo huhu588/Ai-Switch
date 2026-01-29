@@ -153,13 +153,136 @@ fn default_enabled() -> bool {
     true
 }
 
-/// Provider 选项配置
+// ============================================================================
+// Base URL 配置 (支持多 URL)
+// ============================================================================
+
+/// 单个 Base URL 的配置（包含延迟测试结果）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseUrlConfig {
+    /// URL 地址
+    pub url: String,
+    /// 延迟测试结果（毫秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
+    /// 最后测试时间
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_tested: Option<String>,
+}
+
+impl BaseUrlConfig {
+    /// 创建新的 BaseUrlConfig
+    pub fn new(url: String) -> Self {
+        Self {
+            url,
+            latency_ms: None,
+            last_tested: None,
+        }
+    }
+
+    /// 更新延迟测试结果
+    pub fn update_latency(&mut self, latency_ms: Option<u64>) {
+        self.latency_ms = latency_ms;
+        self.last_tested = Some(default_timestamp());
+    }
+
+    /// 获取延迟质量评级
+    pub fn get_quality(&self) -> &'static str {
+        match self.latency_ms {
+            Some(ms) if ms < 200 => "excellent",
+            Some(ms) if ms < 500 => "good",
+            Some(ms) if ms < 1000 => "fair",
+            Some(_) => "poor",
+            None => "untested",
+        }
+    }
+}
+
+/// Provider 选项配置（支持多 URL）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeProviderOptions {
+    /// 当前激活的 Base URL（用于写入 opencode.json）
     #[serde(rename = "baseURL")]
     pub base_url: String,
     #[serde(rename = "apiKey")]
     pub api_key: String,
+    /// 多 Base URL 列表（包含延迟测试结果）
+    #[serde(rename = "baseUrls", default, skip_serializing_if = "Vec::is_empty")]
+    pub base_urls: Vec<BaseUrlConfig>,
+}
+
+impl OpenCodeProviderOptions {
+    /// 创建新的 ProviderOptions
+    pub fn new(base_url: String, api_key: String) -> Self {
+        let base_urls = vec![BaseUrlConfig::new(base_url.clone())];
+        Self {
+            base_url,
+            api_key,
+            base_urls,
+        }
+    }
+
+    /// 从单个 URL 迁移到多 URL（向后兼容）
+    pub fn migrate_from_single_url(&mut self) {
+        if self.base_urls.is_empty() && !self.base_url.is_empty() {
+            self.base_urls = vec![BaseUrlConfig::new(self.base_url.clone())];
+        }
+    }
+
+    /// 添加新的 Base URL
+    pub fn add_base_url(&mut self, url: String) {
+        // 避免重复添加
+        if !self.base_urls.iter().any(|u| u.url == url) {
+            self.base_urls.push(BaseUrlConfig::new(url));
+        }
+    }
+
+    /// 删除 Base URL
+    pub fn remove_base_url(&mut self, url: &str) -> bool {
+        let initial_len = self.base_urls.len();
+        self.base_urls.retain(|u| u.url != url);
+        
+        // 如果删除的是当前激活的 URL，切换到第一个 URL
+        if self.base_url == url && !self.base_urls.is_empty() {
+            self.base_url = self.base_urls[0].url.clone();
+        }
+        
+        self.base_urls.len() < initial_len
+    }
+
+    /// 设置激活的 Base URL
+    pub fn set_active_url(&mut self, url: &str) -> bool {
+        if self.base_urls.iter().any(|u| u.url == url) {
+            self.base_url = url.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 获取指定 URL 的配置（可变引用）
+    pub fn get_url_config_mut(&mut self, url: &str) -> Option<&mut BaseUrlConfig> {
+        self.base_urls.iter_mut().find(|u| u.url == url)
+    }
+
+    /// 获取延迟最低的 URL
+    pub fn get_fastest_url(&self) -> Option<&str> {
+        self.base_urls
+            .iter()
+            .filter(|u| u.latency_ms.is_some())
+            .min_by_key(|u| u.latency_ms.unwrap_or(u64::MAX))
+            .map(|u| u.url.as_str())
+    }
+
+    /// 自动选择最快的 URL 作为激活 URL
+    pub fn auto_select_fastest(&mut self) -> bool {
+        if let Some(fastest_url) = self.get_fastest_url() {
+            self.base_url = fastest_url.to_string();
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Provider 元数据 (仅用于内部管理)
@@ -396,7 +519,7 @@ impl OpenCodeProvider {
             model_type, // 顶级字段，会被序列化到配置文件
             enabled: true, // 默认启用
             auto_add_v1_suffix,
-            options: OpenCodeProviderOptions { base_url, api_key },
+            options: OpenCodeProviderOptions::new(base_url, api_key),
             models: HashMap::new(),
             metadata: ProviderMetadata {
                 description,
@@ -408,16 +531,104 @@ impl OpenCodeProvider {
         }
     }
 
+    /// 创建新的 Provider，支持多 Base URL
+    pub fn new_with_multiple_urls(
+        name: String,
+        base_urls: Vec<String>,
+        api_key: String,
+        npm: Option<String>,
+        description: Option<String>,
+        model_type: Option<String>,
+        auto_add_v1_suffix: bool,
+    ) -> Self {
+        let mut provider = Self::new_with_v1_suffix(
+            name,
+            base_urls.first().cloned().unwrap_or_default(),
+            api_key,
+            npm,
+            description,
+            model_type,
+            auto_add_v1_suffix,
+        );
+        
+        // 添加额外的 URL
+        for url in base_urls.iter().skip(1) {
+            provider.options.add_base_url(url.clone());
+        }
+        
+        provider
+    }
+
     /// 更新 API Key
     pub fn set_api_key(&mut self, api_key: String) {
         self.options.api_key = api_key;
         self.update_timestamp();
     }
 
-    /// 更新 Base URL
+    /// 更新 Base URL（设置激活的 URL）
     pub fn set_base_url(&mut self, base_url: String) {
+        // 如果 URL 不在列表中，添加它
+        if !self.options.base_urls.iter().any(|u| u.url == base_url) {
+            self.options.add_base_url(base_url.clone());
+        }
         self.options.base_url = base_url;
         self.update_timestamp();
+    }
+
+    /// 添加 Base URL
+    pub fn add_base_url(&mut self, url: String) {
+        self.options.add_base_url(url);
+        self.update_timestamp();
+    }
+
+    /// 删除 Base URL
+    pub fn remove_base_url(&mut self, url: &str) -> bool {
+        let result = self.options.remove_base_url(url);
+        if result {
+            self.update_timestamp();
+        }
+        result
+    }
+
+    /// 设置激活的 Base URL
+    pub fn set_active_base_url(&mut self, url: &str) -> bool {
+        let result = self.options.set_active_url(url);
+        if result {
+            self.update_timestamp();
+        }
+        result
+    }
+
+    /// 获取所有 Base URL 配置
+    pub fn get_base_urls(&self) -> &[BaseUrlConfig] {
+        &self.options.base_urls
+    }
+
+    /// 获取激活的 Base URL
+    pub fn get_active_base_url(&self) -> &str {
+        &self.options.base_url
+    }
+
+    /// 更新指定 URL 的延迟测试结果
+    pub fn update_url_latency(&mut self, url: &str, latency_ms: Option<u64>) {
+        if let Some(config) = self.options.get_url_config_mut(url) {
+            config.update_latency(latency_ms);
+            self.update_timestamp();
+        }
+    }
+
+    /// 自动选择最快的 URL
+    pub fn auto_select_fastest_url(&mut self) -> bool {
+        let result = self.options.auto_select_fastest();
+        if result {
+            self.update_timestamp();
+        }
+        result
+    }
+
+    /// 迁移单 URL 到多 URL（向后兼容）
+    pub fn migrate_to_multi_url(&mut self) {
+        self.options.migrate_from_single_url();
     }
 
     /// 获取模型

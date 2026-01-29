@@ -113,11 +113,18 @@ const recommendedRules = ref<RecommendedRule[]>([])
 const selectedRules = ref<Set<string>>(new Set())
 const installedRuleIds = ref<Set<string>>(new Set())
 const addingRules = ref(false)
-const ruleInstallLocation = ref('global_opencode')
 const customRuleName = ref('')
 const customRuleContent = ref('')
 const customRuleError = ref('')
 const addingCustomRule = ref(false)
+
+// 规则多选安装位置（OpenCode、Claude Code、Codex、Gemini）
+const ruleInstallTargets = ref({
+  opencode: true,      // ~/.config/opencode/rules/
+  claudeCode: false,   // ~/.claude/rules/ + CLAUDE.md
+  codex: false,        // ~/.codex/ + AGENTS.md  
+  gemini: false,       // ~/.gemini/ + GEMINI.md
+})
 
 // 已安装的规则列表
 const installedRules = ref<InstalledRule[]>([])
@@ -131,6 +138,11 @@ const editingRule = ref<InstalledRule | null>(null)
 const editRuleContent = ref('')
 const editRuleError = ref('')
 const savingRule = ref(false)
+
+// 编辑模式的 CLI 工具同步选项
+const editSyncToClaudeMd = ref(false)
+const editSyncToAgentsMd = ref(false)
+const editSyncToGeminiMd = ref(false)
 
 // 加载已安装的规则
 async function loadInstalledRules() {
@@ -168,6 +180,10 @@ async function deleteInstalledRule(rule: InstalledRule) {
 async function openEditRuleModal(rule: InstalledRule) {
   editingRule.value = rule
   editRuleError.value = ''
+  // 重置 CLI 工具同步选项
+  editSyncToClaudeMd.value = false
+  editSyncToAgentsMd.value = false
+  editSyncToGeminiMd.value = false
   try {
     editRuleContent.value = await invoke<string>('read_rule_content', { path: rule.path })
     showEditRuleModal.value = true
@@ -188,11 +204,24 @@ async function saveEditedRule() {
   
   savingRule.value = true
   try {
-    // 直接写入文件
+    // 1. 保存规则文件
     await invoke('save_rule_content', {
       path: editingRule.value.path,
       content: editRuleContent.value
     })
+    
+    // 2. 同步到 CLI 工具（如果选中）
+    const syncTargets: string[] = []
+    if (editSyncToClaudeMd.value) syncTargets.push('claude')
+    if (editSyncToAgentsMd.value) syncTargets.push('codex')
+    if (editSyncToGeminiMd.value) syncTargets.push('gemini')
+    
+    if (syncTargets.length > 0) {
+      await invoke('sync_prompt', {
+        content: editRuleContent.value,
+        targets: syncTargets
+      })
+    }
     
     showEditRuleModal.value = false
     installMessage.value = t('rule.saved', { name: editingRule.value.name })
@@ -669,9 +698,20 @@ function toggleRuleSelect(id: string) {
   selectedRules.value = new Set(selectedRules.value)
 }
 
-// 安装选中的推荐规则
+// 安装选中的推荐规则（支持多目标）
 async function addSelectedRules() {
   if (selectedRules.value.size === 0) return
+  
+  // 检查是否至少选择了一个安装位置
+  const hasTarget = ruleInstallTargets.value.opencode || 
+                    ruleInstallTargets.value.claudeCode || 
+                    ruleInstallTargets.value.codex || 
+                    ruleInstallTargets.value.gemini
+  if (!hasTarget) {
+    installMessage.value = t('rule.selectInstallTarget')
+    setTimeout(() => { installMessage.value = '' }, 3000)
+    return
+  }
   
   addingRules.value = true
   let successCount = 0
@@ -679,12 +719,41 @@ async function addSelectedRules() {
   
   try {
     for (const ruleId of selectedRules.value) {
+      const rule = recommendedRules.value.find(r => r.id === ruleId)
+      if (!rule) continue
+      
       try {
-        await invoke('install_rule', {
-          ruleId: ruleId,
-          content: '',
-          location: ruleInstallLocation.value
-        })
+        // 1. 安装到 OpenCode
+        if (ruleInstallTargets.value.opencode) {
+          await invoke('install_rule', {
+            ruleId: ruleId,
+            content: '',
+            location: 'global_opencode'
+          })
+        }
+        
+        // 2. 安装到 Claude Code（rules 目录 + CLAUDE.md）
+        if (ruleInstallTargets.value.claudeCode) {
+          await invoke('install_rule', {
+            ruleId: ruleId,
+            content: '',
+            location: 'global_claude'
+          })
+        }
+        
+        // 3. 同步到 CLI 工具的系统提示文件
+        const syncTargets: string[] = []
+        if (ruleInstallTargets.value.claudeCode) syncTargets.push('claude')
+        if (ruleInstallTargets.value.codex) syncTargets.push('codex')
+        if (ruleInstallTargets.value.gemini) syncTargets.push('gemini')
+        
+        if (syncTargets.length > 0 && rule.content) {
+          await invoke('sync_prompt', {
+            content: rule.content,
+            targets: syncTargets
+          })
+        }
+        
         successCount++
       } catch (e) {
         console.error(`安装规则 ${ruleId} 失败:`, e)
@@ -723,10 +792,17 @@ function openCustomRuleModal() {
 - 注意事项 1
 `
   customRuleError.value = ''
+  // 重置安装位置选项（默认只选中 OpenCode）
+  ruleInstallTargets.value = {
+    opencode: true,
+    claudeCode: false,
+    codex: false,
+    gemini: false,
+  }
   showCustomRuleModal.value = true
 }
 
-// 添加自定义规则
+// 添加自定义规则（支持多目标）
 async function addCustomRule() {
   customRuleError.value = ''
   
@@ -740,13 +816,50 @@ async function addCustomRule() {
     return
   }
   
+  // 检查是否至少选择了一个安装位置
+  const hasTarget = ruleInstallTargets.value.opencode || 
+                    ruleInstallTargets.value.claudeCode || 
+                    ruleInstallTargets.value.codex || 
+                    ruleInstallTargets.value.gemini
+  if (!hasTarget) {
+    customRuleError.value = t('rule.selectInstallTarget')
+    return
+  }
+  
   addingCustomRule.value = true
   try {
-    await invoke('install_rule', {
-      ruleId: customRuleName.value.trim().toLowerCase().replace(/\s+/g, '-'),
-      content: customRuleContent.value,
-      location: ruleInstallLocation.value
-    })
+    const ruleId = customRuleName.value.trim().toLowerCase().replace(/\s+/g, '-')
+    
+    // 1. 安装到 OpenCode
+    if (ruleInstallTargets.value.opencode) {
+      await invoke('install_rule', {
+        ruleId: ruleId,
+        content: customRuleContent.value,
+        location: 'global_opencode'
+      })
+    }
+    
+    // 2. 安装到 Claude Code（rules 目录）
+    if (ruleInstallTargets.value.claudeCode) {
+      await invoke('install_rule', {
+        ruleId: ruleId,
+        content: customRuleContent.value,
+        location: 'global_claude'
+      })
+    }
+    
+    // 3. 同步到 CLI 工具的系统提示文件
+    const syncTargets: string[] = []
+    if (ruleInstallTargets.value.claudeCode) syncTargets.push('claude')
+    if (ruleInstallTargets.value.codex) syncTargets.push('codex')
+    if (ruleInstallTargets.value.gemini) syncTargets.push('gemini')
+    
+    if (syncTargets.length > 0) {
+      await invoke('sync_prompt', {
+        content: customRuleContent.value,
+        targets: syncTargets
+      })
+    }
     
     showCustomRuleModal.value = false
     installMessage.value = t('rule.customAdded', { name: customRuleName.value })
@@ -1339,18 +1452,31 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
             </button>
           </div>
           
-          <!-- 安装位置选择 -->
+          <!-- 安装位置选择（多选） -->
           <div class="px-6 py-3 border-b border-border bg-surface/30">
-            <label class="text-sm font-medium mr-3">{{ t('rule.installLocation') }}</label>
-            <select 
-              v-model="ruleInstallLocation"
-              class="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm focus:border-accent focus:outline-none"
-            >
-              <option value="global_opencode">{{ t('rule.locationOptions.globalOpencode') }}</option>
-              <option value="project_opencode">{{ t('rule.locationOptions.projectOpencode') }}</option>
-              <option value="global_claude">{{ t('rule.locationOptions.globalClaude') }}</option>
-              <option value="project_claude">{{ t('rule.locationOptions.projectClaude') }}</option>
-            </select>
+            <label class="text-sm font-medium block mb-2">{{ t('rule.installLocation') }}</label>
+            <div class="flex flex-wrap gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" v-model="ruleInstallTargets.opencode" class="w-4 h-4 rounded border-border accent-violet-500" />
+                <span class="text-sm">OpenCode</span>
+                <span class="text-xs text-muted-foreground">(~/.config/opencode/rules/)</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" v-model="ruleInstallTargets.claudeCode" class="w-4 h-4 rounded border-border accent-orange-500" />
+                <span class="text-sm">Claude Code</span>
+                <span class="text-xs text-muted-foreground">(~/.claude/)</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" v-model="ruleInstallTargets.codex" class="w-4 h-4 rounded border-border accent-green-500" />
+                <span class="text-sm">Codex</span>
+                <span class="text-xs text-muted-foreground">(AGENTS.md)</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" v-model="ruleInstallTargets.gemini" class="w-4 h-4 rounded border-border accent-blue-500" />
+                <span class="text-sm">Gemini</span>
+                <span class="text-xs text-muted-foreground">(GEMINI.md)</span>
+              </label>
+            </div>
           </div>
           
           <!-- 规则列表 -->
@@ -1460,18 +1586,39 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
               />
             </div>
             
-            <!-- 安装位置 -->
+            <!-- 安装位置（多选） -->
             <div>
               <label class="block text-sm font-medium mb-2">{{ t('rule.installLocation') }}</label>
-              <select 
-                v-model="ruleInstallLocation"
-                class="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm focus:border-violet-500 focus:outline-none"
-              >
-                <option value="global_opencode">{{ t('rule.locationOptions.globalOpencode') }}</option>
-                <option value="project_opencode">{{ t('rule.locationOptions.projectOpencode') }}</option>
-                <option value="global_claude">{{ t('rule.locationOptions.globalClaude') }}</option>
-                <option value="project_claude">{{ t('rule.locationOptions.projectClaude') }}</option>
-              </select>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-surface/50 border border-border hover:border-violet-500/50">
+                  <input type="checkbox" v-model="ruleInstallTargets.opencode" class="w-4 h-4 rounded border-border accent-violet-500" />
+                  <div>
+                    <span class="text-sm font-medium">OpenCode</span>
+                    <p class="text-xs text-muted-foreground">~/.config/opencode/rules/</p>
+                  </div>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-surface/50 border border-border hover:border-orange-500/50">
+                  <input type="checkbox" v-model="ruleInstallTargets.claudeCode" class="w-4 h-4 rounded border-border accent-orange-500" />
+                  <div>
+                    <span class="text-sm font-medium">Claude Code</span>
+                    <p class="text-xs text-muted-foreground">~/.claude/ + CLAUDE.md</p>
+                  </div>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-surface/50 border border-border hover:border-green-500/50">
+                  <input type="checkbox" v-model="ruleInstallTargets.codex" class="w-4 h-4 rounded border-border accent-green-500" />
+                  <div>
+                    <span class="text-sm font-medium">Codex</span>
+                    <p class="text-xs text-muted-foreground">AGENTS.md</p>
+                  </div>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-surface/50 border border-border hover:border-blue-500/50">
+                  <input type="checkbox" v-model="ruleInstallTargets.gemini" class="w-4 h-4 rounded border-border accent-blue-500" />
+                  <div>
+                    <span class="text-sm font-medium">Gemini</span>
+                    <p class="text-xs text-muted-foreground">GEMINI.md</p>
+                  </div>
+                </label>
+              </div>
             </div>
             
             <!-- 规则内容 -->
@@ -1479,7 +1626,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
               <label class="block text-sm font-medium mb-2">{{ t('rule.customContent') }}</label>
               <textarea
                 v-model="customRuleContent"
-                rows="10"
+                rows="8"
                 class="w-full px-3 py-2 rounded-lg bg-surface border border-border focus:border-violet-500 focus:outline-none text-sm font-mono resize-none"
                 spellcheck="false"
               ></textarea>
@@ -1539,10 +1686,30 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                 <label class="block text-sm font-medium mb-2">{{ t('rule.customContent') }}</label>
                 <textarea
                   v-model="editRuleContent"
-                  rows="18"
+                  rows="14"
                   class="w-full px-3 py-2 rounded-lg bg-surface border border-border focus:border-violet-500 focus:outline-none text-sm font-mono resize-none"
                   spellcheck="false"
                 ></textarea>
+              </div>
+              
+              <!-- CLI 工具同步选项 -->
+              <div class="pt-2 border-t border-border">
+                <label class="block text-sm font-medium mb-2">{{ t('rule.syncToCliTools') }}</label>
+                <div class="flex flex-wrap gap-3">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" v-model="editSyncToClaudeMd" class="w-4 h-4 rounded border-border" />
+                    <span class="text-sm">Claude Code (CLAUDE.md)</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" v-model="editSyncToAgentsMd" class="w-4 h-4 rounded border-border" />
+                    <span class="text-sm">Codex (AGENTS.md)</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" v-model="editSyncToGeminiMd" class="w-4 h-4 rounded border-border" />
+                    <span class="text-sm">Gemini (GEMINI.md)</span>
+                  </label>
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">{{ t('rule.syncToCliToolsHint') }}</p>
               </div>
               
               <!-- 错误提示 -->

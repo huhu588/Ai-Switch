@@ -441,6 +441,306 @@ pub struct AddRecommendedResult {
     pub skipped: Vec<String>,
 }
 
+/// 跨应用 MCP 同步目标
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum McpSyncTarget {
+    OpenCode,
+    ClaudeCode,
+    Codex,
+    Gemini,
+}
+
+/// 跨应用 MCP 同步输入
+#[derive(Debug, Deserialize)]
+pub struct CrossAppMcpSyncInput {
+    pub server_names: Vec<String>,
+    pub targets: Vec<McpSyncTarget>,
+}
+
+/// 跨应用 MCP 同步结果
+#[derive(Debug, Serialize)]
+pub struct CrossAppMcpSyncResult {
+    pub target: String,
+    pub success: bool,
+    pub message: String,
+    pub synced_count: usize,
+}
+
+/// 同步 MCP 服务器到多个应用
+#[tauri::command]
+pub fn sync_mcp_to_apps(
+    input: CrossAppMcpSyncInput,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<Vec<CrossAppMcpSyncResult>, AppError> {
+    use crate::config::claude_code_manager::{ClaudeCodeConfigManager, ClaudeMcpServer};
+    use crate::config::codex_manager::{CodexConfigManager, CodexMcpServer};
+    use crate::config::gemini_manager::{GeminiConfigManager, GeminiMcpServer};
+    
+    let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 获取要同步的服务器
+    let mcp_config = manager.mcp().read_config()?;
+    let servers_to_sync: Vec<(&String, &McpServer)> = if input.server_names.is_empty() {
+        mcp_config.servers.iter().filter(|(_, s)| s.enabled).collect()
+    } else {
+        mcp_config.servers.iter()
+            .filter(|(name, s)| s.enabled && input.server_names.contains(name))
+            .collect()
+    };
+    
+    let mut results = Vec::new();
+    
+    for target in &input.targets {
+        let result = match target {
+            McpSyncTarget::OpenCode => {
+                // 使用现有的 OpenCode 同步逻辑
+                let names: Option<&[String]> = if input.server_names.is_empty() {
+                    None
+                } else {
+                    Some(&input.server_names)
+                };
+                
+                match manager.mcp().sync_to_opencode(names) {
+                    Ok(_) => CrossAppMcpSyncResult {
+                        target: "OpenCode".to_string(),
+                        success: true,
+                        message: "同步成功".to_string(),
+                        synced_count: servers_to_sync.len(),
+                    },
+                    Err(e) => CrossAppMcpSyncResult {
+                        target: "OpenCode".to_string(),
+                        success: false,
+                        message: e.to_string(),
+                        synced_count: 0,
+                    },
+                }
+            }
+            McpSyncTarget::ClaudeCode => {
+                match ClaudeCodeConfigManager::new() {
+                    Ok(claude_manager) => {
+                        // 转换为 Claude Code 格式
+                        let claude_servers: HashMap<String, ClaudeMcpServer> = servers_to_sync.iter()
+                            .map(|(name, server)| {
+                                let claude_server = ClaudeMcpServer {
+                                    command: server.command.as_ref().and_then(|c| c.first().cloned()),
+                                    args: server.command.as_ref()
+                                        .map(|c| c.iter().skip(1).cloned().collect())
+                                        .unwrap_or_default(),
+                                    env: server.environment.clone(),
+                                    url: server.url.clone(),
+                                    headers: server.headers.clone(),
+                                };
+                                ((*name).clone(), claude_server)
+                            })
+                            .collect();
+                        
+                        match claude_manager.sync_mcp_servers(claude_servers) {
+                            Ok(_) => CrossAppMcpSyncResult {
+                                target: "Claude Code".to_string(),
+                                success: true,
+                                message: "同步成功".to_string(),
+                                synced_count: servers_to_sync.len(),
+                            },
+                            Err(e) => CrossAppMcpSyncResult {
+                                target: "Claude Code".to_string(),
+                                success: false,
+                                message: e,
+                                synced_count: 0,
+                            },
+                        }
+                    }
+                    Err(e) => CrossAppMcpSyncResult {
+                        target: "Claude Code".to_string(),
+                        success: false,
+                        message: e,
+                        synced_count: 0,
+                    },
+                }
+            }
+            McpSyncTarget::Codex => {
+                match CodexConfigManager::new() {
+                    Ok(codex_manager) => {
+                        // 转换为 Codex 格式
+                        let codex_servers: HashMap<String, CodexMcpServer> = servers_to_sync.iter()
+                            .filter_map(|(name, server)| {
+                                // Codex 只支持本地服务器
+                                server.command.as_ref().map(|cmd| {
+                                    let codex_server = CodexMcpServer {
+                                        command: cmd.clone(),
+                                        env: server.environment.clone(),
+                                    };
+                                    ((*name).clone(), codex_server)
+                                })
+                            })
+                            .collect();
+                        
+                        match codex_manager.sync_mcp_servers(codex_servers) {
+                            Ok(_) => CrossAppMcpSyncResult {
+                                target: "Codex".to_string(),
+                                success: true,
+                                message: "同步成功".to_string(),
+                                synced_count: servers_to_sync.len(),
+                            },
+                            Err(e) => CrossAppMcpSyncResult {
+                                target: "Codex".to_string(),
+                                success: false,
+                                message: e,
+                                synced_count: 0,
+                            },
+                        }
+                    }
+                    Err(e) => CrossAppMcpSyncResult {
+                        target: "Codex".to_string(),
+                        success: false,
+                        message: e,
+                        synced_count: 0,
+                    },
+                }
+            }
+            McpSyncTarget::Gemini => {
+                match GeminiConfigManager::new() {
+                    Ok(gemini_manager) => {
+                        // 转换为 Gemini 格式
+                        let gemini_servers: HashMap<String, GeminiMcpServer> = servers_to_sync.iter()
+                            .map(|(name, server)| {
+                                let gemini_server = GeminiMcpServer {
+                                    command: server.command.as_ref().and_then(|c| c.first().cloned()),
+                                    args: server.command.as_ref()
+                                        .map(|c| c.iter().skip(1).cloned().collect())
+                                        .unwrap_or_default(),
+                                    env: server.environment.clone(),
+                                    url: server.url.clone(),
+                                };
+                                ((*name).clone(), gemini_server)
+                            })
+                            .collect();
+                        
+                        match gemini_manager.sync_mcp_servers(gemini_servers) {
+                            Ok(_) => CrossAppMcpSyncResult {
+                                target: "Gemini CLI".to_string(),
+                                success: true,
+                                message: "同步成功".to_string(),
+                                synced_count: servers_to_sync.len(),
+                            },
+                            Err(e) => CrossAppMcpSyncResult {
+                                target: "Gemini CLI".to_string(),
+                                success: false,
+                                message: e,
+                                synced_count: 0,
+                            },
+                        }
+                    }
+                    Err(e) => CrossAppMcpSyncResult {
+                        target: "Gemini CLI".to_string(),
+                        success: false,
+                        message: e,
+                        synced_count: 0,
+                    },
+                }
+            }
+        };
+        
+        results.push(result);
+    }
+    
+    Ok(results)
+}
+
+/// 获取各应用的 MCP 配置状态
+#[derive(Debug, Serialize)]
+pub struct AppMcpStatus {
+    pub app_name: String,
+    pub is_configured: bool,
+    pub server_count: usize,
+    pub server_names: Vec<String>,
+}
+
+#[tauri::command]
+pub fn get_apps_mcp_status(
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<Vec<AppMcpStatus>, AppError> {
+    use crate::config::claude_code_manager::ClaudeCodeConfigManager;
+    use crate::config::codex_manager::CodexConfigManager;
+    use crate::config::gemini_manager::GeminiConfigManager;
+    
+    let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    let mut statuses = Vec::new();
+    
+    // OpenCode
+    let opencode_mcp = manager.mcp().read_config()?;
+    let opencode_servers: Vec<String> = opencode_mcp.servers.keys().cloned().collect();
+    statuses.push(AppMcpStatus {
+        app_name: "OpenCode".to_string(),
+        is_configured: !opencode_servers.is_empty(),
+        server_count: opencode_servers.len(),
+        server_names: opencode_servers,
+    });
+    
+    // Claude Code
+    if let Ok(claude_manager) = ClaudeCodeConfigManager::new() {
+        if let Ok(claude_servers) = claude_manager.get_mcp_servers() {
+            let server_names: Vec<String> = claude_servers.keys().cloned().collect();
+            statuses.push(AppMcpStatus {
+                app_name: "Claude Code".to_string(),
+                is_configured: !server_names.is_empty(),
+                server_count: server_names.len(),
+                server_names,
+            });
+        } else {
+            statuses.push(AppMcpStatus {
+                app_name: "Claude Code".to_string(),
+                is_configured: false,
+                server_count: 0,
+                server_names: Vec::new(),
+            });
+        }
+    }
+    
+    // Codex
+    if let Ok(codex_manager) = CodexConfigManager::new() {
+        if let Ok(codex_servers) = codex_manager.get_mcp_servers() {
+            let server_names: Vec<String> = codex_servers.keys().cloned().collect();
+            statuses.push(AppMcpStatus {
+                app_name: "Codex".to_string(),
+                is_configured: !server_names.is_empty(),
+                server_count: server_names.len(),
+                server_names,
+            });
+        } else {
+            statuses.push(AppMcpStatus {
+                app_name: "Codex".to_string(),
+                is_configured: false,
+                server_count: 0,
+                server_names: Vec::new(),
+            });
+        }
+    }
+    
+    // Gemini
+    if let Ok(gemini_manager) = GeminiConfigManager::new() {
+        if let Ok(gemini_servers) = gemini_manager.get_mcp_servers() {
+            let server_names: Vec<String> = gemini_servers.keys().cloned().collect();
+            statuses.push(AppMcpStatus {
+                app_name: "Gemini CLI".to_string(),
+                is_configured: !server_names.is_empty(),
+                server_count: server_names.len(),
+                server_names,
+            });
+        } else {
+            statuses.push(AppMcpStatus {
+                app_name: "Gemini CLI".to_string(),
+                is_configured: false,
+                server_count: 0,
+                server_names: Vec::new(),
+            });
+        }
+    }
+    
+    Ok(statuses)
+}
+
 /// 构建 McpServer 对象
 fn build_mcp_server(input: &McpServerInput) -> Result<McpServer, AppError> {
     let server_type = match input.server_type.as_str() {

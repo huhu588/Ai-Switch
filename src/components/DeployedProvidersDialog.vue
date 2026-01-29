@@ -27,17 +27,48 @@ const showModelTypeDialog = ref(false)
 const importingProvider = ref<DeployedProviderItem | null>(null)
 const syncingAll = ref(false)
 
-// 加载已部署的服务商
+// 加载已部署的服务商（从所有工具）
 async function loadData() {
   loading.value = true
   error.value = null
   try {
-    deployedProviders.value = await store.loadDeployedProviders()
+    deployedProviders.value = await store.loadAllDeployedProviders()
   } catch (e) {
     error.value = String(e)
   } finally {
     loading.value = false
   }
+}
+
+// 获取工具显示名称
+function getToolLabel(tool?: string): string {
+  switch (tool) {
+    case 'opencode': return 'OpenCode'
+    case 'claude_code': return 'Claude Code'
+    case 'codex': return 'Codex CLI'
+    case 'gemini': return 'Gemini CLI'
+    default: return 'OpenCode'
+  }
+}
+
+// 获取来源显示标签的颜色
+function getSourceClass(source: string): string {
+  switch (source) {
+    case 'global': return 'bg-blue-500/10 text-blue-500'
+    case 'project': return 'bg-emerald-500/10 text-emerald-500'
+    case 'claude_code': return 'bg-orange-500/10 text-orange-500'
+    case 'codex': return 'bg-purple-500/10 text-purple-500'
+    case 'gemini': return 'bg-cyan-500/10 text-cyan-500'
+    default: return 'bg-gray-500/10 text-gray-500'
+  }
+}
+
+// 获取来源显示名称
+function getSourceLabel(provider: DeployedProviderItem): string {
+  if (provider.tool && provider.tool !== 'opencode') {
+    return getToolLabel(provider.tool)
+  }
+  return provider.source === 'global' ? t('deployed.global') : t('deployed.project')
 }
 
 // 当对话框打开时加载数据
@@ -109,9 +140,24 @@ function startImport(provider: DeployedProviderItem) {
 async function importProvider(modelType: string) {
   if (!importingProvider.value || importing.value) return
   
-  importing.value = importingProvider.value.name
+  const provider = importingProvider.value
+  importing.value = provider.name
+  
   try {
-    await store.importDeployedProvider(importingProvider.value.name, modelType)
+    if (provider.tool === 'opencode' || !provider.tool) {
+      // OpenCode 来源直接导入
+      await store.importDeployedProvider(provider.name, modelType)
+    } else {
+      // 其他工具来源：创建新的 Provider（需要用户后续补充 API Key）
+      await store.addProvider({
+        name: provider.name,
+        api_key: '', // 需要用户后续填写
+        base_url: provider.base_url,
+        description: `从 ${getToolLabel(provider.tool)} 导入`,
+        model_type: modelType
+      })
+    }
+    
     showModelTypeDialog.value = false
     importingProvider.value = null
     // 发出事件通知父组件刷新列表
@@ -135,15 +181,22 @@ async function syncAll() {
   try {
     for (const provider of deployedProviders.value) {
       try {
-        // 优先使用推断的模型类型，如果没有则跳过
-        if (provider.inferred_model_type) {
-          await store.importDeployedProvider(provider.name, provider.inferred_model_type)
-          successCount++
+        const modelType = provider.inferred_model_type || 'codex'
+        
+        if (provider.tool === 'opencode' || !provider.tool) {
+          // OpenCode 来源直接导入
+          await store.importDeployedProvider(provider.name, modelType)
         } else {
-          // 如果无法推断模型类型，尝试默认使用 codex
-          await store.importDeployedProvider(provider.name, 'codex')
-          successCount++
+          // 其他工具来源：创建新的 Provider
+          await store.addProvider({
+            name: provider.name,
+            api_key: '', // 需要用户后续填写
+            base_url: provider.base_url,
+            description: `从 ${getToolLabel(provider.tool)} 导入`,
+            model_type: modelType
+          })
         }
+        successCount++
       } catch (e) {
         console.error(`导入 ${provider.name} 失败:`, e)
         failCount++
@@ -152,9 +205,9 @@ async function syncAll() {
     
     // 显示结果提示
     if (failCount === 0) {
-      error.value = null
+      error.value = `成功导入 ${successCount} 个服务商`
     } else {
-      error.value = `成功导入 ${successCount} 个，失败 ${failCount} 个`
+      error.value = `成功 ${successCount} 个，失败 ${failCount} 个`
     }
     
     // 通知父组件刷新列表
@@ -202,7 +255,7 @@ async function syncAll() {
             <!-- 服务商列表 -->
             <div v-else class="space-y-2">
               <p class="text-sm text-muted-foreground mb-3">
-                {{ t('deployed.description') }}
+                以下是各工具中已配置的服务商，可以一键同步导入到 Open Switch 管理。
               </p>
               
               <div
@@ -215,15 +268,22 @@ async function syncAll() {
                     <span class="font-medium truncate">{{ provider.name }}</span>
                     <span 
                       class="px-1.5 py-0.5 text-xs rounded"
-                      :class="provider.source === 'global' 
-                        ? 'bg-blue-500/10 text-blue-500' 
-                        : 'bg-emerald-500/10 text-emerald-500'"
+                      :class="getSourceClass(provider.tool || provider.source)"
                     >
-                      {{ provider.source === 'global' ? t('deployed.global') : t('deployed.project') }}
+                      {{ getSourceLabel(provider) }}
                     </span>
                   </div>
                   <div class="text-xs text-muted-foreground mt-1 truncate">
-                    {{ provider.base_url }} · {{ provider.model_count }} {{ t('deployed.models') }}
+                    {{ provider.base_url }}
+                    <template v-if="provider.model_count >= 0">
+                      · {{ provider.model_count }} {{ t('deployed.models') }}
+                    </template>
+                    <template v-else-if="provider.current_model">
+                      · {{ provider.current_model }}
+                    </template>
+                    <template v-else>
+                      · 已配置
+                    </template>
                   </div>
                 </div>
                 
@@ -242,8 +302,9 @@ async function syncAll() {
                     <SvgIcon v-else name="download" :size="16" />
                   </button>
                   
-                  <!-- 删除按钮 -->
+                  <!-- 删除按钮（仅 OpenCode 来源可删除） -->
                   <button
+                    v-if="!provider.tool || provider.tool === 'opencode'"
                     @click="removeProvider(provider)"
                     :disabled="deleting !== null || importing !== null"
                     class="p-2 rounded-lg text-muted-foreground hover:text-error-500 hover:bg-error-500/10 transition-colors disabled:opacity-50"

@@ -19,7 +19,8 @@ export default {
     selectAll: 'Select All',
     clearAll: 'Clear All',
     tip: 'Tip',
-    optional: 'Optional'
+    optional: 'Optional',
+    refresh: 'Refresh'
   },
 
   // Navigation
@@ -29,7 +30,13 @@ export default {
     skills: 'skills',
     ohmy: 'oh-my-opencode',
     backup: 'Backup',
-    status: 'Status'
+    status: 'Status',
+    claudeCode: 'Claude Code',
+    codex: 'Codex',
+    gemini: 'Gemini',
+    prompts: 'Prompts',
+    speedTest: 'Speed Test',
+    usage: 'Usage Stats'
   },
 
   // System status
@@ -79,7 +86,22 @@ export default {
       description: 'Optional'
     },
     showApiKey: 'Show',
-    hideApiKey: 'Hide'
+    hideApiKey: 'Hide',
+    // Multi-URL management
+    baseUrls: 'Base URL List',
+    addUrl: 'Add URL',
+    testAllUrls: 'Test All URLs',
+    autoSelectFastest: 'Auto Select Fastest',
+    activeUrl: 'Active',
+    latencyExcellent: 'Excellent',
+    latencyGood: 'Good',
+    latencyFair: 'Fair',
+    latencyPoor: 'Poor',
+    latencyFailed: 'Failed',
+    notTested: 'Not Tested',
+    modelManagement: 'Model Management',
+    addModel: 'Add Model',
+    noModels: 'No models'
   },
 
   // Model related
@@ -142,7 +164,8 @@ export default {
     globalConfig: 'Global Configuration',
     projectPath: './.opencode/opencode.json',
     globalPath: '~/.opencode/opencode.json',
-    selectTarget: 'Please select at least one target'
+    selectTarget: 'Please select at least one target',
+    cliTools: 'CLI Tools'
   },
 
   // Fetch models
@@ -343,7 +366,10 @@ export default {
     customContentRequired: 'Please enter rule content',
     customContentHint: 'Supports Markdown format, use YAML frontmatter to define globs patterns',
     customAdded: 'Added rule {name}',
-    content: 'Rule Content'
+    content: 'Rule Content',
+    syncToCliTools: 'Sync to CLI Tools',
+    syncToCliToolsHint: 'Also write rule content to corresponding CLI tool system prompt files',
+    selectInstallTarget: 'Please select at least one install target'
   },
 
   // Status page
@@ -502,5 +528,128 @@ export default {
     adding: 'Adding...',
     success: 'Provider added successfully!',
     error: 'Failed to add'
+  },
+
+  // Claude Code Configuration
+  claudeCode: {
+    description: 'Manage Claude Code CLI configuration',
+    notConfigured: 'Not Configured',
+    usingOfficial: 'Using Official API',
+    mcpServers: 'MCP Servers',
+    servers: '',
+    setApiKey: 'Set API Key',
+    apiKeyPlaceholder: 'Enter Anthropic API Key (sk-ant-...)',
+    setBaseUrl: 'Set Base URL',
+    baseUrlPlaceholder: 'Leave empty for official API, or enter custom URL',
+    baseUrlHint: 'Leave empty to use Anthropic official API, enter custom URL for third-party proxy',
+    setModel: 'Set Default Model',
+    modelPlaceholder: 'e.g. claude-sonnet-4-5-20250929'
+  },
+
+  // Codex Configuration
+  codex: {
+    description: 'Manage OpenAI Codex CLI configuration',
+    authStatus: 'Auth Status',
+    authenticated: 'Authenticated',
+    notAuthenticated: 'Not Authenticated',
+    providers: 'Model Providers',
+    configured: 'configured',
+    mcpServers: 'MCP Servers',
+    servers: '',
+    modelProviders: 'Model Providers',
+    noProviders: 'No custom model providers',
+    addProvider: 'Add Provider',
+    providerKey: 'Provider Key',
+    providerKeyPlaceholder: 'e.g. custom-provider',
+    displayName: 'Display Name',
+    displayNamePlaceholder: 'e.g. My Custom Provider',
+    envKey: 'Environment Variable',
+    envKeyPlaceholder: 'e.g. CUSTOM_API_KEY'
+  },
+
+  // Gemini Configuration
+  gemini: {
+    description: 'Manage Google Gemini CLI configuration',
+    notConfigured: 'Not Configured',
+    authMode: 'Auth Mode',
+    mcpServers: 'MCP Servers',
+    servers: '',
+    setApiKey: 'Set API Key',
+    apiKeyPlaceholder: 'Enter Gemini API Key',
+    setBaseUrl: 'Set Base URL',
+    baseUrlPlaceholder: 'Leave empty for official API, or enter custom URL',
+    baseUrlHint: 'Leave empty to use Google official API, enter custom URL for third-party proxy',
+    setModel: 'Set Default Model',
+    modelPlaceholder: 'e.g. gemini-2.5-pro'
+  },
+
+  // Prompts Management
+  prompts: {
+    title: 'Prompts Management',
+    description: 'Manage system prompts for CLI tools',
+    characters: 'characters',
+    placeholder: 'Enter system prompt content here (supports Markdown)...',
+    syncTo: 'Sync to',
+    sync: 'Sync',
+    presets: 'Preset Templates',
+    saved: 'Saved successfully',
+    confirmDelete: 'Are you sure you want to delete this Prompt file?'
+  },
+
+  // Speed Test
+  speedTest: {
+    title: 'Speed Test',
+    description: 'Test API endpoint response latency',
+    selectProviders: 'Select providers to test',
+    noProviders: 'No enabled providers. Please add and enable providers first.',
+    selectAll: 'Select All',
+    runTest: 'Run Test',
+    testing: 'Testing...',
+    noResults: 'Click "Run Test" to test selected providers',
+    retest: 'Retest',
+    avgLatency: 'Avg Latency',
+    successRate: 'Success Rate',
+    testCount: 'Test Count'
+  },
+
+  // Extended Navigation
+  navExt: {
+    claudeCode: 'Claude Code',
+    codex: 'Codex',
+    gemini: 'Gemini',
+    prompts: 'Prompts',
+    speedTest: 'Speed Test',
+    tools: 'Tools'
+  },
+
+  // Usage Statistics
+  usage: {
+    title: 'Usage Statistics',
+    description: 'View AI model usage and cost statistics',
+    totalRequests: 'Total Requests',
+    totalCost: 'Total Cost',
+    totalTokens: 'Total Tokens',
+    cacheTokens: 'Cache Tokens',
+    cacheCreation: 'Creation',
+    cacheHit: 'Hits',
+    trend: 'Usage Trend',
+    past24h: 'Past 24 Hours (Hourly)',
+    past7d: 'Past 7 Days',
+    past30d: 'Past 30 Days',
+    requests: 'Requests',
+    cost: 'Cost',
+    clearStats: 'Clear Statistics',
+    confirmClear: 'Are you sure you want to clear all usage statistics? This action cannot be undone.',
+    // Proxy Control
+    proxyControl: 'Proxy Control',
+    startProxy: 'Start Proxy',
+    stopProxy: 'Stop Proxy',
+    takeover: 'Takeover Config',
+    uptime: 'Uptime',
+    success: 'Success',
+    failed: 'Failed',
+    successRate: 'Success Rate',
+    byProvider: 'By Provider',
+    noData: 'No Data'
   }
 }

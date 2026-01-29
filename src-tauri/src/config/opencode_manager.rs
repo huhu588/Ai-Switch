@@ -130,6 +130,9 @@ impl OpenCodeConfigManager {
                     provider.metadata.description = meta.description.clone();
                 }
             }
+            
+            // 迁移单 URL 到多 URL（向后兼容）
+            provider.migrate_to_multi_url();
         }
 
         Ok(config)

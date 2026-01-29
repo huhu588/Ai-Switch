@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ProviderItem } from '@/stores/providers'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -20,7 +21,56 @@ const emit = defineEmits<{
   apply: []
   toggle: [name: string, enabled: boolean]
   viewDeployed: []
+  speedTest: [name: string]
 }>()
+
+// 正在测速的 Provider
+const testingProvider = ref<string | null>(null)
+
+// 获取延迟显示文本
+function getLatencyText(provider: ProviderItem) {
+  // 查找当前激活 URL 的延迟
+  const activeUrl = provider.base_urls?.find(u => u.url === provider.base_url)
+  if (activeUrl?.latency_ms !== null && activeUrl?.latency_ms !== undefined) {
+    return `${activeUrl.latency_ms}ms`
+  }
+  return null
+}
+
+// 获取延迟颜色
+function getLatencyColor(provider: ProviderItem) {
+  const activeUrl = provider.base_urls?.find(u => u.url === provider.base_url)
+  if (!activeUrl?.quality) return 'text-gray-400'
+  switch (activeUrl.quality) {
+    case 'excellent': return 'text-green-500'
+    case 'good': return 'text-blue-500'
+    case 'fair': return 'text-yellow-500'
+    case 'poor': return 'text-orange-500'
+    case 'failed': return 'text-red-500'
+    default: return 'text-gray-400'
+  }
+}
+
+// 触发测速
+function handleSpeedTest(providerName: string) {
+  testingProvider.value = providerName
+  emit('speedTest', providerName)
+  // 3秒后重置状态（实际测试完成后应由父组件控制）
+  setTimeout(() => {
+    if (testingProvider.value === providerName) {
+      testingProvider.value = null
+    }
+  }, 5000)
+}
+
+// 暴露方法给父组件
+defineExpose({
+  setTestingComplete(providerName: string) {
+    if (testingProvider.value === providerName) {
+      testingProvider.value = null
+    }
+  }
+})
 </script>
 
 <template>
@@ -95,32 +145,61 @@ const emit = defineEmits<{
               <span v-if="!provider.enabled" class="text-[10px] text-muted-foreground bg-surface px-1 rounded">
                 已禁用
               </span>
+              <!-- 显示当前 URL 的延迟 -->
+              <span 
+                v-if="getLatencyText(provider)" 
+                :class="['text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-surface border border-border', getLatencyColor(provider)]"
+              >
+                {{ getLatencyText(provider) }}
+              </span>
             </div>
             
             <!-- Actions -->
-            <div class="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <div class="flex items-center gap-1">
+              <!-- 测速按钮 -->
+              <button
+                @click.stop="handleSpeedTest(provider.name)"
+                :disabled="testingProvider === provider.name"
+                class="rounded p-1.5 text-blue-500 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                :title="testingProvider === provider.name ? '测速中...' : '测试延迟'"
+              >
+                <SvgIcon 
+                  :name="testingProvider === provider.name ? 'loading' : 'activity'" 
+                  :size="18" 
+                  :class="testingProvider === provider.name ? 'animate-spin' : ''"
+                />
+              </button>
               <!-- 启用/禁用开关 -->
               <button
                 @click.stop="emit('toggle', provider.name, !provider.enabled)"
-                class="rounded p-1 transition-colors"
-                :class="provider.enabled ? 'text-green-500 hover:bg-green-500/10' : 'text-muted-foreground hover:bg-surface-hover'"
+                class="rounded p-1.5 transition-colors relative"
+                :class="provider.enabled ? 'text-green-500 hover:bg-green-500/10' : 'text-gray-400 hover:bg-gray-500/10'"
                 :title="provider.enabled ? '点击禁用' : '点击启用'"
               >
-                <SvgIcon :name="provider.enabled ? 'eye' : 'eye-off'" :size="12" />
+                <!-- 开关样式 -->
+                <div 
+                  class="w-8 h-4 rounded-full transition-colors relative"
+                  :class="provider.enabled ? 'bg-green-500' : 'bg-gray-400'"
+                >
+                  <div 
+                    class="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all"
+                    :class="provider.enabled ? 'left-4' : 'left-0.5'"
+                  ></div>
+                </div>
               </button>
               <button
                 @click.stop="emit('edit', provider.name)"
-                class="rounded p-1 text-muted-foreground hover:bg-background hover:text-primary transition-colors"
+                class="rounded p-1.5 text-muted-foreground hover:bg-background hover:text-primary transition-colors"
                 :title="t('provider.edit')"
               >
-                <SvgIcon name="edit" :size="12" />
+                <SvgIcon name="edit" :size="18" />
               </button>
               <button
                 @click.stop="emit('delete', provider.name)"
-                class="rounded p-1 text-red-400 hover:bg-red-500/20 hover:text-red-500 transition-colors"
+                class="rounded p-1.5 text-red-400 hover:bg-red-500/20 hover:text-red-500 transition-colors"
                 :title="t('provider.delete')"
               >
-                <SvgIcon name="trash" :size="12" />
+                <SvgIcon name="trash" :size="18" />
               </button>
             </div>
           </div>

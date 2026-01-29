@@ -7,11 +7,21 @@ use std::sync::Mutex;
 use crate::config::ConfigManager;
 use crate::error::AppError;
 
+/// Base URL 配置（传递给前端）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseUrlItem {
+    pub url: String,
+    pub latency_ms: Option<u64>,
+    pub last_tested: Option<String>,
+    pub quality: String,
+}
+
 /// Provider 列表项（传递给前端）
 #[derive(Debug, Clone, Serialize)]
 pub struct ProviderItem {
     pub name: String,
-    pub base_url: String,
+    pub base_url: String,           // 当前激活的 URL（向后兼容）
+    pub base_urls: Vec<BaseUrlItem>, // 所有 URL 列表
     pub model_count: usize,
     pub description: Option<String>,
     pub model_type: String,
@@ -31,7 +41,8 @@ pub struct ProviderDetail {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProviderOptions {
-    pub base_url: String,
+    pub base_url: String,           // 当前激活的 URL
+    pub base_urls: Vec<BaseUrlItem>, // 所有 URL 列表
     pub api_key: String,
 }
 
@@ -40,7 +51,9 @@ pub struct ProviderOptions {
 pub struct ProviderInput {
     pub name: String,
     pub api_key: String,
-    pub base_url: String,
+    pub base_url: String,           // 激活的 URL
+    #[serde(default)]
+    pub base_urls: Vec<String>,     // 所有 URL 列表（可选，为空时使用 base_url）
     pub npm: Option<String>,
     pub description: Option<String>,
     pub model_type: Option<String>,
@@ -50,6 +63,35 @@ pub struct ProviderInput {
 
 fn default_auto_add_v1_suffix() -> bool {
     true
+}
+
+/// 添加 Base URL 的参数
+#[derive(Debug, Deserialize)]
+pub struct AddBaseUrlInput {
+    pub provider_name: String,
+    pub url: String,
+}
+
+/// 删除 Base URL 的参数
+#[derive(Debug, Deserialize)]
+pub struct RemoveBaseUrlInput {
+    pub provider_name: String,
+    pub url: String,
+}
+
+/// 设置激活 Base URL 的参数
+#[derive(Debug, Deserialize)]
+pub struct SetActiveBaseUrlInput {
+    pub provider_name: String,
+    pub url: String,
+}
+
+/// 更新 URL 延迟的参数
+#[derive(Debug, Deserialize)]
+pub struct UpdateUrlLatencyInput {
+    pub provider_name: String,
+    pub url: String,
+    pub latency_ms: Option<u64>,
 }
 
 /// 应用配置的参数
@@ -70,14 +112,39 @@ pub fn get_providers(
     
     let mut items: Vec<ProviderItem> = providers
         .iter()
-        .map(|(name, provider)| ProviderItem {
-            name: name.clone(),
-            base_url: provider.options.base_url.clone(),
-            model_count: provider.models.len(),
-            description: provider.metadata.description.clone(),
-            // 从顶级字段读取 model_type
-            model_type: provider.model_type.clone().unwrap_or_else(|| "claude".to_string()),
-            enabled: provider.enabled,
+        .map(|(name, provider)| {
+            // 转换 base_urls 到前端格式
+            let base_urls: Vec<BaseUrlItem> = provider.options.base_urls
+                .iter()
+                .map(|u| BaseUrlItem {
+                    url: u.url.clone(),
+                    latency_ms: u.latency_ms,
+                    last_tested: u.last_tested.clone(),
+                    quality: u.get_quality().to_string(),
+                })
+                .collect();
+            
+            // 如果 base_urls 为空，使用 base_url 创建一个
+            let base_urls = if base_urls.is_empty() {
+                vec![BaseUrlItem {
+                    url: provider.options.base_url.clone(),
+                    latency_ms: None,
+                    last_tested: None,
+                    quality: "untested".to_string(),
+                }]
+            } else {
+                base_urls
+            };
+            
+            ProviderItem {
+                name: name.clone(),
+                base_url: provider.options.base_url.clone(),
+                base_urls,
+                model_count: provider.models.len(),
+                description: provider.metadata.description.clone(),
+                model_type: provider.model_type.clone().unwrap_or_else(|| "claude".to_string()),
+                enabled: provider.enabled,
+            }
         })
         .collect();
     
@@ -96,17 +163,70 @@ pub fn get_provider(
     let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
     let provider = manager.opencode().get_provider(&name)?;
     
-    Ok(provider.map(|p| ProviderDetail {
-        name: p.name.clone(),
-        npm: p.npm.clone(),
-        model_type: p.model_type.clone(),
-        options: ProviderOptions {
-            base_url: p.options.base_url.clone(),
-            api_key: p.options.api_key.clone(),
-        },
-        models: p.models.clone(),
-        description: p.metadata.description.clone(),
+    Ok(provider.map(|p| {
+        // 转换 base_urls 到前端格式
+        let base_urls: Vec<BaseUrlItem> = p.options.base_urls
+            .iter()
+            .map(|u| BaseUrlItem {
+                url: u.url.clone(),
+                latency_ms: u.latency_ms,
+                last_tested: u.last_tested.clone(),
+                quality: u.get_quality().to_string(),
+            })
+            .collect();
+        
+        // 如果 base_urls 为空，使用 base_url 创建一个
+        let base_urls = if base_urls.is_empty() {
+            vec![BaseUrlItem {
+                url: p.options.base_url.clone(),
+                latency_ms: None,
+                last_tested: None,
+                quality: "untested".to_string(),
+            }]
+        } else {
+            base_urls
+        };
+        
+        ProviderDetail {
+            name: p.name.clone(),
+            npm: p.npm.clone(),
+            model_type: p.model_type.clone(),
+            options: ProviderOptions {
+                base_url: p.options.base_url.clone(),
+                base_urls,
+                api_key: p.options.api_key.clone(),
+            },
+            models: p.models.clone(),
+            description: p.metadata.description.clone(),
+        }
     }))
+}
+
+/// Provider 应用信息（用于应用到 CLI 工具）
+#[derive(Debug, Clone, Serialize)]
+pub struct ProviderApplyInfo {
+    pub name: String,
+    pub api_key: String,
+    pub base_url: String,
+    pub model_type: String,
+}
+
+/// 获取 Provider 信息用于应用到其他 CLI 工具
+#[tauri::command]
+pub fn get_provider_for_apply(
+    provider_name: String,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<ProviderApplyInfo, AppError> {
+    let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    let provider = manager.opencode().get_provider(&provider_name)?
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' not found", provider_name)))?;
+    
+    Ok(ProviderApplyInfo {
+        name: provider.name.clone(),
+        api_key: provider.options.api_key.clone(),
+        base_url: provider.options.base_url.clone(),
+        model_type: provider.model_type.clone().unwrap_or_else(|| "claude".to_string()),
+    })
 }
 
 /// 添加新 Provider
@@ -358,4 +478,141 @@ pub fn import_deployed_provider(
     manager.opencode_mut().write_config(&config)?;
     
     Ok(())
+}
+
+// ============================================================================
+// 多 Base URL 管理命令
+// ============================================================================
+
+/// 添加 Base URL 到 Provider
+#[tauri::command]
+pub fn add_provider_base_url(
+    input: AddBaseUrlInput,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<(), AppError> {
+    let mut manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 读取当前配置
+    let mut config = manager.opencode().read_config()?;
+    
+    // 获取 provider
+    let provider = config.get_provider_mut(&input.provider_name)
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' 不存在", input.provider_name)))?;
+    
+    // 添加 URL
+    provider.add_base_url(input.url);
+    
+    // 写回配置文件
+    manager.opencode_mut().write_config(&config)?;
+    
+    Ok(())
+}
+
+/// 从 Provider 删除 Base URL
+#[tauri::command]
+pub fn remove_provider_base_url(
+    input: RemoveBaseUrlInput,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<(), AppError> {
+    let mut manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 读取当前配置
+    let mut config = manager.opencode().read_config()?;
+    
+    // 获取 provider
+    let provider = config.get_provider_mut(&input.provider_name)
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' 不存在", input.provider_name)))?;
+    
+    // 确保至少保留一个 URL
+    if provider.options.base_urls.len() <= 1 {
+        return Err(AppError::Custom("至少需要保留一个 Base URL".to_string()));
+    }
+    
+    // 删除 URL
+    if !provider.remove_base_url(&input.url) {
+        return Err(AppError::Custom(format!("URL '{}' 不存在", input.url)));
+    }
+    
+    // 写回配置文件
+    manager.opencode_mut().write_config(&config)?;
+    
+    Ok(())
+}
+
+/// 设置 Provider 的激活 Base URL
+#[tauri::command]
+pub fn set_active_base_url(
+    input: SetActiveBaseUrlInput,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<(), AppError> {
+    let mut manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 读取当前配置
+    let mut config = manager.opencode().read_config()?;
+    
+    // 获取 provider
+    let provider = config.get_provider_mut(&input.provider_name)
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' 不存在", input.provider_name)))?;
+    
+    // 设置激活 URL
+    if !provider.set_active_base_url(&input.url) {
+        return Err(AppError::Custom(format!("URL '{}' 不在 Provider 的 URL 列表中", input.url)));
+    }
+    
+    // 写回配置文件
+    manager.opencode_mut().write_config(&config)?;
+    
+    Ok(())
+}
+
+/// 更新 URL 的延迟测试结果
+#[tauri::command]
+pub fn update_url_latency(
+    input: UpdateUrlLatencyInput,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<(), AppError> {
+    let mut manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 读取当前配置
+    let mut config = manager.opencode().read_config()?;
+    
+    // 获取 provider
+    let provider = config.get_provider_mut(&input.provider_name)
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' 不存在", input.provider_name)))?;
+    
+    // 更新延迟
+    provider.update_url_latency(&input.url, input.latency_ms);
+    
+    // 写回配置文件
+    manager.opencode_mut().write_config(&config)?;
+    
+    Ok(())
+}
+
+/// 自动选择最快的 Base URL
+#[tauri::command]
+pub fn auto_select_fastest_base_url(
+    provider_name: String,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+) -> Result<String, AppError> {
+    let mut manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    
+    // 读取当前配置
+    let mut config = manager.opencode().read_config()?;
+    
+    // 获取 provider
+    let provider = config.get_provider_mut(&provider_name)
+        .ok_or_else(|| AppError::Custom(format!("Provider '{}' 不存在", provider_name)))?;
+    
+    // 自动选择最快的 URL
+    if !provider.auto_select_fastest_url() {
+        return Err(AppError::Custom("没有可用的延迟测试结果，无法自动选择".to_string()));
+    }
+    
+    let selected_url = provider.get_active_base_url().to_string();
+    
+    // 写回配置文件
+    manager.opencode_mut().write_config(&config)?;
+    
+    Ok(selected_url)
 }

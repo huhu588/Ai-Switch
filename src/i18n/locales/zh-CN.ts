@@ -19,7 +19,8 @@ export default {
     selectAll: '全选',
     clearAll: '清空',
     tip: '提示',
-    optional: '可选'
+    optional: '可选',
+    refresh: '刷新'
   },
 
   // 导航
@@ -29,7 +30,13 @@ export default {
     skills: 'skills',
     ohmy: 'oh-my-opencode',
     backup: '备份',
-    status: '状态'
+    status: '状态',
+    claudeCode: 'Claude Code',
+    codex: 'Codex',
+    gemini: 'Gemini',
+    prompts: 'Prompts',
+    speedTest: '延迟测试',
+    usage: '使用统计'
   },
 
   // 系统状态
@@ -79,7 +86,22 @@ export default {
       description: '可选'
     },
     showApiKey: '显示',
-    hideApiKey: '隐藏'
+    hideApiKey: '隐藏',
+    // 多 URL 管理
+    baseUrls: 'Base URL 列表',
+    addUrl: '添加 URL',
+    testAllUrls: '测试所有 URL',
+    autoSelectFastest: '自动选择最快',
+    activeUrl: '当前使用',
+    latencyExcellent: '优秀',
+    latencyGood: '良好',
+    latencyFair: '一般',
+    latencyPoor: '较差',
+    latencyFailed: '失败',
+    notTested: '未测试',
+    modelManagement: '模型管理',
+    addModel: '添加模型',
+    noModels: '暂无模型'
   },
 
   // Model 相关
@@ -142,7 +164,8 @@ export default {
     globalConfig: '全局配置',
     projectPath: './.opencode/opencode.json',
     globalPath: '~/.opencode/opencode.json',
-    selectTarget: '请至少选择一个应用目标'
+    selectTarget: '请至少选择一个应用目标',
+    cliTools: 'CLI 工具'
   },
 
   // 获取模型
@@ -343,7 +366,10 @@ export default {
     customContentRequired: '请输入规则内容',
     customContentHint: '支持 Markdown 格式，可使用 YAML frontmatter 定义 globs 匹配模式',
     customAdded: '已添加规则 {name}',
-    content: '规则内容'
+    content: '规则内容',
+    syncToCliTools: '同步到 CLI 工具',
+    syncToCliToolsHint: '同时将规则内容写入对应 CLI 工具的系统提示文件',
+    selectInstallTarget: '请至少选择一个安装位置'
   },
 
   // 状态页面
@@ -502,5 +528,128 @@ export default {
     adding: '添加中...',
     success: '服务商添加成功！',
     error: '添加失败'
+  },
+
+  // Claude Code 配置
+  claudeCode: {
+    description: '管理 Claude Code CLI 的配置',
+    notConfigured: '未配置',
+    usingOfficial: '使用官方 API',
+    mcpServers: 'MCP 服务器',
+    servers: '个',
+    setApiKey: '设置 API Key',
+    apiKeyPlaceholder: '输入 Anthropic API Key (sk-ant-...)',
+    setBaseUrl: '设置 Base URL',
+    baseUrlPlaceholder: '留空使用官方 API，或输入自定义 URL',
+    baseUrlHint: '留空将使用 Anthropic 官方 API，输入自定义 URL 可使用第三方代理',
+    setModel: '设置默认模型',
+    modelPlaceholder: '例如: claude-sonnet-4-5-20250929'
+  },
+
+  // Codex 配置
+  codex: {
+    description: '管理 OpenAI Codex CLI 的配置',
+    authStatus: '认证状态',
+    authenticated: '已认证',
+    notAuthenticated: '未认证',
+    providers: '模型提供商',
+    configured: '个已配置',
+    mcpServers: 'MCP 服务器',
+    servers: '个',
+    modelProviders: '模型提供商列表',
+    noProviders: '暂无自定义模型提供商',
+    addProvider: '添加提供商',
+    providerKey: '提供商 Key',
+    providerKeyPlaceholder: '例如: custom-provider',
+    displayName: '显示名称',
+    displayNamePlaceholder: '例如: My Custom Provider',
+    envKey: '环境变量名',
+    envKeyPlaceholder: '例如: CUSTOM_API_KEY'
+  },
+
+  // Gemini 配置
+  gemini: {
+    description: '管理 Google Gemini CLI 的配置',
+    notConfigured: '未配置',
+    authMode: '认证模式',
+    mcpServers: 'MCP 服务器',
+    servers: '个',
+    setApiKey: '设置 API Key',
+    apiKeyPlaceholder: '输入 Gemini API Key',
+    setBaseUrl: '设置 Base URL',
+    baseUrlPlaceholder: '留空使用官方 API，或输入自定义 URL',
+    baseUrlHint: '留空将使用 Google 官方 API，输入自定义 URL 可使用第三方代理',
+    setModel: '设置默认模型',
+    modelPlaceholder: '例如: gemini-2.5-pro'
+  },
+
+  // Prompts 管理
+  prompts: {
+    title: 'Prompts 管理',
+    description: '管理各 CLI 工具的系统提示文件',
+    characters: '字符',
+    placeholder: '在此输入系统提示内容（支持 Markdown）...',
+    syncTo: '同步到',
+    sync: '同步',
+    presets: '预设模板',
+    saved: '保存成功',
+    confirmDelete: '确定要删除此 Prompt 文件吗？'
+  },
+
+  // 速度测试
+  speedTest: {
+    title: '延迟测试',
+    description: '测试 API 端点的响应延迟',
+    selectProviders: '选择要测试的服务商',
+    noProviders: '暂无启用的服务商，请先在服务商页面添加并启用',
+    selectAll: '全选',
+    runTest: '开始测试',
+    testing: '测试中...',
+    noResults: '点击"开始测试"以测试选中的服务商',
+    retest: '重新测试',
+    avgLatency: '平均延迟',
+    successRate: '成功率',
+    testCount: '测试次数'
+  },
+
+  // 扩展导航
+  navExt: {
+    claudeCode: 'Claude Code',
+    codex: 'Codex',
+    gemini: 'Gemini',
+    prompts: 'Prompts',
+    speedTest: '延迟测试',
+    tools: '工具'
+  },
+
+  // 使用统计
+  usage: {
+    title: '使用统计',
+    description: '查看 AI 模型的使用情况和成本统计',
+    totalRequests: '总请求数',
+    totalCost: '总成本',
+    totalTokens: '总 Token 数',
+    cacheTokens: '缓存 Token',
+    cacheCreation: '创建',
+    cacheHit: '命中',
+    trend: '使用趋势',
+    past24h: '过去 24 小时（按小时）',
+    past7d: '过去 7 天',
+    past30d: '过去 30 天',
+    requests: '请求数',
+    cost: '成本',
+    clearStats: '清除统计',
+    confirmClear: '确定要清除所有使用统计数据吗？此操作不可撤销。',
+    // 代理控制
+    proxyControl: '代理控制',
+    startProxy: '启动代理',
+    stopProxy: '停止代理',
+    takeover: '接管配置',
+    uptime: '运行时长',
+    success: '成功',
+    failed: '失败',
+    successRate: '成功率',
+    byProvider: '按服务商统计',
+    noData: '暂无数据'
   }
 }

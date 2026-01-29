@@ -230,6 +230,15 @@ const navItems = computed(() => [
   },
 ])
 
+// 工具导航
+const toolNavItems = computed(() => [
+  {
+    name: t('nav.usage'),
+    path: '/usage',
+    icon: 'activity'
+  }
+])
+
 const version = ref('')
 const localIp = ref('')
 
@@ -327,7 +336,8 @@ onUnmounted(() => {
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-3 py-6 space-y-1">
+      <nav class="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+        <!-- OpenCode 配置 -->
         <router-link
           v-for="item in navItems"
           :key="item.path"
@@ -352,6 +362,43 @@ onUnmounted(() => {
           />
           <span class="tracking-wide">{{ item.name }}</span>
         </router-link>
+
+        <!-- 工具分隔线（仅当有工具导航项时显示） -->
+        <template v-if="toolNavItems.length > 0">
+          <div class="my-4 px-3">
+            <div class="flex items-center gap-2">
+              <div class="h-px flex-1 bg-border/50"></div>
+              <span class="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">{{ t('navExt.tools') }}</span>
+              <div class="h-px flex-1 bg-border/50"></div>
+            </div>
+          </div>
+
+          <!-- 工具导航 -->
+          <router-link
+            v-for="item in toolNavItems"
+            :key="item.path"
+            :to="item.path"
+            class="group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200"
+            :class="[
+              route.path === item.path
+                ? 'bg-accent/10 text-accent'
+                : 'text-muted-foreground hover:bg-surface-hover hover:text-primary'
+            ]"
+          >
+            <!-- Active Line Indicator -->
+            <div 
+              v-if="route.path === item.path"
+              class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-accent shadow-[0_0_8px_currentColor]"
+            ></div>
+
+            <SvgIcon 
+              :name="item.icon" 
+              :size="18" 
+              class="transition-transform duration-200 group-hover:scale-110"
+            />
+            <span class="tracking-wide">{{ item.name }}</span>
+          </router-link>
+        </template>
       </nav>
 
       <!-- Footer / Language & Theme Toggle -->
@@ -387,7 +434,7 @@ onUnmounted(() => {
       <header class="flex h-16 shrink-0 items-center justify-between border-b border-border/50 px-8 bg-background/30 backdrop-blur-sm">
         <div class="flex items-center gap-2">
           <h2 class="text-lg font-bold tracking-tight text-primary">
-            {{ navItems.find(item => item.path === route.path)?.name || t('app.title') }}
+            {{ navItems.find(item => item.path === route.path)?.name || toolNavItems.find(item => item.path === route.path)?.name || t('app.title') }}
           </h2>
         </div>
         <div class="flex items-center gap-4">
