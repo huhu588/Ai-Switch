@@ -214,7 +214,42 @@ jobs:
       - name: List artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          find artifacts -type f -name "*.dmg" -o -name "*.msi" -o -name "*.exe" | head -20
+          find artifacts -type f -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.sig" -o -name "*.json" | head -30
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate latest.json for updater
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          REPO="${{ github.repository }}"
+          
+          # 创建 latest.json
+          cat > artifacts/latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Open Switch v${VERSION} 发布",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "",
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_aarch64.dmg"
+              },
+              "darwin-x86_64": {
+                "signature": "",
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_x64.dmg"
+              },
+              "windows-x86_64": {
+                "signature": "",
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/Open.Switch_${VERSION}_x64-setup.exe"
+              }
+            }
+          }
+          EOF
+          
+          echo "Generated latest.json:"
+          cat artifacts/latest.json
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -223,6 +258,8 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.msi
             artifacts/**/*.exe
-          draft: true
+            artifacts/**/*.sig
+            artifacts/latest.json
+          draft: false
           generate_release_notes: true
           fail_on_unmatched_files: false
