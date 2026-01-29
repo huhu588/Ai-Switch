@@ -1,0 +1,130 @@
+# ===================
+# Dependencies
+# ===================
+node_modules/
+.pnpm-store/
+
+# ===================
+# Build outputs
+# ===================
+target/
+dist/
+dist-ssr/
+*.local
+
+# ===================
+# Lock files
+# ===================
+# Note: package-lock.json should be committed for reproducible builds
+Cargo.lock
+bun.lock
+pnpm-lock.yaml
+yarn.lock
+
+# ===================
+# Tauri
+# ===================
+src-tauri/target/
+src-tauri/gen/schemas/
+.tauri/
+
+# Tauri signing keys (NEVER commit these!)
+*.key
+*.pem
+tauri-*.key
+
+# ===================
+# Config files with sensitive data
+# ===================
+.opencode/
+src-tauri/.opencode/
+*.env
+*.env.*
+!*.env.example
+.env.local
+.env.*.local
+
+# Secrets and credentials
+**/secrets/
+**/credentials/
+*.secret
+*.credentials
+config.local.*
+
+# ===================
+# IDE and Editor
+# ===================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Cursor IDE
+.cursor/
+.cursorignore
+
+# ===================
+# OS generated files
+# ===================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===================
+# Logs
+# ===================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===================
+# Testing
+# ===================
+coverage/
+.nyc_output/
+
+# ===================
+# Cache
+# ===================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# ===================
+# Temporary files
+# ===================
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ===================
+# Project specific
+# ===================
+# Pencil design files (design tool files, not needed in repo)
+*.pen
+
+# Test scripts
+test-*.ps1
+test-*.sh
+
+# MCP server config (may contain sensitive data)
+mcps/
+
+# Local development notes
+*.local.md
+WARP.md

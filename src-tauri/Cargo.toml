@@ -1,0 +1,66 @@
+[package]
+name = "open-switch"
+version = "1.4.0"
+edition = "2021"
+description = "Open Switch工具"
+authors = ["moguw <weiyiding0@gmail.com>"]
+license = "MIT"
+repository = ""
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri 框架
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+tauri-plugin-store = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = "2"
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 异步运行时 (只启用需要的 features 加速编译)
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "fs", "io-util"] }
+
+# HTTP 客户端 (只启用需要的 features)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "2.0"
+
+# 系统路径
+dirs = "5.0"
+
+# 时间处理
+chrono = "0.4"
+
+# URL 解析
+url = "2.5"
+urlencoding = "2.1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+# 开发模式优化 - 加快编译速度
+[profile.dev]
+incremental = true       # 增量编译
+opt-level = 0            # 不优化，快速编译
+
+# 开发模式下优化依赖（依赖用优化模式编译，自己的代码不优化）
+[profile.dev.package."*"]
+opt-level = 2
+
+# 发布模式优化 - 更小的二进制文件
+[profile.release]
+lto = true               # 链接时优化
+codegen-units = 1        # 单代码生成单元，更好的优化
+strip = true             # 移除调试符号
+panic = "abort"          # 减小二进制体积
