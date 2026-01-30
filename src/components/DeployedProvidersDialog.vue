@@ -29,6 +29,37 @@ const showModelTypeDialog = ref(false)
 const importingProvider = ref<DeployedProviderItem | null>(null)
 const syncingAll = ref(false)
 
+// 选中的服务商列表
+const selectedProviders = ref<Set<string>>(new Set())
+
+// 切换选中状态
+function toggleSelect(provider: DeployedProviderItem) {
+  const name = provider.name
+  if (selectedProviders.value.has(name)) {
+    selectedProviders.value.delete(name)
+  } else {
+    selectedProviders.value.add(name)
+  }
+  // 触发响应式更新
+  selectedProviders.value = new Set(selectedProviders.value)
+}
+
+// 检查是否选中
+function isSelected(provider: DeployedProviderItem): boolean {
+  return selectedProviders.value.has(provider.name)
+}
+
+// 全选/取消全选
+function toggleSelectAll() {
+  if (selectedProviders.value.size === deployedProviders.value.length) {
+    // 全部取消
+    selectedProviders.value = new Set()
+  } else {
+    // 全选
+    selectedProviders.value = new Set(deployedProviders.value.map(p => p.name))
+  }
+}
+
 // 加载已部署的服务商（从所有工具）
 async function loadData() {
   loading.value = true
@@ -99,39 +130,43 @@ function close() {
   emit('update:visible', false)
 }
 
+async function deleteProviderByTool(provider: DeployedProviderItem) {
+  const tool = provider.tool || 'opencode'
+  
+  switch (tool) {
+    case 'opencode':
+      // OpenCode 来源
+      await store.removeDeployedProvider(
+        provider.name,
+        provider.source === 'global',
+        provider.source === 'project'
+      )
+      break
+    case 'claude_code':
+      // Claude Code 来源：清除配置
+      await invoke('clear_claude_code_config')
+      break
+    case 'codex':
+      // Codex 来源：删除 provider
+      await invoke('remove_codex_provider', { name: provider.name })
+      break
+    case 'gemini':
+      // Gemini 来源：清除配置
+      await invoke('clear_gemini_config')
+      break
+    default:
+      // 其他来源尝试通用删除
+      console.warn('未知的工具来源:', tool)
+  }
+}
+
 // 删除已部署的服务商（支持所有来源）
 async function removeProvider(provider: DeployedProviderItem) {
   if (deleting.value) return
   
   deleting.value = provider.name
   try {
-    const tool = provider.tool || 'opencode'
-    
-    switch (tool) {
-      case 'opencode':
-        // OpenCode 来源
-        await store.removeDeployedProvider(
-          provider.name,
-          provider.source === 'global',
-          provider.source === 'project'
-        )
-        break
-      case 'claude_code':
-        // Claude Code 来源：清除配置
-        await invoke('clear_claude_code_config')
-        break
-      case 'codex':
-        // Codex 来源：删除 provider
-        await invoke('remove_codex_provider', { name: provider.name })
-        break
-      case 'gemini':
-        // Gemini 来源：清除配置
-        await invoke('clear_gemini_config')
-        break
-      default:
-        // 其他来源尝试通用删除
-        console.warn('未知的工具来源:', tool)
-    }
+    await deleteProviderByTool(provider)
     // 重新加载列表
     await loadData()
   } catch (e) {
@@ -146,16 +181,21 @@ async function removeAll() {
   if (deleting.value || deployedProviders.value.length === 0) return
   
   deleting.value = 'all'
+  const failedNames: string[] = []
   try {
     for (const provider of deployedProviders.value) {
-      await store.removeDeployedProvider(
-        provider.name,
-        provider.source === 'global',
-        provider.source === 'project'
-      )
+      try {
+        await deleteProviderByTool(provider)
+      } catch (e) {
+        console.error(`删除 ${provider.name} 失败:`, e)
+        failedNames.push(provider.name)
+      }
     }
     // 重新加载列表
     await loadData()
+    if (failedNames.length > 0) {
+      error.value = `部分删除失败: ${failedNames.join(', ')}`
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -205,6 +245,82 @@ async function importProvider(modelType: string) {
     error.value = String(e)
   } finally {
     importing.value = null
+  }
+}
+
+// 导入选中的服务商
+async function importSelected() {
+  if (syncingAll.value || selectedProviders.value.size === 0) return
+  
+  syncingAll.value = true
+  error.value = null
+  successMessage.value = null
+  let successCount = 0
+  let skipCount = 0
+  let failCount = 0
+  const failedNames: string[] = []
+  
+  // 获取已存在的 Provider 列表
+  const existingProviders = new Set(store.providers.map(p => p.name))
+  
+  // 获取选中的服务商
+  const selectedList = deployedProviders.value.filter(p => selectedProviders.value.has(p.name))
+  
+  try {
+    for (const provider of selectedList) {
+      // 检查是否已存在
+      if (existingProviders.has(provider.name)) {
+        console.log(`跳过已存在的 Provider: ${provider.name}`)
+        skipCount++
+        continue
+      }
+      
+      try {
+        const modelType = provider.inferred_model_type || 'codex'
+        
+        if (provider.tool === 'opencode' || !provider.tool) {
+          await store.importDeployedProvider(provider.name, modelType)
+        } else {
+          await store.addProvider({
+            name: provider.name,
+            api_key: provider.api_key || '',
+            base_url: provider.base_url,
+            description: `从 ${getToolLabel(provider.tool)} 导入`,
+            model_type: modelType
+          })
+        }
+        successCount++
+      } catch (e) {
+        const errorMsg = String(e)
+        if (errorMsg.includes('已存在')) {
+          skipCount++
+        } else {
+          console.error(`导入 ${provider.name} 失败:`, e)
+          failCount++
+          failedNames.push(provider.name)
+        }
+      }
+    }
+    
+    // 显示结果提示
+    const parts: string[] = []
+    if (successCount > 0) parts.push(`成功导入 ${successCount} 个`)
+    if (skipCount > 0) parts.push(`跳过已存在 ${skipCount} 个`)
+    
+    if (parts.length > 0) {
+      successMessage.value = parts.join('，')
+    }
+    
+    // 清除选中状态
+    selectedProviders.value = new Set()
+    
+    // 通知父组件刷新列表
+    emit('imported')
+    
+    // 重新加载部署列表
+    await loadData()
+  } finally {
+    syncingAll.value = false
   }
 }
 
@@ -329,58 +445,74 @@ async function syncAll() {
 
             <!-- 服务商列表 -->
             <div v-else class="space-y-2">
-              <p class="text-sm text-muted-foreground mb-3">
-                以下是各工具中已配置的服务商，可以一键同步导入到 Open Switch 管理。
-              </p>
+              <div class="flex items-center justify-between mb-3">
+                <p class="text-sm text-muted-foreground">
+                  点击选择要导入的服务商（已选 {{ selectedProviders.size }} 个）
+                </p>
+                <button 
+                  @click="toggleSelectAll"
+                  class="text-xs text-accent hover:underline"
+                >
+                  {{ selectedProviders.size === deployedProviders.length ? '取消全选' : '全选' }}
+                </button>
+              </div>
               
               <div
                 v-for="provider in deployedProviders"
                 :key="provider.name"
-                class="flex items-center justify-between p-3 rounded-lg bg-surface border border-border hover:border-accent/50 transition-colors"
+                @click="toggleSelect(provider)"
+                class="flex items-center justify-between p-3 rounded-lg bg-surface border-2 cursor-pointer transition-all"
+                :class="[
+                  isSelected(provider) 
+                    ? 'border-emerald-500 bg-emerald-500/5' 
+                    : 'border-border hover:border-accent/50'
+                ]"
               >
-                <div class="flex-1 min-w-0 mr-3">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium truncate">{{ provider.name }}</span>
-                    <span 
-                      class="px-1.5 py-0.5 text-xs rounded"
-                      :class="getSourceClass(provider.tool || provider.source)"
-                    >
-                      {{ getSourceLabel(provider) }}
-                    </span>
+                <div class="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                  <!-- 选中指示器 -->
+                  <div 
+                    class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                    :class="[
+                      isSelected(provider) 
+                        ? 'border-emerald-500 bg-emerald-500' 
+                        : 'border-border'
+                    ]"
+                  >
+                    <svg v-if="isSelected(provider)" class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
-                  <div class="text-xs text-muted-foreground mt-1 truncate">
-                    {{ provider.base_url }}
-                    <template v-if="provider.model_count > 0">
-                      · {{ provider.model_count }} {{ t('deployed.models') }}
-                    </template>
-                    <template v-else-if="provider.current_model">
-                      · {{ provider.current_model }}
-                    </template>
-                    <template v-else-if="provider.tool && provider.tool !== 'opencode'">
-                      · 已配置
-                    </template>
-                    <template v-else-if="provider.model_count === 0">
-                      · 0 {{ t('deployed.models') }}
-                    </template>
+                  
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium truncate">{{ provider.name }}</span>
+                      <span 
+                        class="px-1.5 py-0.5 text-xs rounded"
+                        :class="getSourceClass(provider.tool || provider.source)"
+                      >
+                        {{ getSourceLabel(provider) }}
+                      </span>
+                    </div>
+                    <div class="text-xs text-muted-foreground mt-1 truncate">
+                      {{ provider.base_url }}
+                      <template v-if="provider.model_count > 0">
+                        · {{ provider.model_count }} {{ t('deployed.models') }}
+                      </template>
+                      <template v-else-if="provider.current_model">
+                        · {{ provider.current_model }}
+                      </template>
+                      <template v-else-if="provider.api_key">
+                        · 已配置 API Key
+                      </template>
+                      <template v-else-if="provider.tool && provider.tool !== 'opencode'">
+                        · 已配置
+                      </template>
+                    </div>
                   </div>
                 </div>
                 
-                <div class="flex items-center gap-1">
-                  <!-- 导入按钮 -->
-                  <button
-                    @click="startImport(provider)"
-                    :disabled="importing !== null || deleting !== null"
-                    class="p-2 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-50"
-                    title="导入到管理界面"
-                  >
-                    <svg v-if="importing === provider.name" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <SvgIcon v-else name="download" :size="16" />
-                  </button>
-                  
-                  <!-- 删除按钮（所有来源可删除） -->
+                <div class="flex items-center gap-1" @click.stop>
+                  <!-- 删除按钮 -->
                   <button
                     @click="removeProvider(provider)"
                     :disabled="deleting !== null || importing !== null"
@@ -418,10 +550,12 @@ async function syncAll() {
             </button>
             <div class="flex-1"></div>
             <button
-              @click="close"
-              class="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-hover transition-colors"
+              v-if="selectedProviders.size > 0"
+              @click="importSelected"
+              :disabled="syncingAll || deleting !== null"
+              class="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
-              {{ t('common.cancel') }}
+              {{ syncingAll ? t('common.loading') : `确认导入 (${selectedProviders.size})` }}
             </button>
           </div>
         </div>
