@@ -352,7 +352,8 @@ pub struct CcSwitchProviderItem {
 }
 
 /// 读取 cc-switch 和 Open Switch 配置的服务商列表
-/// cc-switch 存储在 ~/.cc-switch/config.json
+/// cc-switch v3.8.0+ 存储在 ~/.cc-switch/cc-switch.db (SQLite)
+/// cc-switch 旧版本存储在 ~/.cc-switch/config.json
 /// Open Switch 存储在 ~/.open-switch/config.json
 #[tauri::command]
 pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, String> {
@@ -422,9 +423,75 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
         }
     }
     
-    // 2. 读取 cc-switch 的配置 (~/.cc-switch/config.json)
+    // 2. 读取 cc-switch 的配置
+    // 优先读取 SQLite 数据库 (v3.8.0+)，然后尝试 JSON 文件（旧版本）
+    let db_path = std::path::Path::new(&home).join(".cc-switch").join("cc-switch.db");
     let config_path = std::path::Path::new(&home).join(".cc-switch").join("config.json");
     
+    // 2.1 尝试读取 SQLite 数据库 (cc-switch v3.8.0+)
+    if db_path.exists() {
+        if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            // 读取 providers 表
+            if let Ok(mut stmt) = conn.prepare("SELECT id, name, baseUrl, apiKey, enabled, models FROM providers") {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0).unwrap_or_default(),  // id
+                        row.get::<_, String>(1).unwrap_or_default(),  // name
+                        row.get::<_, String>(2).unwrap_or_default(),  // baseUrl
+                        row.get::<_, String>(3).unwrap_or_default(),  // apiKey
+                        row.get::<_, i32>(4).unwrap_or(1),            // enabled
+                        row.get::<_, String>(5).unwrap_or_default(),  // models (JSON)
+                    ))
+                }) {
+                    for row in rows.flatten() {
+                        let (id, name, base_url, _api_key, enabled, models_json) = row;
+                        
+                        if enabled == 0 {
+                            continue; // 跳过禁用的 provider
+                        }
+                        
+                        // 解析 models JSON 获取模型数量
+                        let model_count = if let Ok(models) = serde_json::from_str::<serde_json::Value>(&models_json) {
+                            if let Some(obj) = models.as_object() {
+                                obj.len() as i32
+                            } else {
+                                0
+                            }
+                        } else {
+                            0
+                        };
+                        
+                        // 根据 base_url 推断模型类型
+                        let inferred_type = if base_url.contains("anthropic") || base_url.contains("claude") {
+                            "claude"
+                        } else if base_url.contains("openai") {
+                            "codex"
+                        } else if base_url.contains("google") || base_url.contains("gemini") {
+                            "gemini"
+                        } else {
+                            "claude" // 默认 Claude
+                        };
+                        
+                        providers.push(CcSwitchProviderItem {
+                            name: format!("{} (cc-switch)", name),
+                            base_url,
+                            model_count,
+                            source: format!("cc_switch_db_{}", id),
+                            tool: Some("cc_switch".to_string()),
+                            inferred_model_type: Some(inferred_type.to_string()),
+                            current_model: None,
+                        });
+                    }
+                }
+            }
+        }
+        // 如果 SQLite 读取成功，返回结果
+        if !providers.is_empty() || !config_path.exists() {
+            return Ok(providers);
+        }
+    }
+    
+    // 2.2 尝试读取 JSON 配置文件（旧版本 cc-switch）
     if !config_path.exists() {
         // cc-switch 未安装或未配置
         return Ok(providers);
