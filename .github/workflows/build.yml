@@ -249,10 +249,12 @@ jobs:
             # 不退出，但记录错误
           fi
           
-          # 查找实际的 exe 文件名
+          # 查找实际的 exe 文件名并进行 URL 编码
           EXEFILE=$(find artifacts -name "*.exe" ! -name "*.exe.sig" -type f | head -1)
-          EXENAME=$(basename "$EXEFILE" 2>/dev/null || echo "Open.Switch_${VERSION}_x64-setup.exe")
-          echo "Found exe file: $EXEFILE -> $EXENAME"
+          EXENAME=$(basename "$EXEFILE" 2>/dev/null || echo "Open Switch_${VERSION}_x64-setup.exe")
+          # URL 编码：空格 -> %20
+          EXENAME_ENCODED=$(echo "$EXENAME" | sed 's/ /%20/g')
+          echo "Found exe file: $EXEFILE -> $EXENAME -> $EXENAME_ENCODED"
           
           # 创建 latest.json (仅 Windows，macOS DMG 不支持自动更新)
           cat > artifacts/latest.json << EOF
@@ -263,7 +265,7 @@ jobs:
             "platforms": {
               "windows-x86_64": {
                 "signature": "${WIN_SIG}",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/${EXENAME}"
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/${EXENAME_ENCODED}"
               }
             }
           }
