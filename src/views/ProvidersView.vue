@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
-import { useProvidersStore } from '@/stores/providers'
+import { useProvidersStore, type DeployedProviderItem } from '@/stores/providers'
 
 const { t } = useI18n()
 import ProviderList from '@/components/ProviderList.vue'
@@ -20,6 +20,9 @@ const providerListRef = ref<InstanceType<typeof ProviderList> | null>(null)
 
 // 模型厂家筛选
 const selectedModelType = ref<ModelType>('claude')
+
+// 已部署的服务商映射：base_url -> tools[]
+const deployedToolsMap = ref<Map<string, string[]>>(new Map())
 
 // 切换模型厂家时清空选中的 Provider
 watch(selectedModelType, () => {
@@ -52,9 +55,35 @@ const showDeployedDialog = ref(false)
 const editingProvider = ref<string | null>(null)
 const deleteTarget = ref<{ type: 'provider'; name: string } | null>(null)
 
+// 加载已部署的服务商信息
+async function loadDeployedTools() {
+  try {
+    const deployed = await store.loadAllDeployedProviders()
+    const map = new Map<string, string[]>()
+    
+    for (const item of deployed) {
+      const key = item.base_url
+      if (!map.has(key)) {
+        map.set(key, [])
+      }
+      if (item.tool) {
+        const tools = map.get(key)!
+        if (!tools.includes(item.tool)) {
+          tools.push(item.tool)
+        }
+      }
+    }
+    
+    deployedToolsMap.value = map
+  } catch (e) {
+    console.error('加载部署信息失败:', e)
+  }
+}
+
 // 加载数据
 onMounted(() => {
   store.loadProviders()
+  loadDeployedTools()
 })
 
 // 添加 Provider
@@ -152,6 +181,7 @@ async function handleSpeedTest(providerName: string) {
         ref="providerListRef"
         :providers="filteredProviders"
         :selected="store.selectedProvider"
+        :deployed-tools-map="deployedToolsMap"
         @select="store.selectProvider"
         @add="openAddProvider"
         @edit="openEditProvider"

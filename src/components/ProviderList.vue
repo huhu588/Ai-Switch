@@ -9,6 +9,7 @@ const { t } = useI18n()
 interface Props {
   providers: ProviderItem[]
   selected: string | null
+  deployedToolsMap?: Map<string, string[]>  // base_url -> deployed tools
 }
 
 const props = defineProps<Props>()
@@ -63,32 +64,60 @@ function handleSpeedTest(providerName: string) {
   }, 5000)
 }
 
-// 获取所有标识（模型类型 + 工具来源）
+// 获取所有标识（已部署的工具）
 function getToolBadges(provider: ProviderItem) {
   const badges: { label: string; class: string }[] = []
   
-  // 1. 模型类型标识（始终显示）
-  switch (provider.model_type) {
-    case 'claude':
-      badges.push({ label: 'Claude', class: 'bg-amber-500/10 text-amber-600 border-amber-500/30' })
-      break
-    case 'codex':
-      badges.push({ label: 'Codex', class: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' })
-      break
-    case 'gemini':
-      badges.push({ label: 'Gemini', class: 'bg-blue-500/10 text-blue-600 border-blue-500/30' })
-      break
+  // 从 deployedToolsMap 中查找该 Provider 部署到了哪些工具
+  const deployedTools: string[] = []
+  
+  if (props.deployedToolsMap) {
+    // 检查所有 base_url
+    const urlsToCheck = [provider.base_url, ...provider.base_urls.map(u => u.url)]
+    
+    for (const url of urlsToCheck) {
+      const tools = props.deployedToolsMap.get(url)
+      if (tools) {
+        for (const tool of tools) {
+          if (!deployedTools.includes(tool)) {
+            deployedTools.push(tool)
+          }
+        }
+      }
+    }
   }
   
-  // 2. 工具来源标识（从描述判断）
-  const desc = provider.description?.toLowerCase() || ''
+  // 根据已部署的工具显示标识
+  for (const tool of deployedTools) {
+    switch (tool) {
+      case 'opencode':
+        badges.push({ label: 'OpenCode', class: 'bg-blue-500/10 text-blue-600 border-blue-500/30' })
+        break
+      case 'claude_code':
+        badges.push({ label: 'Claude Code', class: 'bg-orange-500/10 text-orange-500 border-orange-500/30' })
+        break
+      case 'codex':
+        badges.push({ label: 'Codex CLI', class: 'bg-purple-500/10 text-purple-500 border-purple-500/30' })
+        break
+      case 'gemini':
+        badges.push({ label: 'Gemini CLI', class: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/30' })
+        break
+    }
+  }
   
-  if (desc.includes('claude code')) {
-    badges.push({ label: 'Claude Code', class: 'bg-orange-500/10 text-orange-500 border-orange-500/30' })
-  } else if (desc.includes('codex')) {
-    badges.push({ label: 'Codex CLI', class: 'bg-purple-500/10 text-purple-500 border-purple-500/30' })
-  } else if (desc.includes('gemini')) {
-    badges.push({ label: 'Gemini CLI', class: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/30' })
+  // 如果没有部署信息，显示模型类型作为 fallback
+  if (badges.length === 0) {
+    switch (provider.model_type) {
+      case 'claude':
+        badges.push({ label: 'Claude', class: 'bg-amber-500/10 text-amber-600 border-amber-500/30' })
+        break
+      case 'codex':
+        badges.push({ label: 'Codex', class: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' })
+        break
+      case 'gemini':
+        badges.push({ label: 'Gemini', class: 'bg-teal-500/10 text-teal-600 border-teal-500/30' })
+        break
+    }
   }
   
   return badges
