@@ -16,6 +16,25 @@ const updateMessage = ref('')
 type CloseAction = 'ask' | 'tray' | 'quit'
 const closeAction = ref<CloseAction>('ask')
 
+// 自动启动设置
+const autoStartEnabled = ref(false)
+const autoStartLoading = ref(false)
+
+// 环境变量冲突
+interface ConflictSource {
+  app: string
+  value: string
+  config_path: string
+}
+
+interface EnvConflict {
+  variable: string
+  sources: ConflictSource[]
+}
+
+const envConflicts = ref<EnvConflict[]>([])
+const conflictsLoading = ref(false)
+
 interface AppSettings {
   close_action: CloseAction
 }
@@ -37,6 +56,41 @@ async function setCloseAction(action: CloseAction) {
     closeAction.value = action
   } catch (e) {
     console.error('保存关闭行为设置失败:', e)
+  }
+}
+
+// 加载自动启动设置
+async function loadAutoStart() {
+  try {
+    autoStartEnabled.value = await invoke<boolean>('get_autostart_enabled')
+  } catch (e) {
+    console.error('加载自动启动设置失败:', e)
+  }
+}
+
+// 切换自动启动
+async function toggleAutoStart() {
+  autoStartLoading.value = true
+  try {
+    const newValue = !autoStartEnabled.value
+    await invoke('set_autostart_enabled', { enabled: newValue })
+    autoStartEnabled.value = newValue
+  } catch (e) {
+    console.error('设置自动启动失败:', e)
+  } finally {
+    autoStartLoading.value = false
+  }
+}
+
+// 加载环境变量冲突
+async function loadEnvConflicts() {
+  conflictsLoading.value = true
+  try {
+    envConflicts.value = await invoke<EnvConflict[]>('detect_env_conflicts')
+  } catch (e) {
+    console.error('检测环境变量冲突失败:', e)
+  } finally {
+    conflictsLoading.value = false
   }
 }
 
@@ -84,6 +138,8 @@ async function loadStatus() {
 onMounted(() => {
   loadStatus()
   loadCloseAction()
+  loadAutoStart()
+  loadEnvConflicts()
 })
 </script>
 
@@ -183,6 +239,45 @@ onMounted(() => {
             </div>
           </div>
         </section>
+
+        <!-- 环境变量冲突检测 -->
+        <section>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            {{ t('status.envConflicts') }}
+          </h3>
+          <div v-if="conflictsLoading" class="text-sm text-muted-foreground">
+            {{ t('common.loading') }}
+          </div>
+          <div v-else-if="envConflicts.length === 0" class="flex items-center gap-2 text-emerald-500 text-sm">
+            <SvgIcon name="check" :size="16" />
+            {{ t('status.noConflicts') }}
+          </div>
+          <div v-else class="space-y-3">
+            <div class="flex items-center gap-2 text-amber-500 text-sm mb-2">
+              <SvgIcon name="info" :size="16" />
+              {{ t('status.conflictsFound', { count: envConflicts.length }) }}
+            </div>
+            <div 
+              v-for="conflict in envConflicts" 
+              :key="conflict.variable"
+              class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3"
+            >
+              <div class="font-mono text-sm font-medium text-amber-400 mb-2">
+                {{ conflict.variable }}
+              </div>
+              <div class="space-y-1.5">
+                <div 
+                  v-for="source in conflict.sources" 
+                  :key="source.app"
+                  class="flex items-center justify-between text-xs"
+                >
+                  <span class="font-medium">{{ source.app }}</span>
+                  <span class="font-mono text-muted-foreground">{{ source.value }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -235,6 +330,27 @@ onMounted(() => {
                 {{ t('settings.closeQuit') }}
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- 开机自启动 -->
+        <div class="bg-surface rounded-lg p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-medium">{{ t('status.autoStart') }}</div>
+              <div class="text-xs text-muted-foreground mt-1">{{ t('status.autoStartDesc') }}</div>
+            </div>
+            <button
+              @click="toggleAutoStart"
+              :disabled="autoStartLoading"
+              class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="autoStartEnabled ? 'bg-accent' : 'bg-gray-400 dark:bg-gray-600'"
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="autoStartEnabled ? 'translate-x-5' : 'translate-x-0'"
+              />
+            </button>
           </div>
         </div>
       </div>

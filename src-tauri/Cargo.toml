@@ -1,6 +1,6 @@
 [package]
 name = "open-switch"
-version = "1.4.6"
+version = "1.4.7"
 edition = "2021"
 description = "Open Switch工具"
 authors = ["moguw <weiyiding0@gmail.com>"]
@@ -20,6 +20,7 @@ tauri-plugin-process = "2"
 tauri-plugin-store = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
 
 # 序列化
 serde = { version = "1.0", features = ["derive"] }

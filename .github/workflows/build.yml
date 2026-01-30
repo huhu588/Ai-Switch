@@ -257,19 +257,25 @@ jobs:
           echo "Found exe file: $EXEFILE -> $EXENAME -> $EXENAME_ENCODED"
           
           # 创建 latest.json (仅 Windows，macOS DMG 不支持自动更新)
-          cat > artifacts/latest.json << EOF
-          {
-            "version": "${VERSION}",
-            "notes": "Open Switch v${VERSION} 发布",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "${WIN_SIG}",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/${EXENAME_ENCODED}"
-              }
-            }
-          }
-          EOF
+          # 注意：不要缩进 EOF 块内容，否则 JSON 会包含前导空格
+          cat > artifacts/latest.json << 'ENDJSON'
+{
+  "version": "VERSION_PLACEHOLDER",
+  "notes": "Open Switch vVERSION_PLACEHOLDER 发布",
+  "pub_date": "DATE_PLACEHOLDER",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "SIG_PLACEHOLDER",
+      "url": "URL_PLACEHOLDER"
+    }
+  }
+}
+ENDJSON
+          # 替换占位符
+          sed -i "s|VERSION_PLACEHOLDER|${VERSION}|g" artifacts/latest.json
+          sed -i "s|DATE_PLACEHOLDER|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" artifacts/latest.json
+          sed -i "s|SIG_PLACEHOLDER|${WIN_SIG}|g" artifacts/latest.json
+          sed -i "s|URL_PLACEHOLDER|https://github.com/${REPO}/releases/download/v${VERSION}/${EXENAME_ENCODED}|g" artifacts/latest.json
           
           echo "Generated latest.json:"
           cat artifacts/latest.json

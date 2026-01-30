@@ -50,7 +50,8 @@ export default {
   language: {
     switch: 'Switch Language',
     zh: '中文',
-    en: 'English'
+    en: 'English',
+    ja: '日本語'
   },
 
   // Provider related
@@ -399,7 +400,16 @@ export default {
     updateLater: 'Later',
     updateNow: 'Update Now',
     updateNotes: 'Release Notes',
-    downloadProgress: 'Download Progress'
+    downloadProgress: 'Download Progress',
+    // Auto start
+    autoStart: 'Auto Start',
+    autoStartDesc: 'Auto launch app on system startup',
+    // Environment conflicts
+    envConflicts: 'Environment Conflicts',
+    noConflicts: 'No Conflicts',
+    conflictsFound: '{count} conflict(s) detected',
+    conflictVariable: 'Variable',
+    conflictSources: 'Conflict Sources'
   },
 
   // App Settings

@@ -50,7 +50,8 @@ export default {
   language: {
     switch: '切换语言',
     zh: '中文',
-    en: 'English'
+    en: 'English',
+    ja: '日本語'
   },
 
   // Provider 相关
@@ -399,7 +400,16 @@ export default {
     updateLater: '稍后更新',
     updateNow: '立即更新',
     updateNotes: '更新内容',
-    downloadProgress: '下载进度'
+    downloadProgress: '下载进度',
+    // 自动启动
+    autoStart: '开机自启动',
+    autoStartDesc: '系统启动时自动运行应用',
+    // 环境变量冲突
+    envConflicts: '环境变量冲突',
+    noConflicts: '无冲突',
+    conflictsFound: '检测到 {count} 个冲突',
+    conflictVariable: '变量',
+    conflictSources: '冲突来源'
   },
 
   // 应用设置

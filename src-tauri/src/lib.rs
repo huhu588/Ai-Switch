@@ -10,14 +10,111 @@ use std::sync::{Arc, Mutex};
 use config::ConfigManager;
 use database::Database;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager,
+    AppHandle, Emitter, Manager,
 };
 use tokio::sync::RwLock;
 
 /// 托盘图标状态包装器（用于在应用生命周期内保持托盘图标存活）
-pub struct TrayState(pub TrayIcon);
+pub struct TrayState(pub Mutex<TrayIcon>);
+
+/// 构建包含 Provider 列表的托盘菜单
+fn build_tray_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+    // 获取 Provider 列表
+    let providers = {
+        let config_state = app.state::<Mutex<ConfigManager>>();
+        let manager = config_state.lock().map_err(|e| format!("Lock error: {}", e))?;
+        manager.opencode().get_all_providers().unwrap_or_default()
+    };
+    
+    let mut items: Vec<MenuItem<tauri::Wry>> = Vec::new();
+    
+    // 为每个启用的 Provider 创建菜单项
+    for (name, provider) in &providers {
+        if provider.enabled {
+            let check_mark = "✓ ";
+            let label = format!("{}{}", check_mark, name);
+            let item = MenuItem::with_id(
+                app,
+                format!("provider_{}", name),
+                &label,
+                true,
+                None::<&str>
+            )?;
+            items.push(item);
+        }
+    }
+    
+    // 为未启用的 Provider 也创建菜单项（无勾选）
+    for (name, provider) in &providers {
+        if !provider.enabled {
+            let label = format!("  {}", name);
+            let item = MenuItem::with_id(
+                app,
+                format!("provider_{}", name),
+                &label,
+                true,
+                None::<&str>
+            )?;
+            items.push(item);
+        }
+    }
+    
+    // 如果有 Provider，添加分隔线
+    let separator = if !providers.is_empty() {
+        Some(PredefinedMenuItem::separator(app)?)
+    } else {
+        None
+    };
+    
+    let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    
+    // 构建菜单项引用列表
+    let mut menu_items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
+    for item in &items {
+        menu_items.push(item);
+    }
+    if let Some(ref sep) = separator {
+        menu_items.push(sep);
+    }
+    menu_items.push(&show_item);
+    menu_items.push(&quit_item);
+    
+    Menu::with_items(app, &menu_items).map_err(|e| e.into())
+}
+
+/// 处理 Provider 点击事件
+fn handle_provider_click(app: &AppHandle, provider_name: &str) {
+    // 先切换 Provider 启用状态
+    {
+        let config_state = app.state::<Mutex<ConfigManager>>();
+        if let Ok(mut manager) = config_state.lock() {
+            // 切换 Provider 状态
+            let _ = manager.opencode_mut().toggle_provider(provider_name);
+            // 保存配置
+            let _ = manager.save();
+        }
+    }
+    
+    // 刷新托盘菜单
+    refresh_tray_menu(app);
+    
+    // 通知前端刷新
+    let _ = app.emit("providers-changed", ());
+}
+
+/// 刷新托盘菜单
+pub fn refresh_tray_menu(app: &AppHandle) {
+    if let Some(tray_state) = app.try_state::<TrayState>() {
+        if let Ok(tray) = tray_state.0.lock() {
+            if let Ok(menu) = build_tray_menu(app) {
+                let _ = tray.set_menu(Some(menu));
+            }
+        }
+    }
+}
 
 /// 运行 Tauri 应用
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +151,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]) // 启动参数，最小化启动
+        ))
         .manage(Mutex::new(config_manager))
         .manage(db_arc)
         .manage(proxy_service_state)
@@ -195,6 +296,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_close_action,
             commands::set_close_action,
             commands::handle_close_choice,
+            // Autostart commands
+            commands::get_autostart_enabled,
+            commands::set_autostart_enabled,
+            // Environment conflict detection
+            commands::detect_env_conflicts,
             // oh-my-opencode commands
             commands::check_ohmy_status,
             commands::get_available_models,
