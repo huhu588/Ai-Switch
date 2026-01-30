@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_autostart::ManagerExt;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::config::ConfigManager;
+use crate::database::Database;
 
 /// 关闭窗口时的行为
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,17 +51,58 @@ impl std::str::FromStr for CloseAction {
     }
 }
 
+/// 日志保留策略
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogRetention {
+    /// 保留 30 天
+    Days30,
+    /// 永久保留
+    Permanent,
+}
+
+impl Default for LogRetention {
+    fn default() -> Self {
+        LogRetention::Permanent // 默认永久保留
+    }
+}
+
+impl std::fmt::Display for LogRetention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogRetention::Days30 => write!(f, "days30"),
+            LogRetention::Permanent => write!(f, "permanent"),
+        }
+    }
+}
+
+impl std::str::FromStr for LogRetention {
+    type Err = String;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "days30" | "30days" | "30" => Ok(LogRetention::Days30),
+            "permanent" | "forever" | "all" => Ok(LogRetention::Permanent),
+            _ => Err(format!("Unknown log retention: {}", s)),
+        }
+    }
+}
+
 /// 应用设置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     /// 关闭窗口时的行为
     pub close_action: CloseAction,
+    /// 日志保留策略
+    #[serde(default)]
+    pub log_retention: LogRetention,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
             close_action: CloseAction::Ask,
+            log_retention: LogRetention::Permanent, // 默认永久保留
         }
     }
 }
@@ -147,6 +189,94 @@ pub async fn set_close_action(
     store.save().map_err(|e| e.to_string())?;
     
     Ok(())
+}
+
+/// 获取日志保留设置
+#[tauri::command]
+pub async fn get_log_retention(
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    
+    let settings = if let Some(value) = store.get(SETTINGS_STORE_KEY) {
+        serde_json::from_value::<AppSettings>(value.clone()).map_err(|e| {
+            eprintln!("读取 settings.json 失败: {}", e);
+            format!("读取 settings.json 失败: {}", e)
+        })?
+    } else {
+        AppSettings::default()
+    };
+    
+    Ok(settings.log_retention.to_string())
+}
+
+/// 设置日志保留策略
+#[tauri::command]
+pub async fn set_log_retention(
+    app: tauri::AppHandle,
+    retention: String,
+) -> Result<(), String> {
+    let log_retention: LogRetention = retention.parse()?;
+    
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    
+    // 读取现有设置或创建默认设置
+    let mut settings = if let Some(value) = store.get(SETTINGS_STORE_KEY) {
+        serde_json::from_value::<AppSettings>(value.clone()).map_err(|e| {
+            eprintln!("读取 settings.json 失败: {}", e);
+            format!("读取 settings.json 失败: {}", e)
+        })?
+    } else {
+        AppSettings::default()
+    };
+    
+    settings.log_retention = log_retention;
+    
+    let value = serde_json::to_value(&settings).map_err(|e| e.to_string())?;
+    store.set(SETTINGS_STORE_KEY, value);
+    store.save().map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+/// 清理过期日志
+#[tauri::command]
+pub async fn cleanup_old_logs(
+    app: tauri::AppHandle,
+    db: State<'_, Arc<Database>>,
+) -> Result<u32, String> {
+    // 获取当前保留设置
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    
+    let settings = if let Some(value) = store.get(SETTINGS_STORE_KEY) {
+        serde_json::from_value::<AppSettings>(value.clone()).unwrap_or_default()
+    } else {
+        AppSettings::default()
+    };
+    
+    // 如果是永久保留，不删除任何记录
+    if settings.log_retention == LogRetention::Permanent {
+        return Ok(0);
+    }
+    
+    // 计算 30 天前的时间戳
+    let cutoff_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+        - (30 * 24 * 3600); // 30 天
+    
+    // 删除过期记录
+    let conn = db.conn.lock().map_err(|e| format!("获取数据库锁失败: {e}"))?;
+    
+    let deleted = conn
+        .execute(
+            "DELETE FROM proxy_request_logs WHERE created_at < ?1",
+            rusqlite::params![cutoff_time],
+        )
+        .map_err(|e| format!("清理过期日志失败: {e}"))?;
+    
+    Ok(deleted as u32)
 }
 
 /// 处理用户的关闭选择（统一由后端处理窗口操作）

@@ -118,7 +118,13 @@ function getToolBadges(provider: ProviderItem) {
   for (const tool of relevantTools) {
     if (tool === 'cc_switch' || tool === 'open_switch') {
       // 根据 model_type 转换为对应的 CLI 工具
-      normalizedTools.add('opencode') // 都显示为 OpenCode
+      if (provider.model_type === 'claude') {
+        normalizedTools.add('claude_code')
+      } else if (provider.model_type === 'codex') {
+        normalizedTools.add('codex')
+      } else if (provider.model_type === 'gemini') {
+        normalizedTools.add('gemini')
+      }
     } else {
       normalizedTools.add(tool)
     }

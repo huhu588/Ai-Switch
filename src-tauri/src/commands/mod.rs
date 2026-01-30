@@ -18,6 +18,7 @@ pub mod speedtest;
 pub mod usage;
 pub mod proxy;
 pub mod open_switch;
+pub mod local_logs;
 
 pub use backup::*;
 pub use provider::*;
@@ -37,3 +38,4 @@ pub use speedtest::*;
 pub use usage::*;
 pub use proxy::*;
 pub use open_switch::*;
+pub use local_logs::*;

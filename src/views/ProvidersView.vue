@@ -40,11 +40,25 @@ const filteredProviders = computed(() => {
   })
 })
 
+watch(filteredProviders, (providers) => {
+  if (providers.length === 0) return
+  const selected = store.selectedProvider
+  const exists = providers.some(p => p.name === selected)
+  if (!exists) {
+    store.selectProvider(providers[0].name)
+  }
+})
+
 // 获取启用的 Provider 名称列表（用于应用配置）
 const enabledProviderNames = computed(() => {
   return filteredProviders.value
     .filter(p => p.enabled)
     .map(p => p.name)
+})
+
+const selectedProviderEnabled = computed(() => {
+  if (!store.selectedProvider) return false
+  return !!store.providers.find(p => p.name === store.selectedProvider)?.enabled
 })
 
 // 对话框状态
@@ -216,7 +230,9 @@ async function handleSpeedTest(providerName: string) {
       v-model:visible="showApplyDialog"
       :provider-names="enabledProviderNames"
       :model-type="selectedModelType"
-      @applied="() => {}"
+    :selected-provider-name="store.selectedProvider"
+    :selected-provider-enabled="selectedProviderEnabled"
+    @applied="store.loadProviders()"
     />
 
     <!-- 已部署服务商管理对话框 -->

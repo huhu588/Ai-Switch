@@ -20,7 +20,9 @@ export default {
     clearAll: 'Clear All',
     tip: 'Tip',
     optional: 'Optional',
-    refresh: 'Refresh'
+    refresh: 'Refresh',
+    done: 'Done',
+    close: 'Close'
   },
 
   // Navigation
@@ -649,8 +651,15 @@ export default {
     past24h: 'Past 24 Hours (Hourly)',
     past7d: 'Past 7 Days',
     past30d: 'Past 30 Days',
+    pastAll: 'All Time',
+    period24h: '24h',
+    period7d: '7d',
+    period30d: '30d',
+    periodAll: 'All',
     requests: 'Requests',
     cost: 'Cost',
+    model: 'Model',
+    unknownModel: 'Unknown model',
     clearStats: 'Clear Statistics',
     confirmClear: 'Are you sure you want to clear all usage statistics? This action cannot be undone.',
     // Proxy Control
@@ -663,6 +672,53 @@ export default {
     failed: 'Failed',
     successRate: 'Success Rate',
     byProvider: 'By Provider',
-    noData: 'No Data'
+    noData: 'No Data',
+    // Local logs import
+    importLocalLogs: 'Import Local Logs',
+    scanning: 'Scanning...',
+    files: 'files',
+    entries: 'entries',
+    notFound: 'Not found',
+    existingRecords: 'Existing records',
+    noLogsFound: 'No importable log files found',
+    clearLocalLogs: 'Clear Local Logs',
+    confirmClearLocal: 'Are you sure you want to clear all imported local logs?',
+    clearedLocalLogs: 'Cleared local log records',
+    import: 'Import',
+    importing: 'Importing...',
+    importFailed: 'Import failed',
+    importComplete: 'Import Complete',
+    imported: 'Imported',
+    skipped: 'Skipped (Duplicate)',
+    failedEntries: 'Failed entries',
+    // Log retention settings
+    logRetention: 'Log Retention',
+    logRetentionDesc: 'Choose how long to keep usage statistics',
+    retentionPermanent: 'Permanent',
+    retention30Days: '30 Days',
+    // Model pricing settings
+    modelPricing: 'Model Pricing',
+    modelPricingDesc: 'Customize model prices for cost calculation',
+    editPricing: 'Edit Pricing',
+    inputCost: 'Input Cost ($/M tokens)',
+    outputCost: 'Output Cost ($/M tokens)',
+    cacheReadCost: 'Cache Read Cost',
+    cacheCreationCost: 'Cache Creation Cost',
+    resetPricing: 'Reset to Default',
+    confirmResetPricing: 'Are you sure you want to reset all model prices to default?',
+    confirmDeletePricing: 'Are you sure you want to delete this pricing configuration?',
+    input: 'Input',
+    output: 'Output',
+    // Provider filter
+    allProviders: 'All',
+    noProviderData: 'No data for this provider',
+    // Provider pricing
+    selectProvider: 'Select Provider',
+    selectProviderHint: 'Please select a provider to set its specific model prices. Default prices below will be used if no provider-specific prices are set.',
+    customPricing: 'Pricing',
+    defaultPricing: 'Default Pricing (Global)',
+    noCustomPricing: 'No custom pricing yet. Click Add to create one.',
+    modelId: 'Model ID',
+    selectModel: 'Select Model'
   }
 }

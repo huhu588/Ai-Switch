@@ -20,7 +20,9 @@ export default {
     clearAll: 'クリア',
     tip: 'ヒント',
     optional: '任意',
-    refresh: '更新'
+    refresh: '更新',
+    done: '完了',
+    close: '閉じる'
   },
 
   // Navigation
@@ -649,8 +651,15 @@ export default {
     past24h: '過去24時間（時間別）',
     past7d: '過去7日間',
     past30d: '過去30日間',
+    pastAll: '全期間',
+    period24h: '24時間',
+    period7d: '7日',
+    period30d: '30日',
+    periodAll: '全部',
     requests: 'リクエスト',
     cost: 'コスト',
+    model: 'モデル',
+    unknownModel: '不明なモデル',
     clearStats: '統計をクリア',
     confirmClear: '全ての使用統計をクリアしますか？この操作は元に戻せません。',
     // Proxy Control
@@ -663,6 +672,53 @@ export default {
     failed: '失敗',
     successRate: '成功率',
     byProvider: 'プロバイダー別',
-    noData: 'データなし'
+    noData: 'データなし',
+    // ローカルログインポート
+    importLocalLogs: 'ローカルログをインポート',
+    scanning: 'スキャン中...',
+    files: 'ファイル',
+    entries: 'エントリー',
+    notFound: '見つかりません',
+    existingRecords: '既存のレコード',
+    noLogsFound: 'インポート可能なログファイルが見つかりません',
+    clearLocalLogs: 'ローカルログをクリア',
+    confirmClearLocal: 'インポートしたローカルログを全てクリアしますか？',
+    clearedLocalLogs: 'クリアしたローカルログレコード',
+    import: 'インポート',
+    importing: 'インポート中...',
+    importFailed: 'インポート失敗',
+    importComplete: 'インポート完了',
+    imported: 'インポート済み',
+    skipped: 'スキップ（重複）',
+    failedEntries: '失敗エントリー',
+    // ログ保持設定
+    logRetention: 'ログ保持',
+    logRetentionDesc: '使用統計の保持期間を選択',
+    retentionPermanent: '永久',
+    retention30Days: '30日間',
+    // モデル価格設定
+    modelPricing: 'モデル価格',
+    modelPricingDesc: 'コスト計算用にモデル価格をカスタマイズ',
+    editPricing: '価格を編集',
+    inputCost: '入力価格 ($/M tokens)',
+    outputCost: '出力価格 ($/M tokens)',
+    cacheReadCost: 'キャッシュ読取価格',
+    cacheCreationCost: 'キャッシュ作成価格',
+    resetPricing: 'デフォルトに戻す',
+    confirmResetPricing: '全てのモデル価格をデフォルトにリセットしますか？',
+    confirmDeletePricing: 'この価格設定を削除しますか？',
+    input: '入力',
+    output: '出力',
+    // プロバイダーフィルター
+    allProviders: '全て',
+    noProviderData: 'このプロバイダーのデータがありません',
+    // プロバイダー価格
+    selectProvider: 'プロバイダーを選択',
+    selectProviderHint: 'プロバイダーを選択して、その固有のモデル価格を設定してください。プロバイダー固有の価格が設定されていない場合は、以下のデフォルト価格が使用されます。',
+    customPricing: '価格',
+    defaultPricing: 'デフォルト価格（グローバル）',
+    noCustomPricing: 'カスタム価格がありません。追加ボタンをクリックして作成してください。',
+    modelId: 'モデル ID',
+    selectModel: 'モデルを選択'
   }
 }

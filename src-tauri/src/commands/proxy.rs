@@ -168,10 +168,12 @@ pub async fn get_proxy_usage_summary(
 #[tauri::command]
 pub async fn get_proxy_usage_trend(
     period: String,
+    provider_id: Option<String>,
     db: State<'_, Arc<Database>>,
 ) -> Result<Vec<UsageTrend>, String> {
     let (start_ts, end_ts) = get_time_range(&period);
-    db.get_usage_trend(start_ts, end_ts, &period).map_err(|e| e.to_string())
+    db.get_usage_trend(start_ts, end_ts, &period, provider_id.as_deref())
+        .map_err(|e| e.to_string())
 }
 
 /// 获取各服务商统计

@@ -67,7 +67,7 @@ impl Database {
         )
         .map_err(|e| AppError::Database(format!("创建 model 索引失败: {e}")))?;
 
-        // 2. 模型定价表
+        // 2. 模型定价表（默认全局定价）
         conn.execute(
             "CREATE TABLE IF NOT EXISTS model_pricing (
                 model_id TEXT PRIMARY KEY,
@@ -80,6 +80,24 @@ impl Database {
             [],
         )
         .map_err(|e| AppError::Database(format!("创建 model_pricing 表失败: {e}")))?;
+
+        // 2.1 服务商特定模型定价表
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS provider_model_pricing (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_id TEXT NOT NULL,
+                model_id TEXT NOT NULL,
+                input_cost_per_million TEXT NOT NULL,
+                output_cost_per_million TEXT NOT NULL,
+                cache_read_cost_per_million TEXT NOT NULL DEFAULT '0',
+                cache_creation_cost_per_million TEXT NOT NULL DEFAULT '0',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(provider_id, model_id)
+            )",
+            [],
+        )
+        .map_err(|e| AppError::Database(format!("创建 provider_model_pricing 表失败: {e}")))?;
 
         // 3. 代理配置表
         conn.execute(
@@ -260,6 +278,7 @@ pub struct UsageTrend {
     pub total_cost: f64,
     pub input_tokens: u64,
     pub output_tokens: u64,
+    pub top_model: Option<String>,
 }
 
 /// Provider 统计
@@ -414,7 +433,13 @@ impl Database {
     }
 
     /// 获取使用趋势
-    pub fn get_usage_trend(&self, start_ts: Option<i64>, end_ts: Option<i64>, period: &str) -> Result<Vec<UsageTrend>, AppError> {
+    pub fn get_usage_trend(
+        &self,
+        start_ts: Option<i64>,
+        end_ts: Option<i64>,
+        period: &str,
+        provider_id: Option<&str>,
+    ) -> Result<Vec<UsageTrend>, AppError> {
         let conn = lock_conn!(self.conn);
 
         // 根据时间段决定分组粒度
@@ -422,17 +447,30 @@ impl Database {
             "24h" => ("%Y-%m-%d %H:00", "hour"),
             "7d" => ("%Y-%m-%d", "day"),
             "30d" => ("%Y-%m-%d", "day"),
+            "all" => ("%Y-%m-%d", "day"),
             _ => ("%Y-%m-%d", "day"),
         };
 
-        let (where_clause, params): (String, Vec<i64>) = match (start_ts, end_ts) {
-            (Some(start), Some(end)) => {
-                ("WHERE created_at >= ?1 AND created_at <= ?2".to_string(), vec![start, end])
-            }
-            (Some(start), None) => {
-                ("WHERE created_at >= ?1".to_string(), vec![start])
-            }
-            _ => (String::new(), vec![]),
+        let mut conditions: Vec<String> = Vec::new();
+        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+
+        if let Some(start) = start_ts {
+            conditions.push("created_at >= ?".to_string());
+            params.push(start.into());
+        }
+        if let Some(end) = end_ts {
+            conditions.push("created_at <= ?".to_string());
+            params.push(end.into());
+        }
+        if let Some(pid) = provider_id {
+            conditions.push("provider_id = ?".to_string());
+            params.push(pid.to_string().into());
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
         };
 
         let sql = format!(
@@ -448,6 +486,34 @@ impl Database {
             ORDER BY period ASC"
         );
 
+        // 计算每个时间段使用最多的模型
+        let model_sql = format!(
+            "SELECT
+                strftime('{group_format}', created_at, 'unixepoch', 'localtime') as period,
+                model,
+                COUNT(*) as cnt
+            FROM proxy_request_logs
+            {where_clause}
+            GROUP BY period, model
+            ORDER BY period ASC, cnt DESC"
+        );
+
+        let mut top_models: HashMap<String, String> = HashMap::new();
+        let mut model_stmt = conn.prepare(&model_sql)
+            .map_err(|e| AppError::Database(format!("准备模型查询失败: {e}")))?;
+        let mut model_rows = model_stmt.query(rusqlite::params_from_iter(params.clone()))
+            .map_err(|e| AppError::Database(format!("查询模型统计失败: {e}")))?;
+
+        while let Some(row) = model_rows.next().map_err(|e| AppError::Database(format!("读取模型行失败: {e}")))? {
+            let period: String = row.get(0).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?;
+            let model: Option<String> = row.get(1).ok();
+            if !top_models.contains_key(&period) {
+                if let Some(m) = model {
+                    top_models.insert(period, m);
+                }
+            }
+        }
+
         let mut stmt = conn.prepare(&sql)
             .map_err(|e| AppError::Database(format!("准备查询失败: {e}")))?;
 
@@ -456,12 +522,15 @@ impl Database {
 
         let mut trends = Vec::new();
         while let Some(row) = rows.next().map_err(|e| AppError::Database(format!("读取行失败: {e}")))? {
+            let period: String = row.get(0).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?;
+            let top_model = top_models.get(&period).cloned();
             trends.push(UsageTrend {
-                period: row.get(0).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?,
+                period,
                 request_count: row.get::<_, i64>(1).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
                 total_cost: row.get(2).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?,
                 input_tokens: row.get::<_, i64>(3).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
                 output_tokens: row.get::<_, i64>(4).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
+                top_model,
             });
         }
 
@@ -549,7 +618,10 @@ impl Database {
             (Some(start), None) => {
                 ("WHERE created_at >= ?1".to_string(), vec![start])
             }
-            _ => (String::new(), vec![]),
+            (None, Some(end)) => {
+                ("WHERE created_at <= ?1".to_string(), vec![end])
+            }
+            (None, None) => (String::new(), vec![]),
         };
 
         let sql = format!(

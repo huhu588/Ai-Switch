@@ -20,7 +20,9 @@ export default {
     clearAll: '清空',
     tip: '提示',
     optional: '可选',
-    refresh: '刷新'
+    refresh: '刷新',
+    done: '完成',
+    close: '关闭'
   },
 
   // 导航
@@ -649,8 +651,15 @@ export default {
     past24h: '过去 24 小时（按小时）',
     past7d: '过去 7 天',
     past30d: '过去 30 天',
+    pastAll: '全部时间',
+    period24h: '24小时',
+    period7d: '7天',
+    period30d: '30天',
+    periodAll: '全部',
     requests: '请求数',
     cost: '成本',
+    model: '模型',
+    unknownModel: '未知模型',
     clearStats: '清除统计',
     confirmClear: '确定要清除所有使用统计数据吗？此操作不可撤销。',
     // 代理控制
@@ -663,6 +672,53 @@ export default {
     failed: '失败',
     successRate: '成功率',
     byProvider: '按服务商统计',
-    noData: '暂无数据'
+    noData: '暂无数据',
+    // 本地日志导入
+    importLocalLogs: '导入本地日志',
+    scanning: '扫描中...',
+    files: '个文件',
+    entries: '条记录',
+    notFound: '未找到',
+    existingRecords: '已导入记录',
+    noLogsFound: '未找到可导入的日志文件',
+    clearLocalLogs: '清除本地日志',
+    confirmClearLocal: '确定要清除所有本地导入的日志吗？',
+    clearedLocalLogs: '已清除本地日志记录数',
+    import: '导入',
+    importing: '导入中...',
+    importFailed: '导入失败',
+    importComplete: '导入完成',
+    imported: '已导入',
+    skipped: '已跳过（重复）',
+    failedEntries: '失败条目',
+    // 日志保留设置
+    logRetention: '日志保留',
+    logRetentionDesc: '选择使用统计日志的保留时间',
+    retentionPermanent: '永久',
+    retention30Days: '30 天',
+    // 模型定价设置
+    modelPricing: '模型定价',
+    modelPricingDesc: '自定义各模型的价格用于成本计算',
+    editPricing: '编辑定价',
+    inputCost: '输入价格 ($/M tokens)',
+    outputCost: '输出价格 ($/M tokens)',
+    cacheReadCost: '缓存读取价格',
+    cacheCreationCost: '缓存创建价格',
+    resetPricing: '重置为默认',
+    confirmResetPricing: '确定要将所有模型定价重置为默认值吗？',
+    confirmDeletePricing: '确定要删除此定价配置吗？',
+    input: '输入',
+    output: '输出',
+    // 服务商筛选
+    allProviders: '全部',
+    noProviderData: '暂无该服务商的统计数据',
+    // 服务商定价
+    selectProvider: '选择服务商',
+    selectProviderHint: '请先选择一个服务商来设置其特定的模型价格。如果没有设置服务商特定价格，将使用下方的默认价格。',
+    customPricing: '定价',
+    defaultPricing: '默认定价（全局）',
+    noCustomPricing: '暂无自定义定价，点击添加按钮创建',
+    modelId: '模型 ID',
+    selectModel: '请选择模型'
   }
 }

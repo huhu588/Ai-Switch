@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { useProvidersStore, type DeployedProviderItem } from '@/stores/providers'
+import { getModelsByType, matchPresetByUrl } from '@/config/providerPresets'
 import SvgIcon from '@/components/SvgIcon.vue'
 
 const { t } = useI18n()
@@ -28,9 +29,89 @@ const successMessage = ref<string | null>(null)
 const showModelTypeDialog = ref(false)
 const importingProvider = ref<DeployedProviderItem | null>(null)
 const syncingAll = ref(false)
+const fixingModels = ref(false)
 
 // 选中的服务商列表
 const selectedProviders = ref<Set<string>>(new Set())
+
+function presetMatchesModelType(modelId: string, modelType: string) {
+  const id = modelId.toLowerCase()
+  switch (modelType) {
+    case 'claude':
+      return id.startsWith('claude')
+    case 'codex':
+      return id.startsWith('gpt')
+    case 'gemini':
+      return id.startsWith('gemini')
+    default:
+      return false
+  }
+}
+
+function buildPresetModelInputs(modelType: string, baseUrl: string) {
+  const resolvedType = (modelType || 'claude').toLowerCase()
+  const preset = matchPresetByUrl(baseUrl)
+  const presetModels = preset?.models || []
+  const usePreset = presetModels.length > 0 &&
+    presetModels.some(model => presetMatchesModelType(model.id, resolvedType))
+  
+  const models = usePreset ? presetModels : getModelsByType(resolvedType)
+  return models.map(model => ({ id: model.id, name: model.name }))
+}
+
+async function addPresetModels(providerName: string, modelType: string, baseUrl: string) {
+  const inputs = buildPresetModelInputs(modelType, baseUrl)
+  if (inputs.length === 0) return
+  await invoke('add_models_batch_detailed', { providerName, inputs })
+}
+
+async function fillMissingModels() {
+  if (fixingModels.value) return
+  
+  fixingModels.value = true
+  error.value = null
+  successMessage.value = null
+  
+  try {
+    await store.loadProviders()
+    const ccSwitchNames = new Set(
+      deployedProviders.value
+        .filter(p => p.tool === 'cc_switch' || p.tool === 'open_switch')
+        .map(p => p.name)
+    )
+    
+    const targets = store.providers.filter(
+      p => ccSwitchNames.has(p.name) && p.model_count === 0
+    )
+    
+    let successCount = 0
+    const failedNames: string[] = []
+    
+    for (const provider of targets) {
+      try {
+        await addPresetModels(provider.name, provider.model_type || 'claude', provider.base_url)
+        successCount++
+      } catch (e) {
+        console.error(`补齐 ${provider.name} 模型失败:`, e)
+        failedNames.push(provider.name)
+      }
+    }
+    
+    if (successCount > 0) {
+      successMessage.value = `已补齐 ${successCount} 个服务商模型`
+    } else if (failedNames.length === 0) {
+      successMessage.value = '没有需要补齐的服务商'
+    }
+    
+    if (failedNames.length > 0) {
+      error.value = `补齐失败: ${failedNames.join(', ')}`
+    }
+    
+    await store.loadProviders()
+  } finally {
+    fixingModels.value = false
+  }
+}
 
 // 切换选中状态
 function toggleSelect(provider: DeployedProviderItem) {
@@ -71,6 +152,13 @@ async function loadData() {
   error.value = null
   try {
     deployedProviders.value = await store.loadAllDeployedProviders()
+    
+    // 自动勾选已存在于 Open Switch 中的服务商
+    const existingProviders = new Set(store.providers.map(p => p.name))
+    const autoSelected = deployedProviders.value
+      .filter(p => existingProviders.has(p.name))
+      .map(p => p.name)
+    selectedProviders.value = new Set(autoSelected)
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -159,9 +247,17 @@ async function deleteProviderByTool(provider: DeployedProviderItem) {
       // Gemini 来源：清除配置
       await invoke('clear_gemini_config')
       break
+    case 'cc_switch':
+    case 'open_switch':
+      // cc-switch / Open Switch 来源：这些是外部配置，无法直接删除
+      // 只能从列表中移除显示，提示用户去源工具中删除
+      error.value = `请在 ${tool === 'cc_switch' ? 'cc-switch' : 'Open Switch'} 中删除此服务商`
+      throw new Error('外部配置无法直接删除')
     default:
       // 其他来源尝试通用删除
       console.warn('未知的工具来源:', tool)
+      error.value = `无法删除来源为 "${tool}" 的服务商`
+      throw new Error('未知来源')
   }
 }
 
@@ -228,6 +324,7 @@ async function importProvider(modelType: string) {
         description: `从 ${getToolLabel(provider.tool)} 导入`,
         model_type: modelType
       })
+      await addPresetModels(provider.name, modelType, provider.base_url)
     }
     
     showModelTypeDialog.value = false
@@ -281,6 +378,7 @@ async function importSelected() {
             description: `从 ${getToolLabel(provider.tool)} 导入`,
             model_type: modelType
           })
+          await addPresetModels(provider.name, modelType, provider.base_url)
         }
         successCount++
       } catch (e) {
@@ -306,85 +404,6 @@ async function importSelected() {
     
     // 清除选中状态
     selectedProviders.value = new Set()
-    
-    // 通知父组件刷新列表
-    emit('imported')
-    
-    // 重新加载部署列表
-    await loadData()
-  } finally {
-    syncingAll.value = false
-  }
-}
-
-// 一键同步所有已部署的服务商
-async function syncAll() {
-  if (syncingAll.value || deployedProviders.value.length === 0) return
-  
-  syncingAll.value = true
-  error.value = null
-  successMessage.value = null
-  let successCount = 0
-  let skipCount = 0
-  let failCount = 0
-  const failedNames: string[] = []
-  
-  // 获取已存在的 Provider 列表
-  const existingProviders = new Set(store.providers.map(p => p.name))
-  
-  try {
-    for (const provider of deployedProviders.value) {
-      // 检查是否已存在
-      if (existingProviders.has(provider.name)) {
-        console.log(`跳过已存在的 Provider: ${provider.name}`)
-        skipCount++
-        continue
-      }
-      
-      try {
-        const modelType = provider.inferred_model_type || 'codex'
-        
-        if (provider.tool === 'opencode' || !provider.tool) {
-          // OpenCode 来源直接导入
-          await store.importDeployedProvider(provider.name, modelType)
-        } else {
-          // 其他工具来源：创建新的 Provider，使用获取到的 API Key
-          await store.addProvider({
-            name: provider.name,
-            api_key: provider.api_key || '', // 使用获取到的 API Key
-            base_url: provider.base_url,
-            description: `从 ${getToolLabel(provider.tool)} 导入`,
-            model_type: modelType
-          })
-        }
-        successCount++
-      } catch (e) {
-        const errorMsg = String(e)
-        // 如果是"已存在"错误，当作跳过处理
-        if (errorMsg.includes('已存在')) {
-          skipCount++
-        } else {
-          console.error(`导入 ${provider.name} 失败:`, e)
-          failCount++
-          failedNames.push(provider.name)
-        }
-      }
-    }
-    
-    // 显示结果提示
-    const parts: string[] = []
-    if (successCount > 0) parts.push(`成功导入 ${successCount} 个`)
-    if (skipCount > 0) parts.push(`跳过已存在 ${skipCount} 个`)
-    
-    if (parts.length > 0) {
-      successMessage.value = parts.join('，')
-    }
-    
-    if (failCount > 0) {
-      error.value = `失败 ${failCount} 个: ${failedNames.join(', ')}`
-    } else {
-      error.value = null
-    }
     
     // 通知父组件刷新列表
     emit('imported')
@@ -507,8 +526,8 @@ async function syncAll() {
                 <div class="flex items-center gap-1" @click.stop>
                   <!-- 删除按钮 -->
                   <button
-                    @click="removeProvider(provider)"
-                    :disabled="deleting !== null || importing !== null"
+                    @click.stop.prevent="removeProvider(provider)"
+                    :disabled="deleting !== null"
                     class="p-2 rounded-lg text-muted-foreground hover:text-error-500 hover:bg-error-500/10 transition-colors disabled:opacity-50"
                     :title="t('common.delete')"
                   >
@@ -536,16 +555,24 @@ async function syncAll() {
             <button
               v-if="deployedProviders.length > 0"
               @click="selectAllProviders"
-              :disabled="syncingAll || deleting !== null"
+              :disabled="syncingAll || deleting !== null || fixingModels"
               class="px-4 py-2 text-sm font-medium rounded-lg text-accent border border-accent/30 hover:bg-accent/10 disabled:opacity-50 transition-colors"
             >
               {{ t('deployed.syncAll') }}
+            </button>
+            <button
+              v-if="deployedProviders.length > 0"
+              @click="fillMissingModels"
+              :disabled="fixingModels || syncingAll || deleting !== null"
+              class="px-4 py-2 text-sm font-medium rounded-lg text-emerald-600 border border-emerald-600/30 hover:bg-emerald-600/10 disabled:opacity-50 transition-colors"
+            >
+              {{ fixingModels ? t('common.loading') : '一键补齐模型' }}
             </button>
             <div class="flex-1"></div>
             <button
               v-if="selectedProviders.size > 0"
               @click="importSelected"
-              :disabled="syncingAll || deleting !== null"
+              :disabled="syncingAll || deleting !== null || fixingModels"
               class="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
               {{ syncingAll ? t('common.loading') : `确认导入 (${selectedProviders.size})` }}

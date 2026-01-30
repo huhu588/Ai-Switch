@@ -1068,7 +1068,7 @@ async function save() {
                       @keydown="e => e.key === 'Enter' && addModelToExisting()"
                       class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono" />
                     <button type="button" @click="addModelToExisting" :disabled="!customModelInput.trim()"
-                      class="px-4 py-2 rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors">
+                      class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                       添加
                     </button>
                   </div>

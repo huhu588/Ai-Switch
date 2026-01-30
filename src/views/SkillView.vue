@@ -49,6 +49,26 @@ interface SkillsRepository {
   enabled: boolean
 }
 
+// 聚合的 Skill 管理信息
+interface ManagedSkill {
+  name: string
+  description: string
+  claude_enabled: boolean
+  codex_enabled: boolean
+  gemini_enabled: boolean
+  opencode_enabled: boolean
+  source_path: string | null
+  is_local: boolean
+}
+
+// Skills 统计信息
+interface SkillsStats {
+  claude_count: number
+  codex_count: number
+  gemini_count: number
+  opencode_count: number
+}
+
 // 状态
 const installedSkills = ref<InstalledSkill[]>([])
 const recommendedSkills = ref<RecommendedSkill[]>([])
@@ -85,6 +105,13 @@ const discoveringSkills = ref(false)
 const discoveredSkills = ref<RecommendedSkill[]>([])
 const discoverSearchQuery = ref('')
 const selectedDiscovered = ref<Set<string>>(new Set())
+
+// Skills 管理（类似 cc-switch）
+const showManageModal = ref(false)
+const managedSkills = ref<ManagedSkill[]>([])
+const skillsStats = ref<SkillsStats>({ claude_count: 0, codex_count: 0, gemini_count: 0, opencode_count: 0 })
+const togglingTool = ref<string | null>(null) // 正在切换的 skill-tool 组合
+const manageSearchQuery = ref('')
 
 // 按位置分组的已安装 Skills
 const groupedSkills = computed(() => {
@@ -141,6 +168,107 @@ async function loadRecommendedSkills() {
     console.error('加载推荐 skills 失败:', e)
   }
 }
+
+// ==================== Skills 管理功能 ====================
+
+// 加载管理的 skills 列表
+async function loadManagedSkills() {
+  try {
+    managedSkills.value = await invoke<ManagedSkill[]>('get_managed_skills')
+    skillsStats.value = await invoke<SkillsStats>('get_skills_stats')
+  } catch (e) {
+    console.error('加载 managed skills 失败:', e)
+  }
+}
+
+// 打开 Skills 管理弹窗
+async function openManageModal() {
+  await loadManagedSkills()
+  manageSearchQuery.value = ''
+  showManageModal.value = true
+}
+
+// 过滤后的管理 skills 列表
+const filteredManagedSkills = computed(() => {
+  if (!manageSearchQuery.value.trim()) {
+    return managedSkills.value
+  }
+  const query = manageSearchQuery.value.toLowerCase()
+  return managedSkills.value.filter(skill => 
+    skill.name.toLowerCase().includes(query) || 
+    skill.description.toLowerCase().includes(query)
+  )
+})
+
+// 切换 skill 的工具启用状态
+async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | 'gemini' | 'opencode') {
+  const key = `${skill.name}-${tool}`
+  if (togglingTool.value) return
+  
+  togglingTool.value = key
+  
+  const currentEnabled = tool === 'claude' ? skill.claude_enabled :
+                         tool === 'codex' ? skill.codex_enabled :
+                         tool === 'gemini' ? skill.gemini_enabled :
+                         skill.opencode_enabled
+  
+  try {
+    await invoke('toggle_skill_tool', {
+      skillName: skill.name,
+      tool: tool,
+      enabled: !currentEnabled
+    })
+    
+    // 更新本地状态
+    if (tool === 'claude') skill.claude_enabled = !currentEnabled
+    else if (tool === 'codex') skill.codex_enabled = !currentEnabled
+    else if (tool === 'gemini') skill.gemini_enabled = !currentEnabled
+    else skill.opencode_enabled = !currentEnabled
+    
+    // 更新统计
+    await loadManagedSkills()
+    // 同时刷新已安装列表
+    await loadInstalledSkills()
+  } catch (e) {
+    console.error(`切换 ${tool} 失败:`, e)
+    showMessage(`切换失败: ${e}`, 'error')
+  } finally {
+    togglingTool.value = null
+  }
+}
+
+// 删除 skill（从所有工具中移除）
+async function deleteSkillFromAll(skill: ManagedSkill) {
+  if (!confirm(`确定要从所有工具中删除 "${skill.name}" 吗？`)) return
+  
+  try {
+    // 依次从各个工具中删除
+    const tools = ['claude', 'codex', 'gemini', 'opencode'] as const
+    for (const tool of tools) {
+      const enabled = tool === 'claude' ? skill.claude_enabled :
+                      tool === 'codex' ? skill.codex_enabled :
+                      tool === 'gemini' ? skill.gemini_enabled :
+                      skill.opencode_enabled
+      
+      if (enabled) {
+        await invoke('toggle_skill_tool', {
+          skillName: skill.name,
+          tool: tool,
+          enabled: false
+        })
+      }
+    }
+    
+    showMessage('删除成功', 'success')
+    await loadManagedSkills()
+    await loadInstalledSkills()
+  } catch (e) {
+    console.error('删除失败:', e)
+    showMessage(`删除失败: ${e}`, 'error')
+  }
+}
+
+// ==================== 结束 Skills 管理功能 ====================
 
 // 打开推荐弹窗
 async function openRecommendedModal() {
@@ -234,7 +362,7 @@ async function installSelected() {
 async function viewSkillContent(skill: InstalledSkill) {
   selectedSkill.value = skill
   try {
-    skillContent.value = await invoke<string>('read_skills_content', { skills_path: skill.path })
+    skillContent.value = await invoke<string>('read_skills_content', { skillsPath: skill.path })
     showContentModal.value = true
   } catch (e) {
     console.error('读取 Skill 内容失败:', e)
@@ -253,7 +381,7 @@ async function deleteskills() {
   if (!skillToDelete.value) return
   
   try {
-    await invoke('delete_skills', { skills_path: skillToDelete.value.path })
+    await invoke('delete_skills', { skillsPath: skillToDelete.value.path })
     showDeleteConfirm.value = false
     await loadInstalledSkills()
     showMessage('删除成功', 'success')
@@ -497,6 +625,15 @@ onMounted(() => {
         >
           <SvgIcon name="repository" :size="16" />
           {{ t('skills.manageRepos') }}
+        </button>
+        
+        <!-- Skills 管理按钮 -->
+        <button
+          @click="openManageModal"
+          class="px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-medium text-sm transition-all flex items-center gap-2"
+        >
+          <SvgIcon name="settings" :size="16" />
+          Skills 管理
         </button>
         
         <button
@@ -1041,6 +1178,166 @@ onMounted(() => {
             >
               {{ t('common.confirm') }}
             </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+    
+    <!-- Skills 管理弹窗 -->
+    <Teleport to="body">
+      <div 
+        v-if="showManageModal" 
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+        @click.self="showManageModal = false"
+      >
+        <div class="bg-background border border-border rounded-2xl w-[800px] max-h-[85vh] overflow-hidden shadow-2xl">
+          <!-- 头部 -->
+          <div class="px-6 py-4 border-b border-border flex items-center justify-between">
+            <h2 class="text-lg font-semibold flex items-center gap-2">
+              <SvgIcon name="settings" :size="20" class="text-blue-400" />
+              Skills 管理
+            </h2>
+            <button 
+              @click="showManageModal = false"
+              class="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <SvgIcon name="close" :size="16" />
+            </button>
+          </div>
+          
+          <!-- 统计信息 -->
+          <div class="px-6 py-3 border-b border-border bg-surface/30 text-sm text-muted-foreground">
+            已安装 · Claude: {{ skillsStats.claude_count }} · Codex: {{ skillsStats.codex_count }} · Gemini: {{ skillsStats.gemini_count }} · OpenCode: {{ skillsStats.opencode_count }}
+          </div>
+          
+          <!-- 搜索框 -->
+          <div class="px-6 py-3 border-b border-border">
+            <input
+              v-model="manageSearchQuery"
+              type="text"
+              :placeholder="t('skills.searchSkills')"
+              class="w-full px-4 py-2 rounded-lg bg-surface border border-border focus:border-accent focus:outline-none text-sm"
+            />
+          </div>
+          
+          <!-- Skills 列表 -->
+          <div class="p-4 max-h-[50vh] overflow-auto space-y-3">
+            <div v-if="filteredManagedSkills.length === 0" class="text-center py-8 text-muted-foreground">
+              暂无已安装的 Skills
+            </div>
+            
+            <div
+              v-for="skill in filteredManagedSkills"
+              :key="skill.name"
+              class="p-4 rounded-xl border border-border bg-surface/30 hover:bg-surface/50 transition-all"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <!-- 左侧：名称和描述 -->
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold text-foreground">{{ skill.name }}</h3>
+                  <p class="text-sm text-muted-foreground mt-1 line-clamp-2">{{ skill.description || '暂无描述' }}</p>
+                  <span v-if="skill.is_local" class="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-accent/20 text-accent">本地</span>
+                </div>
+                
+                <!-- 右侧：工具开关 -->
+                <div class="flex flex-col gap-2 flex-shrink-0">
+                  <!-- Claude 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">Claude</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'claude')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.claude_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.claude_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Codex 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">Codex</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'codex')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.codex_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.codex_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Gemini 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">Gemini</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'gemini')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.gemini_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.gemini_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- OpenCode 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">OpenCode</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'opencode')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.opencode_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.opencode_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- 删除按钮 -->
+                <button
+                  @click="deleteSkillFromAll(skill)"
+                  class="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                  title="从所有工具中删除"
+                >
+                  <SvgIcon name="delete" :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 底部 -->
+          <div class="px-6 py-4 border-t border-border flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">
+              共 {{ managedSkills.length }} 个 Skills
+            </span>
+            <div class="flex gap-2">
+              <button
+                @click="loadManagedSkills"
+                class="px-4 py-2 rounded-lg bg-surface hover:bg-surface-hover text-foreground text-sm transition-all flex items-center gap-2"
+              >
+                <SvgIcon name="refresh" :size="14" />
+                {{ t('skills.refresh') }}
+              </button>
+              <button
+                @click="showManageModal = false"
+                class="px-4 py-2 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-medium transition-all"
+              >
+                {{ t('common.confirm') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

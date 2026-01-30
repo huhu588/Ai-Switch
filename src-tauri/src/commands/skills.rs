@@ -56,6 +56,75 @@ pub struct RemoteSkill {
     pub path: String,
 }
 
+/// 从 SKILL.md 内容中提取描述
+fn extract_description_from_skill_md(content: &str) -> Option<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    
+    // 策略1: 寻找 frontmatter 中的 description
+    let mut in_frontmatter = false;
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            if in_frontmatter {
+                break; // 结束 frontmatter
+            }
+            in_frontmatter = true;
+            continue;
+        }
+        if in_frontmatter {
+            if let Some(desc) = trimmed.strip_prefix("description:") {
+                let desc = desc.trim().trim_matches('"').trim_matches('\'');
+                if !desc.is_empty() {
+                    return Some(desc.to_string());
+                }
+            }
+        }
+    }
+    
+    // 策略2: 找到第一个非空、非标题、非 frontmatter 的段落
+    let mut past_frontmatter = false;
+    let mut found_end = false;
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed == "---" {
+            if past_frontmatter {
+                found_end = true;
+            }
+            past_frontmatter = true;
+            continue;
+        }
+        if past_frontmatter && found_end {
+            // 跳过标题行
+            if trimmed.starts_with('#') {
+                continue;
+            }
+            // 跳过空行
+            if trimmed.is_empty() {
+                continue;
+            }
+            // 找到第一个段落
+            let desc = trimmed.chars().take(200).collect::<String>();
+            if !desc.is_empty() {
+                return Some(if desc.len() >= 200 { format!("{}...", desc) } else { desc });
+            }
+        }
+    }
+    
+    // 策略3: 如果没有 frontmatter，找第一个非标题段落
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed == "---" {
+            continue;
+        }
+        let desc = trimmed.chars().take(200).collect::<String>();
+        if !desc.is_empty() {
+            return Some(if desc.len() >= 200 { format!("{}...", desc) } else { desc });
+        }
+    }
+    
+    None
+}
+
 /// 仓库索引文件格式
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillsIndex {
@@ -358,6 +427,23 @@ async fn detect_default_branch(client: &reqwest::Client, owner: &str, repo_name:
 }
 
 /// 通过 GitHub API 扫描仓库目录获取技能
+/// 获取单个技能的描述
+async fn fetch_skill_description(client: &reqwest::Client, raw_url: &str) -> Option<String> {
+    let response = client.get(raw_url)
+        .header("User-Agent", "Open-Switch/1.0")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .ok()?;
+    
+    if !response.status().is_success() {
+        return None;
+    }
+    
+    let content = response.text().await.ok()?;
+    extract_description_from_skill_md(&content)
+}
+
 async fn fetch_skills_by_scanning(client: &reqwest::Client, repo: &SkillsRepository) -> Result<Vec<RecommendedSkills>, AppError> {
     let parts: Vec<&str> = repo.url.trim_end_matches('/').split('/').collect();
     if parts.len() < 2 {
@@ -442,14 +528,15 @@ async fn fetch_skills_by_scanning(client: &reqwest::Client, repo: &SkillsReposit
                     .collect::<Vec<_>>()
                     .join(" ");
                 
+                let raw_url = format!("{}{}/SKILL.md", base_raw_url, content.path);
                 all_skills.push(RecommendedSkills {
                     id: content.name.clone(),
                     name: formatted_name,
-                    description: github_path.clone(), // 使用 GitHub 路径作为来源标识
+                    description: format!("{}/{}", github_path, content.name), // 初始使用路径
                     category: "community".to_string(),
                     repo: repo.name.clone(),
                     repo_url: repo.url.clone(),
-                    raw_url: format!("{}{}/SKILL.md", base_raw_url, content.path),
+                    raw_url,
                 });
             } else if content.name.ends_with(".md") && content.name != "README.md" {
                 let skills_name = content.name.trim_end_matches(".md");
@@ -465,20 +552,45 @@ async fn fetch_skills_by_scanning(client: &reqwest::Client, repo: &SkillsReposit
                     .collect::<Vec<_>>()
                     .join(" ");
                 
+                let raw_url = format!("{}{}", base_raw_url, content.path);
                 all_skills.push(RecommendedSkills {
                     id: skills_name.to_string(),
                     name: formatted_name,
-                    description: github_path.clone(), // 使用 GitHub 路径作为来源标识
+                    description: format!("{}/{}", github_path, skills_name), // 初始使用路径
                     category: "community".to_string(),
                     repo: repo.name.clone(),
                     repo_url: repo.url.clone(),
-                    raw_url: format!("{}{}", base_raw_url, content.path),
+                    raw_url,
                 });
             }
         }
         
         if !all_skills.is_empty() {
             break;
+        }
+    }
+    
+    // 并行获取技能描述（限制最多获取前 20 个）
+    let skills_to_fetch: Vec<_> = all_skills.iter().take(20).collect();
+    let mut description_futures = Vec::new();
+    
+    for skill in &skills_to_fetch {
+        let client_clone = client.clone();
+        let raw_url = skill.raw_url.clone();
+        description_futures.push(async move {
+            fetch_skill_description(&client_clone, &raw_url).await
+        });
+    }
+    
+    // 执行所有请求
+    let descriptions: Vec<Option<String>> = futures::future::join_all(description_futures).await;
+    
+    // 更新描述
+    for (i, desc) in descriptions.into_iter().enumerate() {
+        if let Some(description) = desc {
+            if i < all_skills.len() {
+                all_skills[i].description = description;
+            }
         }
     }
     
@@ -567,6 +679,25 @@ pub struct RecommendedSkills {
     pub raw_url: String,
 }
 
+/// 聚合的 Skill 管理信息（按名称聚合，显示各工具启用状态）
+#[derive(Debug, Clone, Serialize)]
+pub struct ManagedSkill {
+    pub name: String,
+    pub description: String,
+    /// 是否安装到 Claude (~/.claude/skills/)
+    pub claude_enabled: bool,
+    /// 是否安装到 Codex (~/.codex/skills/)
+    pub codex_enabled: bool,
+    /// 是否安装到 Gemini (~/.gemini/skills/)
+    pub gemini_enabled: bool,
+    /// 是否安装到 OpenCode (~/.config/opencode/skills/)
+    pub opencode_enabled: bool,
+    /// 源文件路径（用于复制）
+    pub source_path: Option<String>,
+    /// 是否来自本地（已安装）
+    pub is_local: bool,
+}
+
 /// 安装 Skills 的输入参数
 #[derive(Debug, Deserialize)]
 pub struct InstallSkillsInput {
@@ -601,6 +732,205 @@ fn get_skills_paths() -> Vec<(PathBuf, SkillsLocation)> {
     }
     
     paths
+}
+
+/// 获取各个工具的全局 skills 目录路径
+fn get_tool_skills_paths() -> Vec<(String, PathBuf)> {
+    let mut paths = Vec::new();
+    
+    if let Some(home_dir) = dirs::home_dir() {
+        paths.push(("claude".to_string(), home_dir.join(".claude").join("skills")));
+        paths.push(("codex".to_string(), home_dir.join(".codex").join("skills")));
+        paths.push(("gemini".to_string(), home_dir.join(".gemini").join("skills")));
+        paths.push(("opencode".to_string(), home_dir.join(".config").join("opencode").join("skills")));
+    }
+    
+    paths
+}
+
+/// 获取聚合的 Skills 管理列表
+#[tauri::command]
+pub fn get_managed_skills() -> Result<Vec<ManagedSkill>, AppError> {
+    use std::collections::HashMap;
+    
+    let tool_paths = get_tool_skills_paths();
+    let mut skills_map: HashMap<String, ManagedSkill> = HashMap::new();
+    
+    for (tool, base_path) in &tool_paths {
+        if !base_path.exists() {
+            continue;
+        }
+        
+        if let Ok(entries) = std::fs::read_dir(base_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let skill_file = path.join("SKILL.md");
+                    if skill_file.exists() {
+                        let name = path.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        
+                        // 读取描述
+                        let description = std::fs::read_to_string(&skill_file)
+                            .map(|c| extract_description_from_skill_md(&c).unwrap_or_default())
+                            .unwrap_or_default();
+                        
+                        let skill = skills_map.entry(name.clone()).or_insert_with(|| ManagedSkill {
+                            name: name.clone(),
+                            description: description.clone(),
+                            claude_enabled: false,
+                            codex_enabled: false,
+                            gemini_enabled: false,
+                            opencode_enabled: false,
+                            source_path: Some(skill_file.to_string_lossy().to_string()),
+                            is_local: true,
+                        });
+                        
+                        // 更新描述（如果当前为空）
+                        if skill.description.is_empty() && !description.is_empty() {
+                            skill.description = description;
+                        }
+                        
+                        // 更新启用状态
+                        match tool.as_str() {
+                            "claude" => skill.claude_enabled = true,
+                            "codex" => skill.codex_enabled = true,
+                            "gemini" => skill.gemini_enabled = true,
+                            "opencode" => skill.opencode_enabled = true,
+                            _ => {}
+                        }
+                        
+                        // 更新源路径
+                        if skill.source_path.is_none() {
+                            skill.source_path = Some(skill_file.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    let mut skills: Vec<ManagedSkill> = skills_map.into_values().collect();
+    skills.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    Ok(skills)
+}
+
+/// 切换 Skill 在某个工具中的启用状态
+#[tauri::command]
+pub async fn toggle_skill_tool(skill_name: String, tool: String, enabled: bool) -> Result<(), AppError> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| AppError::Custom("无法获取主目录".to_string()))?;
+    
+    let target_path = match tool.as_str() {
+        "claude" => home_dir.join(".claude").join("skills").join(&skill_name),
+        "codex" => home_dir.join(".codex").join("skills").join(&skill_name),
+        "gemini" => home_dir.join(".gemini").join("skills").join(&skill_name),
+        "opencode" => home_dir.join(".config").join("opencode").join("skills").join(&skill_name),
+        _ => return Err(AppError::Custom(format!("未知的工具: {}", tool))),
+    };
+    
+    if enabled {
+        // 启用：从其他工具目录复制
+        if target_path.exists() {
+            return Ok(()); // 已存在，无需操作
+        }
+        
+        // 查找源文件
+        let tool_paths = get_tool_skills_paths();
+        let mut source_path: Option<PathBuf> = None;
+        
+        for (_, base_path) in &tool_paths {
+            let potential_source = base_path.join(&skill_name);
+            if potential_source.exists() && potential_source.join("SKILL.md").exists() {
+                source_path = Some(potential_source);
+                break;
+            }
+        }
+        
+        let source = source_path
+            .ok_or_else(|| AppError::Custom(format!("找不到 skill 源文件: {}", skill_name)))?;
+        
+        // 确保目标目录存在
+        if let Some(parent) = target_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| AppError::Custom(format!("创建目录失败: {}", e)))?;
+        }
+        
+        // 复制整个 skill 目录
+        copy_dir_all(&source, &target_path)
+            .map_err(|e| AppError::Custom(format!("复制失败: {}", e)))?;
+    } else {
+        // 禁用：删除目录
+        if target_path.exists() {
+            std::fs::remove_dir_all(&target_path)
+                .map_err(|e| AppError::Custom(format!("删除失败: {}", e)))?;
+        }
+    }
+    
+    Ok(())
+}
+
+/// 递归复制目录
+fn copy_dir_all(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+/// 获取 Skills 统计信息
+#[tauri::command]
+pub fn get_skills_stats() -> Result<SkillsStats, AppError> {
+    let tool_paths = get_tool_skills_paths();
+    let mut stats = SkillsStats {
+        claude_count: 0,
+        codex_count: 0,
+        gemini_count: 0,
+        opencode_count: 0,
+    };
+    
+    for (tool, base_path) in &tool_paths {
+        if !base_path.exists() {
+            continue;
+        }
+        
+        let count = std::fs::read_dir(base_path)
+            .map(|entries| {
+                entries.flatten()
+                    .filter(|e| e.path().is_dir() && e.path().join("SKILL.md").exists())
+                    .count()
+            })
+            .unwrap_or(0);
+        
+        match tool.as_str() {
+            "claude" => stats.claude_count = count,
+            "codex" => stats.codex_count = count,
+            "gemini" => stats.gemini_count = count,
+            "opencode" => stats.opencode_count = count,
+            _ => {}
+        }
+    }
+    
+    Ok(stats)
+}
+
+/// Skills 统计信息
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillsStats {
+    pub claude_count: usize,
+    pub codex_count: usize,
+    pub gemini_count: usize,
+    pub opencode_count: usize,
 }
 
 /// 扫描已安装的 Skills
@@ -792,6 +1122,12 @@ pub fn delete_skills(skills_path: String) -> Result<(), AppError> {
 /// 读取 Skills 内容
 #[tauri::command]
 pub fn read_skills_content(skills_path: String) -> Result<String, AppError> {
+    // 检查路径是否存在
+    let path = std::path::Path::new(&skills_path);
+    if !path.exists() {
+        return Err(AppError::Custom(format!("文件不存在: {}", skills_path)));
+    }
+    
     std::fs::read_to_string(&skills_path)
-        .map_err(|e| AppError::Custom(format!("读取文件失败: {}", e)))
+        .map_err(|e| AppError::Custom(format!("读取文件失败: {} - {}", skills_path, e)))
 }

@@ -278,6 +278,9 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::install_skills,
             commands::delete_skills,
             commands::read_skills_content,
+            commands::get_managed_skills,
+            commands::toggle_skill_tool,
+            commands::get_skills_stats,
             // skills repository commands
             commands::get_skills_repos,
             commands::add_skills_repo,
@@ -392,6 +395,20 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::add_usage_record,
             commands::clear_usage_stats,
             commands::get_usage_by_provider,
+            // Model pricing commands
+            commands::get_model_pricing_list,
+            commands::update_model_pricing,
+            commands::add_model_pricing,
+            commands::delete_model_pricing,
+            commands::reset_model_pricing,
+            // Provider model pricing commands
+            commands::get_provider_model_pricing,
+            commands::get_all_provider_pricing,
+            commands::set_provider_model_pricing,
+            commands::delete_provider_model_pricing,
+            commands::get_pricing_providers,
+            // Diagnostics commands
+            commands::diagnose_usage_data,
             // Proxy commands
             commands::init_proxy_service,
             commands::start_proxy,
@@ -417,6 +434,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::apply_open_switch_provider,
             commands::import_to_open_switch,
             commands::get_open_switch_config_path,
+            // Local logs import commands
+            commands::scan_local_logs,
+            commands::import_local_logs,
+            commands::clear_local_logs,
+            // Log retention commands
+            commands::get_log_retention,
+            commands::set_log_retention,
+            commands::cleanup_old_logs,
         ])
         .run(tauri::generate_context!())?;
 

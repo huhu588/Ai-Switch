@@ -10,6 +10,8 @@ interface Props {
   visible: boolean
   providerNames: string[]
   modelType: string
+  selectedProviderName: string | null
+  selectedProviderEnabled: boolean
 }
 
 const props = defineProps<Props>()
@@ -37,6 +39,13 @@ const applyToGemini = ref(false)
 const loading = ref(false)
 const checkingStatus = ref(false)
 const error = ref<string | null>(null)
+
+const cliProviderName = computed(() => {
+  if (props.selectedProviderName) {
+    return props.selectedProviderName
+  }
+  return props.providerNames[0] || null
+})
 
 watch(() => props.visible, async (visible) => {
   if (visible && props.providerNames.length > 0) {
@@ -100,9 +109,16 @@ async function apply() {
       })
     }
     
-    // 2. 应用到 CLI 工具（只取第一个 provider）
-    if (hasCliTarget && props.providerNames.length > 0) {
-      const providerName = props.providerNames[0]
+    // 2. 应用到 CLI 工具（选中优先，否则取启用列表第一个）
+  if (hasCliTarget) {
+    const providerName = cliProviderName.value
+    if (!providerName) {
+      error.value = '请先选择一个服务商用于 CLI 配置'
+      return
+    }
+      if (!props.selectedProviderEnabled) {
+        await invoke('toggle_provider', { name: providerName, enabled: true })
+      }
       // 从后端获取完整的 provider 信息（包含 api_key）
       const providerConfig = await invoke<{
         name: string
@@ -198,8 +214,11 @@ async function apply() {
             </div>
             
             <!-- CLI 工具配置 -->
-            <div class="space-y-2 pt-2 border-t border-border">
+          <div class="space-y-2 pt-2 border-t border-border">
               <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ t('applyConfig.cliTools') }}</div>
+            <div class="text-xs text-muted-foreground">
+              将使用服务商：<span class="font-mono text-primary">{{ cliProviderName || '未选择' }}</span>
+            </div>
               <div class="space-y-2 pl-1">
                 <label class="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" v-model="applyToClaudeCode" class="w-4 h-4 rounded border-border" />
