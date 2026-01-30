@@ -580,19 +580,53 @@ async function save() {
     }
     
     if (props.editing) {
-      await invoke('update_provider', {
-        name: props.editing,
-        input: {
-          name: form.value.name,
-          api_key: form.value.api_key,
-          base_url: activeBaseUrl.value || baseUrl,
-          base_urls: baseUrls.value.map(u => u.url),
-          description: form.value.description || null,
-          npm,
-          model_type: form.value.model_type,
-          auto_add_v1_suffix: autoAddV1Suffix.value
+      const nameChanged = props.editing !== form.value.name.trim()
+      
+      if (nameChanged) {
+        // 名称改变了，需要删除旧的并创建新的
+        // 先获取旧 provider 的模型列表
+        const oldModels = existingModels.value.map(m => ({ id: m.id, name: m.name }))
+        
+        // 删除旧的 provider
+        await invoke('delete_provider', { name: props.editing })
+        
+        // 创建新的 provider
+        await invoke('add_provider', {
+          input: {
+            name: form.value.name,
+            api_key: form.value.api_key,
+            base_url: activeBaseUrl.value || baseUrl,
+            base_urls: baseUrls.value.map(u => u.url),
+            description: form.value.description || null,
+            model_type: form.value.model_type,
+            npm,
+            auto_add_v1_suffix: autoAddV1Suffix.value
+          }
+        })
+        
+        // 重新添加模型
+        if (oldModels.length > 0) {
+          await invoke('add_models_batch_detailed', {
+            providerName: form.value.name,
+            inputs: oldModels,
+          })
         }
-      })
+      } else {
+        // 名称没变，正常更新
+        await invoke('update_provider', {
+          name: props.editing,
+          input: {
+            name: form.value.name,
+            api_key: form.value.api_key,
+            base_url: activeBaseUrl.value || baseUrl,
+            base_urls: baseUrls.value.map(u => u.url),
+            description: form.value.description || null,
+            npm,
+            model_type: form.value.model_type,
+            auto_add_v1_suffix: autoAddV1Suffix.value
+          }
+        })
+      }
     } else {
       await invoke('add_provider', {
         input: {
@@ -801,8 +835,8 @@ async function save() {
               <!-- 名称 -->
               <div class="space-y-1.5">
                 <label class="block text-sm font-medium">{{ t('provider.name') }} *</label>
-                <input v-model="form.name" type="text" :placeholder="t('provider.placeholder.name')" :disabled="!!editing"
-                  class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary disabled:opacity-60" />
+                <input v-model="form.name" type="text" :placeholder="t('provider.placeholder.name')"
+                  class="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary" />
               </div>
 
               <!-- API Key -->
