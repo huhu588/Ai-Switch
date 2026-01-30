@@ -102,6 +102,12 @@ function getToolBadges(provider: ProviderItem) {
       case 'gemini':
         badges.push({ label: 'Gemini CLI', class: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/30' })
         break
+      case 'cc_switch':
+        badges.push({ label: 'cc-switch', class: 'bg-pink-500/10 text-pink-500 border-pink-500/30' })
+        break
+      case 'open_switch':
+        badges.push({ label: 'Open Switch', class: 'bg-accent/10 text-accent border-accent/30' })
+        break
     }
   }
   

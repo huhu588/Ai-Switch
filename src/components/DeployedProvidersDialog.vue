@@ -48,7 +48,9 @@ function getToolLabel(tool?: string): string {
     case 'claude_code': return 'Claude Code'
     case 'codex': return 'Codex CLI'
     case 'gemini': return 'Gemini CLI'
-    default: return 'OpenCode'
+    case 'cc_switch': return 'cc-switch'
+    case 'open_switch': return 'Open Switch'
+    default: return tool || 'OpenCode'
   }
 }
 
