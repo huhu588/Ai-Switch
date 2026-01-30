@@ -140,3 +140,17 @@ pub async fn save_claude_md(content: String) -> Result<(), String> {
     let manager = ClaudeCodeConfigManager::new()?;
     manager.write_claude_md(&content)
 }
+
+/// 清除 Claude Code Provider 配置（API Key、Base URL）
+#[tauri::command]
+pub async fn clear_claude_code_config() -> Result<(), String> {
+    let manager = ClaudeCodeConfigManager::new()?;
+    let mut settings = manager.read_settings()?;
+    
+    // 清除 API Key 和 Base URL
+    settings.env.remove("ANTHROPIC_API_KEY");
+    settings.env.remove("ANTHROPIC_BASE_URL");
+    settings.model = None;
+    
+    manager.write_settings(&settings)
+}

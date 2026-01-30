@@ -139,3 +139,10 @@ pub async fn save_gemini_md(content: String) -> Result<(), String> {
     let manager = GeminiConfigManager::new()?;
     manager.write_gemini_md(&content)
 }
+
+/// 清除 Gemini Provider 配置（API Key、Base URL）
+#[tauri::command]
+pub async fn clear_gemini_config() -> Result<(), String> {
+    let manager = GeminiConfigManager::new()?;
+    manager.clear_provider_config()
+}

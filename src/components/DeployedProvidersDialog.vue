@@ -98,17 +98,39 @@ function close() {
   emit('update:visible', false)
 }
 
-// 删除已部署的服务商
+// 删除已部署的服务商（支持所有来源）
 async function removeProvider(provider: DeployedProviderItem) {
   if (deleting.value) return
   
   deleting.value = provider.name
   try {
-    await store.removeDeployedProvider(
-      provider.name,
-      provider.source === 'global',
-      provider.source === 'project'
-    )
+    const tool = provider.tool || 'opencode'
+    
+    switch (tool) {
+      case 'opencode':
+        // OpenCode 来源
+        await store.removeDeployedProvider(
+          provider.name,
+          provider.source === 'global',
+          provider.source === 'project'
+        )
+        break
+      case 'claude_code':
+        // Claude Code 来源：清除配置
+        await invoke('clear_claude_code_config')
+        break
+      case 'codex':
+        // Codex 来源：删除 provider
+        await invoke('remove_codex_provider', { name: provider.name })
+        break
+      case 'gemini':
+        // Gemini 来源：清除配置
+        await invoke('clear_gemini_config')
+        break
+      default:
+        // 其他来源尝试通用删除
+        console.warn('未知的工具来源:', tool)
+    }
     // 重新加载列表
     await loadData()
   } catch (e) {
@@ -357,9 +379,8 @@ async function syncAll() {
                     <SvgIcon v-else name="download" :size="16" />
                   </button>
                   
-                  <!-- 删除按钮（仅 OpenCode 来源可删除） -->
+                  <!-- 删除按钮（所有来源可删除） -->
                   <button
-                    v-if="!provider.tool || provider.tool === 'opencode'"
                     @click="removeProvider(provider)"
                     :disabled="deleting !== null || importing !== null"
                     class="p-2 rounded-lg text-muted-foreground hover:text-error-500 hover:bg-error-500/10 transition-colors disabled:opacity-50"

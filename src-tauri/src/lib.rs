@@ -344,6 +344,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::sync_mcp_to_claude_code,
             commands::get_claude_md,
             commands::save_claude_md,
+            commands::clear_claude_code_config,
             // Codex commands
             commands::get_codex_status,
             commands::get_codex_providers,
@@ -371,6 +372,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::sync_mcp_to_gemini,
             commands::get_gemini_md,
             commands::save_gemini_md,
+            commands::clear_gemini_config,
             // Prompts commands
             commands::get_prompts_status,
             commands::get_prompt,

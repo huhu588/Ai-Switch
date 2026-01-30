@@ -344,6 +344,17 @@ impl GeminiConfigManager {
     pub fn is_configured(&self) -> bool {
         self.env_file.exists() || self.settings_json.exists()
     }
+
+    /// 清除 Provider 配置（API Key、Base URL、Model）
+    pub fn clear_provider_config(&self) -> Result<(), String> {
+        // 清除 .env 文件中的配置
+        let mut env = self.read_env()?;
+        env.gemini_api_key = None;
+        env.google_gemini_api_key = None;
+        env.google_gemini_base_url = None;
+        env.gemini_model = None;
+        self.write_env(&env)
+    }
 }
 
 #[cfg(test)]
