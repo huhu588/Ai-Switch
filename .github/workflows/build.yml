@@ -274,16 +274,16 @@ jobs:
           fi
           
           # 写入 latest.json
-          cat > artifacts/latest.json << EOF
-          {
-            "version": "$VERSION",
-            "notes": "Open Switch v$VERSION 发布",
-            "pub_date": "$PUB_DATE",
-            "platforms": {
-              $PLATFORMS
-            }
-          }
-          EOF
+          cat > artifacts/latest.json <<EOF
+{
+  "version": "$VERSION",
+  "notes": "Open Switch v$VERSION 发布",
+  "pub_date": "$PUB_DATE",
+  "platforms": {
+    $PLATFORMS
+  }
+}
+EOF
           
           echo "Generated latest.json:"
           cat artifacts/latest.json
