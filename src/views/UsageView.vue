@@ -156,12 +156,6 @@ let statusInterval: number | null = null
 // 根据服务商筛选趋势数据（需要后端支持，目前显示全部）
 const filteredTrend = computed(() => trend.value)
 
-// 筛选后的趋势最大值
-const maxFilteredTrendValue = computed(() => {
-  if (filteredTrend.value.length === 0) return 1
-  return Math.max(...filteredTrend.value.map(t => t.totalCost), 0.01)
-})
-
 // 预定义的模型颜色（按常见模型分配）
 const modelColors: Record<string, string> = {
   // Claude 系列 - 橙色/黄色系

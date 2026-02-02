@@ -92,7 +92,7 @@ function getToolBadges(provider: ProviderItem) {
   // Claude Code 只适用于 claude 类型
   // Codex CLI 只适用于 codex 类型
   // Gemini CLI 只适用于 gemini 类型
-  // cc_switch 和 open_switch 不单独显示，而是显示为对应的工具标识
+  // 外部工具来源不单独显示，而是显示为对应的工具标识
   const relevantTools = deployedTools.filter(tool => {
     if (tool === 'opencode') {
       return true
@@ -106,14 +106,14 @@ function getToolBadges(provider: ProviderItem) {
     if (tool === 'gemini' && provider.model_type === 'gemini') {
       return true
     }
-    // cc_switch 和 open_switch 转换为对应的工具标识
+    // 外部工具来源转换为对应的工具标识
     if (tool === 'cc_switch' || tool === 'open_switch') {
       return true // 会在下面转换
     }
     return false
   })
   
-  // 将 cc_switch/open_switch 转换为对应的工具标识
+  // 将外部工具来源转换为对应的工具标识
   const normalizedTools = new Set<string>()
   for (const tool of relevantTools) {
     if (tool === 'cc_switch' || tool === 'open_switch') {

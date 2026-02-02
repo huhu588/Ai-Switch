@@ -106,7 +106,7 @@ const discoveredSkills = ref<RecommendedSkill[]>([])
 const discoverSearchQuery = ref('')
 const selectedDiscovered = ref<Set<string>>(new Set())
 
-// Skills 管理（类似 cc-switch）
+// Skills 管理
 const showManageModal = ref(false)
 const managedSkills = ref<ManagedSkill[]>([])
 const skillsStats = ref<SkillsStats>({ claude_count: 0, codex_count: 0, gemini_count: 0, opencode_count: 0 })

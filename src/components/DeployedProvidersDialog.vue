@@ -202,9 +202,9 @@ function getSourceLabel(provider: DeployedProviderItem): string {
   if (provider.tool === 'open_switch') {
     return 'Open Switch'
   }
-  // cc-switch 来源
+  // 外部工具来源
   if (provider.tool === 'cc_switch') {
-    return 'cc-switch'
+    return '外部工具'
   }
   if (provider.tool && provider.tool !== 'opencode') {
     return getToolLabel(provider.tool)
@@ -249,9 +249,9 @@ async function deleteProviderByTool(provider: DeployedProviderItem) {
       break
     case 'cc_switch':
     case 'open_switch':
-      // cc-switch / Open Switch 来源：这些是外部配置，无法直接删除
+      // 外部工具来源：这些是外部配置，无法直接删除
       // 只能从列表中移除显示，提示用户去源工具中删除
-      error.value = `请在 ${tool === 'cc_switch' ? 'cc-switch' : 'Open Switch'} 中删除此服务商`
+      error.value = `请在源工具中删除此服务商`
       throw new Error('外部配置无法直接删除')
     default:
       // 其他来源尝试通用删除
@@ -316,7 +316,7 @@ async function importProvider(modelType: string) {
       // OpenCode 来源直接导入
       await store.importDeployedProvider(provider.name, modelType)
     } else {
-      // 其他工具来源：创建新的 Provider，使用从 cc-switch 获取的 API Key
+      // 其他工具来源：创建新的 Provider，使用获取的 API Key
       await store.addProvider({
         name: provider.name,
         api_key: provider.api_key || '', // 使用获取到的 API Key，如果没有则为空

@@ -319,7 +319,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::detect_env_conflicts,
             // Tray menu refresh
             commands::refresh_tray_menu,
-            // cc-switch integration
+            // 外部配置读取
             commands::get_cc_switch_providers,
             // oh-my-opencode commands
             commands::check_ohmy_status,

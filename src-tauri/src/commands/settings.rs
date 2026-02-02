@@ -467,9 +467,9 @@ pub async fn detect_env_conflicts() -> Result<Vec<EnvConflict>, String> {
     Ok(conflicts)
 }
 
-// ============== cc-switch 配置读取 ==============
+// ============== 外部工具配置读取 ==============
 
-/// cc-switch 服务商项
+/// 外部工具服务商项
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CcSwitchProviderItem {
     pub name: String,
@@ -482,10 +482,8 @@ pub struct CcSwitchProviderItem {
     pub current_model: Option<String>,
 }
 
-/// 读取 cc-switch 和 Open Switch 配置的服务商列表
-/// cc-switch v3.8.0+ 存储在 ~/.cc-switch/cc-switch.db (SQLite)
-/// cc-switch 旧版本存储在 ~/.cc-switch/config.json
-/// Open Switch 存储在 ~/.open-switch/config.json
+/// 读取外部工具配置的服务商列表
+/// 支持读取 SQLite 数据库和 JSON 配置文件格式
 #[tauri::command]
 pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, String> {
     let mut providers = Vec::new();
@@ -555,14 +553,13 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
         }
     }
     
-    // 2. 读取 cc-switch 的配置
-    // 优先读取 SQLite 数据库 (v3.8.0+)，然后尝试 JSON 文件（旧版本）
+    // 2. 读取外部工具配置
+    // 优先读取 SQLite 数据库，然后尝试 JSON 文件
     let db_path = std::path::Path::new(&home).join(".cc-switch").join("cc-switch.db");
     let config_path = std::path::Path::new(&home).join(".cc-switch").join("config.json");
     
-    // 2.1 尝试读取 SQLite 数据库 (cc-switch v3.8.0+)
+    // 2.1 尝试读取 SQLite 数据库
     // 表结构: providers(id, app_type, name, settings_config, website_url, notes, is_current, ...)
-    // settings_config 是 JSON: {"env": {"ANTHROPIC_BASE_URL": "...", "ANTHROPIC_AUTH_TOKEN": "..."}}
     if db_path.exists() {
         if let Ok(conn) = rusqlite::Connection::open(&db_path) {
             // 读取 providers 表 - 使用正确的列名
@@ -640,19 +637,19 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
         }
     }
     
-    // 2.2 尝试读取 JSON 配置文件 (cc-switch config.json)
+    // 2.2 尝试读取 JSON 配置文件
     if !config_path.exists() {
-        // cc-switch 未安装或未配置
+        // 外部工具未安装或未配置
         return Ok(providers);
     }
     
     let content = std::fs::read_to_string(&config_path)
-        .map_err(|e| format!("读取 cc-switch 配置失败: {}", e))?;
+        .map_err(|e| format!("读取外部工具配置失败: {}", e))?;
     
     let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 cc-switch 配置失败: {}", e))?;
+        .map_err(|e| format!("解析外部工具配置失败: {}", e))?;
     
-    // cc-switch config.json 格式 (v2):
+    // JSON 配置格式:
     // { "claude": { "providers": { ... } }, "codex": { "providers": { ... } }, "gemini": { "providers": { ... } } }
     
     // 读取 claude.providers（Claude Code 的供应商）

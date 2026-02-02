@@ -237,17 +237,17 @@ export const useProvidersStore = defineStore('providers', () => {
     return await invoke<DeployedProviderItem[]>('get_deployed_providers')
   }
 
-  // 获取所有工具的已配置服务商（OpenCode + Claude Code + Codex + Gemini + cc-switch）
+  // 获取所有工具的已配置服务商
   async function loadAllDeployedProviders(): Promise<DeployedProviderItem[]> {
     const allProviders: DeployedProviderItem[] = []
     
-    // 0. cc-switch 配置 (~/.cc-switch/config.json)
-    // cc-switch 存储的服务商列表，这是主要的配置来源
+    // 0. 外部工具配置
+    // 读取外部工具存储的服务商列表
     try {
       const ccSwitchProviders = await invoke<DeployedProviderItem[]>('get_cc_switch_providers')
       allProviders.push(...ccSwitchProviders)
     } catch (e) {
-      console.warn('加载 cc-switch 配置失败:', e)
+      console.warn('加载外部工具配置失败:', e)
     }
     
     // 1. OpenCode 配置
@@ -259,7 +259,7 @@ export const useProvidersStore = defineStore('providers', () => {
     }
     
     // 2. Claude Code 配置
-    // cc-switch 存储在 ~/.claude/settings.json，env.ANTHROPIC_BASE_URL 和 model 字段
+    // 存储在 ~/.claude/settings.json
     try {
       const status = await invoke<{ is_configured: boolean; has_api_key: boolean; api_key_masked?: string }>('get_claude_code_status')
       if (status.is_configured && status.has_api_key) {
@@ -282,7 +282,7 @@ export const useProvidersStore = defineStore('providers', () => {
     }
     
     // 3. Codex CLI 配置
-    // cc-switch 存储在 ~/.codex/config.toml 的 [model_providers.xxx] 段
+    // 存储在 ~/.codex/config.toml
     try {
       const status = await invoke<{ is_configured: boolean; has_auth: boolean; provider_count: number }>('get_codex_status')
       if (status.is_configured && status.provider_count > 0) {
@@ -303,7 +303,7 @@ export const useProvidersStore = defineStore('providers', () => {
     }
     
     // 4. Gemini CLI 配置
-    // cc-switch 存储在 ~/.gemini/.env 和 ~/.gemini/settings.json
+    // 存储在 ~/.gemini/.env 和 ~/.gemini/settings.json
     try {
       const status = await invoke<{ is_configured: boolean; has_api_key: boolean; base_url?: string }>('get_gemini_status')
       if (status.is_configured && status.has_api_key) {
