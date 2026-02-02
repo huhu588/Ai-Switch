@@ -454,7 +454,7 @@ fn infer_model_type(provider_name: &str, models: &std::collections::HashMap<Stri
     None
 }
 
-/// 导入已部署的服务商到 Open Switch 管理界面
+/// 导入已部署的服务商到 Ai Switch 管理界面
 /// 实际上是确保 provider 包含 model_type 字段
 #[tauri::command]
 pub fn import_deployed_provider(

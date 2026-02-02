@@ -1,4 +1,4 @@
-// Open Switch 统一配置命令
+// Ai Switch 统一配置命令
 // 管理 ~/.open-switch/config.json
 
 use serde::{Deserialize, Serialize};
@@ -211,7 +211,7 @@ fn input_to_provider(input: UnifiedProviderInput, existing_id: Option<String>) -
 
 // ============== Tauri Commands ==============
 
-/// 获取 Open Switch 所有统一服务商
+/// 获取 Ai Switch 所有统一服务商
 #[tauri::command]
 pub async fn get_open_switch_providers() -> Result<Vec<UnifiedProviderOutput>, String> {
     let manager = OpenSwitchConfigManager::new()?;
@@ -363,7 +363,7 @@ pub async fn apply_open_switch_provider(id: String, app: String) -> Result<(), S
     Ok(())
 }
 
-/// 从现有服务商导入到 Open Switch 统一配置
+/// 从现有服务商导入到 Ai Switch 统一配置
 #[tauri::command]
 pub async fn import_to_open_switch(
     name: String,
@@ -397,7 +397,7 @@ pub async fn import_to_open_switch(
     Ok(provider.into())
 }
 
-/// 获取 Open Switch 配置文件路径
+/// 获取 Ai Switch 配置文件路径
 #[tauri::command]
 pub async fn get_open_switch_config_path() -> Result<String, String> {
     let manager = OpenSwitchConfigManager::new()?;

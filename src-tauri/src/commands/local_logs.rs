@@ -1457,3 +1457,65 @@ pub async fn clear_local_logs(db: State<'_, Arc<Database>>) -> Result<u32, Strin
     
     Ok(deleted as u32)
 }
+
+/// 自动导入本地日志（静默模式，用于后台自动导入）
+/// 返回新导入的记录数
+#[tauri::command]
+pub async fn auto_import_local_logs(db: State<'_, Arc<Database>>) -> Result<u32, String> {
+    let conn = db.conn.lock().map_err(|e| format!("获取数据库锁失败: {e}"))?;
+    
+    let mut imported = 0u32;
+    
+    // 用于去重的集合
+    let mut seen_ids: HashSet<String> = HashSet::new();
+    
+    // 自动导入所有来源的日志
+    let sources = vec!["claude", "codex", "gemini", "opencode"];
+    
+    for source in sources {
+        let (files, _) = match source {
+            "claude" => scan_claude_logs(),
+            "codex" => scan_codex_logs(),
+            "gemini" => scan_gemini_logs(),
+            "opencode" => scan_opencode_logs(),
+            _ => continue,
+        };
+        
+        for file in files {
+            let entries: Vec<LocalLogEntry> = match source {
+                "claude" => parse_claude_log_file(&file),
+                "codex" => parse_codex_log_file(&file),
+                "gemini" => parse_gemini_log_file(&file),
+                "opencode" => parse_opencode_log_file(&file),
+                _ => continue,
+            };
+            
+            for entry in entries {
+                // 检查是否已处理过
+                if seen_ids.contains(&entry.session_id) {
+                    continue;
+                }
+                seen_ids.insert(entry.session_id.clone());
+                
+                // 检查数据库中是否已存在
+                if record_exists(&conn, &entry.session_id) {
+                    continue;
+                }
+                
+                // 计算成本（优先使用服务商特定定价）
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = entry.cost_usd
+                    .map(|c| Decimal::from_str(&c.to_string()).unwrap_or(Decimal::ZERO))
+                    .unwrap_or_else(|| calculate_cost(&entry, pricing));
+                
+                // 插入数据库
+                if insert_log_entry(&conn, &entry, cost).is_ok() {
+                    imported += 1;
+                }
+            }
+        }
+    }
+    
+    Ok(imported)
+}

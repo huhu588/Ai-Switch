@@ -34,7 +34,7 @@ impl Database {
         let config_dir = home.join(".config").join("opencode");
         std::fs::create_dir_all(&config_dir)
             .map_err(|e| AppError::Database(format!("创建配置目录失败: {e}")))?;
-        Ok(config_dir.join("open-switch.db"))
+        Ok(config_dir.join("ai-switch.db"))
     }
 
     /// 打开或创建数据库

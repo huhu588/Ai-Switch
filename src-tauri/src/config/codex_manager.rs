@@ -50,7 +50,7 @@ pub struct CodexConfig {
     pub forced_chatgpt_workspace_id: Option<String>,
 }
 
-/// Codex Provider 信息（用于 Open Switch 管理）
+/// Codex Provider 信息（用于 Ai Switch 管理）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodexProvider {
     pub name: String,

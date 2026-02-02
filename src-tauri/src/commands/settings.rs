@@ -492,8 +492,8 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
         .or_else(|_| std::env::var("USERPROFILE"))
         .map_err(|_| "无法获取用户目录".to_string())?;
     
-    // 1. 先读取 Open Switch 自己的配置 (~/.open-switch/config.json)
-    let open_switch_path = std::path::Path::new(&home).join(".open-switch").join("config.json");
+    // 1. 先读取 Ai Switch 自己的配置 (~/.ai-switch/config.json)
+    let open_switch_path = std::path::Path::new(&home).join(".ai-switch").join("config.json");
     if open_switch_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&open_switch_path) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -540,7 +540,7 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
                         providers.push(CcSwitchProviderItem {
                             name: if apps_info.is_empty() { name } else { format!("{} ({})", name, apps_info) },
                             base_url,
-                            api_key: None, // Open Switch 配置不包含 API key
+                            api_key: None, // Ai Switch 配置不包含 API key
                             model_count: -1,
                             source: "open_switch".to_string(),
                             tool: Some("open_switch".to_string()),
@@ -993,4 +993,176 @@ pub async fn get_cc_switch_providers() -> Result<Vec<CcSwitchProviderItem>, Stri
     }
     
     Ok(providers)
+}
+
+/// 删除 cc-switch 服务商
+/// 支持从 SQLite 数据库和 JSON 配置文件中删除
+#[tauri::command]
+pub async fn delete_cc_switch_provider(name: String, source: String) -> Result<(), String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "无法获取用户目录".to_string())?;
+    
+    // 从名称中提取原始名称（去掉 "(cc-switch)" 后缀）
+    let original_name = name
+        .trim_end_matches(" (cc-switch)")
+        .to_string();
+    
+    // 如果来源是 SQLite 数据库
+    if source.starts_with("cc_switch_db_") {
+        let db_id = source.strip_prefix("cc_switch_db_").unwrap_or("");
+        let db_path = std::path::Path::new(&home).join(".cc-switch").join("cc-switch.db");
+        
+        if db_path.exists() {
+            let conn = rusqlite::Connection::open(&db_path)
+                .map_err(|e| format!("打开数据库失败: {}", e))?;
+            
+            // 尝试通过 ID 删除
+            let deleted = conn.execute(
+                "DELETE FROM providers WHERE id = ?1",
+                rusqlite::params![db_id],
+            ).map_err(|e| format!("删除失败: {}", e))?;
+            
+            if deleted == 0 {
+                // 如果通过 ID 删除失败，尝试通过名称删除
+                conn.execute(
+                    "DELETE FROM providers WHERE name = ?1",
+                    rusqlite::params![original_name],
+                ).map_err(|e| format!("删除失败: {}", e))?;
+            }
+            
+            return Ok(());
+        }
+    }
+    
+    // 如果来源是 JSON 配置文件
+    let config_path = std::path::Path::new(&home).join(".cc-switch").join("config.json");
+    
+    if !config_path.exists() {
+        return Err("cc-switch 配置文件不存在".to_string());
+    }
+    
+    let content = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    
+    let mut json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析配置文件失败: {}", e))?;
+    
+    let mut deleted = false;
+    
+    // 根据来源确定要删除的位置
+    let sections = match source.as_str() {
+        "cc_switch_claude" => vec![("claude", "providers")],
+        "cc_switch_codex" => vec![("codex", "providers"), ("codexProviders", "providers")],
+        "cc_switch_gemini" => vec![("gemini", "providers"), ("geminiProviders", "providers")],
+        "cc_switch_universal" => vec![
+            ("claude", "providers"),
+            ("codex", "providers"),
+            ("gemini", "providers"),
+            ("codexProviders", "providers"),
+            ("geminiProviders", "providers"),
+        ],
+        _ => vec![
+            ("claude", "providers"),
+            ("codex", "providers"),
+            ("gemini", "providers"),
+            ("codexProviders", "providers"),
+            ("geminiProviders", "providers"),
+        ],
+    };
+    
+    for (section, key) in sections {
+        if let Some(providers) = json.get_mut(section)
+            .and_then(|v| v.get_mut(key))
+            .and_then(|v| v.as_object_mut())
+        {
+            // 找到并删除匹配名称的服务商
+            let keys_to_remove: Vec<String> = providers.iter()
+                .filter(|(_k, v)| {
+                    v.get("name")
+                        .and_then(|n| n.as_str())
+                        .map(|n| n == original_name)
+                        .unwrap_or(false)
+                })
+                .map(|(k, _)| k.clone())
+                .collect();
+            
+            for key in keys_to_remove {
+                providers.remove(&key);
+                deleted = true;
+            }
+        }
+    }
+    
+    if !deleted {
+        return Err(format!("未找到名为 '{}' 的服务商", original_name));
+    }
+    
+    // 写回配置文件
+    let content = serde_json::to_string_pretty(&json)
+        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    
+    std::fs::write(&config_path, content)
+        .map_err(|e| format!("写入配置文件失败: {}", e))?;
+    
+    Ok(())
+}
+
+/// 删除 Ai Switch 统一配置中的服务商
+#[tauri::command]
+pub async fn delete_open_switch_provider(name: String) -> Result<(), String> {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "无法获取用户目录".to_string())?;
+    
+    let config_path = std::path::Path::new(&home).join(".ai-switch").join("config.json");
+    
+    if !config_path.exists() {
+        return Err("Ai Switch 配置文件不存在".to_string());
+    }
+    
+    let content = std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("读取配置文件失败: {}", e))?;
+    
+    let mut json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("解析配置文件失败: {}", e))?;
+    
+    // 从名称中提取原始名称（去掉应用标签后缀，如 "(OpenCode Claude Codex Gemini)"）
+    let original_name = if let Some(pos) = name.rfind(" (") {
+        name[..pos].to_string()
+    } else {
+        name.clone()
+    };
+    
+    let providers = json.get_mut("providers")
+        .and_then(|v| v.as_object_mut())
+        .ok_or_else(|| "配置文件中不存在 providers 字段".to_string())?;
+    
+    // 找到并删除匹配名称的服务商
+    let keys_to_remove: Vec<String> = providers.iter()
+        .filter(|(_k, v)| {
+            v.get("name")
+                .and_then(|n| n.as_str())
+                .map(|n| n == original_name)
+                .unwrap_or(false)
+        })
+        .map(|(k, _)| k.clone())
+        .collect();
+    
+    if keys_to_remove.is_empty() {
+        return Err(format!("未找到名为 '{}' 的服务商", original_name));
+    }
+    
+    for key in keys_to_remove {
+        providers.remove(&key);
+    }
+    
+    // 写回配置文件
+    let content = serde_json::to_string_pretty(&json)
+        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    
+    std::fs::write(&config_path, content)
+        .map_err(|e| format!("写入配置文件失败: {}", e))?;
+    
+    Ok(())
 }

@@ -421,7 +421,7 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
     Ok(BackupData {
         version: BACKUP_VERSION.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
-        app_name: "Open Switch".to_string(),
+        app_name: "Ai Switch".to_string(),
         providers,
         mcp_servers,
         rules,

@@ -1,7 +1,7 @@
 export default {
   // 应用
   app: {
-    title: 'Open Switch工具'
+    title: 'Ai Switch工具'
   },
 
   // 通用
@@ -104,8 +104,8 @@ export default {
     notTested: '未测试',
     modelManagement: '模型管理',
     addModel: '添加模型',
-    // Open Switch 统一配置
-    saveToOpenSwitch: '保存到 Open Switch 统一配置',
+    // Ai Switch 统一配置
+    saveToOpenSwitch: '保存到 Ai Switch 统一配置',
     saveToOpenSwitchDesc: '将配置保存到 ~/.open-switch/config.json，支持跨工具共享',
     noModels: '暂无模型'
   },
@@ -730,6 +730,10 @@ export default {
     cumulativeUsage: '累计用量',
     moreModels: '其他模型',
     otherModels: '其他模型',
-    total: '总计'
+    total: '总计',
+    // 自动导入
+    autoImport: '自动导入日志',
+    autoImportDesc: '打开使用统计页面时自动导入本地日志',
+    autoImported: '已自动导入 {count} 条记录'
   }
 }

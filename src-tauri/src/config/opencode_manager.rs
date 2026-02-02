@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 const SYNC_THEME: &str = "tokyonight";
 
-/// Provider 元数据（Open Switch 特有字段，不同步到 opencode.json）
+/// Provider 元数据（Ai Switch 特有字段，不同步到 opencode.json）
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderMetadataStorage {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,7 +30,7 @@ fn default_enabled() -> bool {
 pub struct OpenCodeConfigManager {
     // OpenCode 官方主配置文件：~/.config/opencode/opencode.json（所有读写操作的目标）
     opencode_config_json: PathBuf,
-    // Open Switch 元数据文件：~/.config/opencode/switch_metadata.json
+    // Ai Switch 元数据文件：~/.config/opencode/switch_metadata.json
     metadata_json: PathBuf,
     // 备份路径：~/.opencode/opencode.json（仅用于备份）
     home_dir: PathBuf,

@@ -77,7 +77,7 @@ const autoSelectFastestEnabled = ref(true)
 // 应用目标选择
 const applyTargets = ref<string[]>(['opencode'])
 
-// 保存到 Open Switch 统一配置
+// 保存到 Ai Switch 统一配置
 const saveToOpenSwitch = ref(true)
 
 // 删除确认对话框
@@ -726,7 +726,7 @@ async function save() {
       }
     }
     
-    // 保存到 Open Switch 统一配置
+    // 保存到 Ai Switch 统一配置
     if (saveToOpenSwitch.value) {
       try {
         // 构建 OpenCode 模型配置
@@ -772,7 +772,7 @@ async function save() {
           }
         })
       } catch (e) {
-        console.warn('保存到 Open Switch 统一配置失败:', e)
+        console.warn('保存到 Ai Switch 统一配置失败:', e)
         // 不中断整个流程
       }
     }
@@ -895,7 +895,7 @@ async function save() {
                 <p class="text-xs text-muted-foreground">选择要将此服务商配置应用到的工具</p>
               </div>
 
-              <!-- 保存到 Open Switch 统一配置 -->
+              <!-- 保存到 Ai Switch 统一配置 -->
               <div class="flex items-center gap-3 p-3 rounded-lg bg-accent/5 border border-accent/20">
                 <label class="flex items-center gap-2 cursor-pointer flex-1">
                   <input

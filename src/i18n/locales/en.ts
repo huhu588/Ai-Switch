@@ -1,7 +1,7 @@
 export default {
   // App
   app: {
-    title: 'Open Switch - Coding Agent Configuration Manager'
+    title: 'Ai Switch - Coding Agent Configuration Manager'
   },
 
   // Common
@@ -105,8 +105,8 @@ export default {
     modelManagement: 'Model Management',
     addModel: 'Add Model',
     noModels: 'No models',
-    // Open Switch unified config
-    saveToOpenSwitch: 'Save to Open Switch Unified Config',
+    // Ai Switch unified config
+    saveToOpenSwitch: 'Save to Ai Switch Unified Config',
     saveToOpenSwitchDesc: 'Save configuration to ~/.open-switch/config.json for cross-tool sharing'
   },
 
@@ -730,6 +730,10 @@ export default {
     cumulativeUsage: 'Cumulative',
     moreModels: 'more models',
     otherModels: 'other models',
-    total: 'Total'
+    total: 'Total',
+    // Auto import
+    autoImport: 'Auto Import Logs',
+    autoImportDesc: 'Automatically import local logs when opening usage statistics',
+    autoImported: 'Auto imported {count} records'
   }
 }

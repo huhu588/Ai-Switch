@@ -1,4 +1,4 @@
-// Open Switch Tauri 库入口
+// Ai Switch Tauri 库入口
 
 pub mod commands;
 pub mod config;
@@ -174,7 +174,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .clone();
             let tray = TrayIconBuilder::new()
                 .icon(icon)
-                .tooltip("Open Switch")
+                .tooltip("Ai Switch")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
@@ -321,6 +321,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::refresh_tray_menu,
             // 外部配置读取
             commands::get_cc_switch_providers,
+            commands::delete_cc_switch_provider,
+            commands::delete_open_switch_provider,
             // oh-my-opencode commands
             commands::check_ohmy_status,
             commands::get_available_models,
@@ -426,7 +428,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_proxy_usage_trend_by_model,
             commands::get_provider_stats,
             commands::clear_proxy_usage_stats,
-            // Open Switch unified config commands
+            // Ai Switch unified config commands
             commands::get_open_switch_providers,
             commands::get_open_switch_provider,
             commands::add_open_switch_provider,
@@ -439,6 +441,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::scan_local_logs,
             commands::import_local_logs,
             commands::clear_local_logs,
+            commands::auto_import_local_logs,
             // Log retention commands
             commands::get_log_retention,
             commands::set_log_retention,

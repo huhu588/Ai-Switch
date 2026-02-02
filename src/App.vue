@@ -329,7 +329,7 @@ onUnmounted(() => {
             </svg>
           </div>
           <div>
-            <h1 class="font-bold text-lg tracking-tight text-glow">Open Switch</h1>
+            <h1 class="font-bold text-lg tracking-tight text-glow">Ai Switch</h1>
             <p class="text-[10px] font-mono text-muted-foreground">v{{ version }}</p>
           </div>
         </div>

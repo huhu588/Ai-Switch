@@ -44,7 +44,7 @@ pub struct GeminiEnv {
     pub other: HashMap<String, String>,
 }
 
-/// Gemini Provider 信息（用于 Open Switch 管理）
+/// Gemini Provider 信息（用于 Ai Switch 管理）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeminiProvider {
     pub name: String,

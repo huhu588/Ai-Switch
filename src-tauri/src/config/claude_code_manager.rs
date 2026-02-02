@@ -65,7 +65,7 @@ pub struct ClaudeJsonConfig {
     pub other: HashMap<String, serde_json::Value>,
 }
 
-/// Claude Code Provider 信息（用于 Open Switch 管理）
+/// Claude Code Provider 信息（用于 Ai Switch 管理）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeCodeProvider {
     pub name: String,
@@ -287,7 +287,7 @@ impl ClaudeCodeConfigManager {
         self.write_claude_json(&config)
     }
 
-    /// 同步 MCP 服务器配置（从 Open Switch 格式转换）
+    /// 同步 MCP 服务器配置（从 Ai Switch 格式转换）
     pub fn sync_mcp_servers(&self, servers: HashMap<String, ClaudeMcpServer>) -> Result<(), String> {
         let mut config = self.read_claude_json()?;
         config.mcp_servers = servers;

@@ -153,7 +153,7 @@ async function loadData() {
   try {
     deployedProviders.value = await store.loadAllDeployedProviders()
     
-    // 自动勾选已存在于 Open Switch 中的服务商
+    // 自动勾选已存在于 Ai Switch 中的服务商
     const existingProviders = new Set(store.providers.map(p => p.name))
     const autoSelected = deployedProviders.value
       .filter(p => existingProviders.has(p.name))
@@ -174,7 +174,7 @@ function getToolLabel(tool?: string): string {
     case 'codex': return 'Codex CLI'
     case 'gemini': return 'Gemini CLI'
     case 'cc_switch': return 'cc-switch'
-    case 'open_switch': return 'Open Switch'
+    case 'open_switch': return 'Ai Switch'
     default: return tool || 'OpenCode'
   }
 }
@@ -198,9 +198,9 @@ function getSourceClass(source: string): string {
 
 // 获取来源显示名称
 function getSourceLabel(provider: DeployedProviderItem): string {
-  // Open Switch 自己的统一配置
+  // Ai Switch 自己的统一配置
   if (provider.tool === 'open_switch') {
-    return 'Open Switch'
+    return 'Ai Switch'
   }
   // 外部工具来源
   if (provider.tool === 'cc_switch') {
@@ -248,11 +248,16 @@ async function deleteProviderByTool(provider: DeployedProviderItem) {
       await invoke('clear_gemini_config')
       break
     case 'cc_switch':
+      // cc-switch 来源：从 cc-switch 配置中删除
+      await invoke('delete_cc_switch_provider', { 
+        name: provider.name, 
+        source: provider.source 
+      })
+      break
     case 'open_switch':
-      // 外部工具来源：这些是外部配置，无法直接删除
-      // 只能从列表中移除显示，提示用户去源工具中删除
-      error.value = `请在源工具中删除此服务商`
-      throw new Error('外部配置无法直接删除')
+      // Ai Switch 统一配置：从 ~/.ai-switch/config.json 删除
+      await invoke('delete_open_switch_provider', { name: provider.name })
+      break
     default:
       // 其他来源尝试通用删除
       console.warn('未知的工具来源:', tool)

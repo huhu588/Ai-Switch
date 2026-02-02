@@ -1,5 +1,5 @@
-// Open Switch 统一配置管理器
-// 管理 ~/.open-switch/config.json，存储跨工具的服务商配置
+// Ai Switch 统一配置管理器
+// 管理 ~/.ai-switch/config.json，存储跨工具的服务商配置
 // 支持 OpenCode、Claude Code、Codex、Gemini
 
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-/// Open Switch 配置文件版本
+/// Ai Switch 配置文件版本
 const CONFIG_VERSION: &str = "1.0";
 
-/// Open Switch 统一配置文件结构
+/// Ai Switch 统一配置文件结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenSwitchConfig {
     /// 配置版本
@@ -202,7 +202,7 @@ pub struct GeminiModels {
     pub model: Option<String>,
 }
 
-/// Open Switch 配置管理器
+/// Ai Switch 配置管理器
 pub struct OpenSwitchConfigManager {
     config_dir: PathBuf,
     config_path: PathBuf,
@@ -214,7 +214,7 @@ impl OpenSwitchConfigManager {
         let user_home = dirs::home_dir()
             .ok_or_else(|| "无法获取用户主目录".to_string())?;
         
-        let config_dir = user_home.join(".open-switch");
+        let config_dir = user_home.join(".ai-switch");
         let config_path = config_dir.join("config.json");
         
         // 确保配置目录存在

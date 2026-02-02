@@ -1,7 +1,7 @@
 export default {
   // App
   app: {
-    title: 'Open Switch - コーディングエージェント設定マネージャー'
+    title: 'Ai Switch - コーディングエージェント設定マネージャー'
   },
 
   // Common
@@ -105,8 +105,8 @@ export default {
     modelManagement: 'モデル管理',
     addModel: 'モデル追加',
     noModels: 'モデルなし',
-    // Open Switch 統一設定
-    saveToOpenSwitch: 'Open Switch 統一設定に保存',
+    // Ai Switch 統一設定
+    saveToOpenSwitch: 'Ai Switch 統一設定に保存',
     saveToOpenSwitchDesc: '設定を ~/.open-switch/config.json に保存し、ツール間で共有できます'
   },
 
@@ -730,6 +730,10 @@ export default {
     cumulativeUsage: '累計',
     moreModels: '他のモデル',
     otherModels: '他のモデル',
-    total: '合計'
+    total: '合計',
+    // 自動インポート
+    autoImport: 'ログ自動インポート',
+    autoImportDesc: '使用統計ページを開く時にローカルログを自動的にインポート',
+    autoImported: '{count} 件を自動インポートしました'
   }
 }

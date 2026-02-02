@@ -1,4 +1,4 @@
-# Open Switch
+# Ai Switch
 
 > OpenCode 配置管理工具 | v1.4.28
 
@@ -11,7 +11,7 @@
 - **MCP 服务器** - MCP 服务器配置与管理
 - **技能管理** - 安装和管理 OpenCode 技能
 - **规则管理** - 自定义规则配置
-- **深链接** - 支持 `openswitch://` 协议一键配置
+- **深链接** - 支持 `aiswitch://` 协议一键配置
 - **备份恢复** - 配置导入导出功能
 - **多语言** - 支持中文和英文界面
 - **自动更新** - 全平台支持（Windows / macOS Intel / macOS Apple Silicon）

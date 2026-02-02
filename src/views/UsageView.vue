@@ -135,6 +135,11 @@ const importOpencode = ref(true)
 // 日志保留设置
 const logRetention = ref<'permanent' | 'days30'>('permanent')
 
+// 自动导入设置
+const autoImport = ref(true)
+const lastAutoImport = ref<number>(0) // 上次自动导入的时间戳
+const autoImportResult = ref<{ imported: number; time: number } | null>(null)
+
 // 服务商筛选
 const selectedProvider = ref<'all' | 'claude' | 'codex' | 'gemini' | 'opencode'>('all')
 
@@ -514,6 +519,52 @@ async function loadLogRetention() {
   }
 }
 
+// 加载自动导入设置
+async function loadAutoImportSetting() {
+  try {
+    // 从 localStorage 读取设置
+    const saved = localStorage.getItem('usage_auto_import')
+    if (saved !== null) {
+      autoImport.value = saved === 'true'
+    }
+  } catch (e) {
+    console.error('加载自动导入设置失败:', e)
+  }
+}
+
+// 保存自动导入设置
+function saveAutoImportSetting(value: boolean) {
+  autoImport.value = value
+  localStorage.setItem('usage_auto_import', String(value))
+}
+
+// 自动导入本地日志
+async function autoImportLogs() {
+  if (!autoImport.value) return
+  
+  // 防止频繁导入（至少间隔 30 秒）
+  const now = Date.now()
+  if (now - lastAutoImport.value < 30000) return
+  lastAutoImport.value = now
+  
+  try {
+    const imported = await invoke<number>('auto_import_local_logs')
+    if (imported > 0) {
+      autoImportResult.value = { imported, time: now }
+      // 刷新数据
+      await loadData()
+      // 3 秒后清除提示
+      setTimeout(() => {
+        if (autoImportResult.value?.time === now) {
+          autoImportResult.value = null
+        }
+      }, 3000)
+    }
+  } catch (e) {
+    console.error('自动导入失败:', e)
+  }
+}
+
 // 设置日志保留策略
 async function setLogRetention(retention: 'permanent' | 'days30') {
   try {
@@ -721,8 +772,13 @@ watch(selectedProvider, () => {
 
 onMounted(async () => {
   await initProxy()
-  await loadData()
   await loadLogRetention()
+  await loadAutoImportSetting()
+  
+  // 启动时自动导入本地日志（在加载数据之前）
+  await autoImportLogs()
+  
+  await loadData()
   
   // 启动时清理过期日志
   try {
@@ -758,6 +814,16 @@ onUnmounted(() => {
           <h1 class="text-xl font-semibold">{{ t('usage.title') }}</h1>
           <p class="text-sm text-gray-500">{{ t('usage.description') }}</p>
         </div>
+        <!-- 自动导入成功提示 -->
+        <Transition name="fade">
+          <div 
+            v-if="autoImportResult" 
+            class="ml-4 px-3 py-1 text-xs bg-emerald-500/10 text-emerald-500 rounded-full flex items-center gap-1"
+          >
+            <SvgIcon name="check" class="w-3 h-3" />
+            {{ t('usage.autoImported', { count: autoImportResult.imported }) }}
+          </div>
+        </Transition>
       </div>
       
       <!-- 时间周期选择 -->
@@ -1186,6 +1252,23 @@ onUnmounted(() => {
             {{ t('usage.retention30Days') }}
           </button>
         </div>
+      </div>
+      
+      <!-- 自动导入设置 -->
+      <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div>
+          <h3 class="font-medium text-sm">{{ t('usage.autoImport') }}</h3>
+          <p class="text-xs text-gray-500 mt-1">{{ t('usage.autoImportDesc') }}</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input 
+            type="checkbox" 
+            :checked="autoImport"
+            @change="saveAutoImportSetting(!autoImport)"
+            class="sr-only peer"
+          />
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
+        </label>
       </div>
       
       <!-- 模型定价设置 -->

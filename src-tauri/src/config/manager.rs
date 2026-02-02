@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 /// 核心配置管理器
 pub struct ConfigManager {
-    global_config_file: PathBuf, // ~/.Open Switch/config.json
+    global_config_file: PathBuf, // ~/.Ai Switch/config.json
     opencode_manager: OpenCodeConfigManager,
     mcp_manager: McpConfigManager,
 }
@@ -21,7 +21,7 @@ impl ConfigManager {
         let home_dir = dirs::home_dir().ok_or_else(|| ConfigError::NotFound {
             name: "用户主目录".to_string(),
         })?;
-        let config_dir = home_dir.join(".Open Switch");
+        let config_dir = home_dir.join(".Ai Switch");
         let global_config_file = config_dir.join("config.json");
 
         // 确保配置目录存在

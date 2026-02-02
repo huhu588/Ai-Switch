@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Open Switch",
+  "productName": "Ai Switch",
   "version": "1.4.28",
-  "identifier": "dev.openswitch.desktop",
+  "identifier": "dev.aiswitch.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Open Switch",
+        "title": "Ai Switch",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -42,7 +42,7 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "OpenCode 配置管理工具",
-    "longDescription": "Open Switch工具，支持多 Provider 和 Model 管理、MCP 服务器配置、规则与技能管理。",
+    "longDescription": "Ai Switch工具，支持多 Provider 和 Model 管理、MCP 服务器配置、规则与技能管理。",
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
@@ -71,7 +71,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["openswitch"]
+        "schemes": ["aiswitch"]
       }
     }
   }
