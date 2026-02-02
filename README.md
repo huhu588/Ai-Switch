@@ -14,6 +14,7 @@
 - **深链接** - 支持 `openswitch://` 协议一键配置
 - **备份恢复** - 配置导入导出功能
 - **多语言** - 支持中文和英文界面
+- **自动更新** - 全平台支持（Windows / macOS Intel / macOS Apple Silicon）
 
 ## 快速开始
 
@@ -38,6 +39,12 @@ npm run tauri dev
 ```bash
 npm run tauri build
 ```
+
+#### 构建注意事项
+
+- `npm run tauri build` 会先执行 `beforeBuildCommand`（`npm run build:tauri`），其中包含 `vue-tsc --noEmit`。
+- `vue-tsc` 会在检测到**未使用变量/导入**时直接报错（如 TS6133），导致构建失败。请在提交/构建前清理未使用的变量、计算属性或导入。
+- 建议先本地执行 `npm run build` 进行静态检查，避免在打包阶段才失败。
 
 ## 配置层级
 
