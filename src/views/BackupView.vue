@@ -57,6 +57,46 @@ interface ExportedSkills {
   content: string
 }
 
+// Codex CLI 配置
+interface ExportedCodexProvider {
+  name: string
+  base_url: string
+  env_key?: string
+  requires_openai_auth?: boolean
+}
+
+interface ExportedCodexMcpServer {
+  name: string
+  command: string[]
+  env?: Record<string, string>
+}
+
+interface ExportedCodexConfig {
+  model_providers: ExportedCodexProvider[]
+  mcp_servers: ExportedCodexMcpServer[]
+}
+
+// Gemini CLI 配置
+interface ExportedGeminiEnv {
+  gemini_api_key?: string
+  google_gemini_api_key?: string
+  google_gemini_base_url?: string
+  gemini_model?: string
+}
+
+interface ExportedGeminiMcpServer {
+  name: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  url?: string
+}
+
+interface ExportedGeminiConfig {
+  env: ExportedGeminiEnv
+  mcp_servers: ExportedGeminiMcpServer[]
+}
+
 interface BackupData {
   version: string
   created_at: string
@@ -65,6 +105,8 @@ interface BackupData {
   mcp_servers: ExportedMcpServer[]
   rules: ExportedRule[]
   skills: ExportedSkills[]
+  codex_config?: ExportedCodexConfig
+  gemini_config?: ExportedGeminiConfig
 }
 
 interface ExportStats {
@@ -73,6 +115,10 @@ interface ExportStats {
   mcp_servers: number
   rules: number
   skills: number
+  codex_providers: number
+  codex_mcp_servers: number
+  gemini_configured: boolean
+  gemini_mcp_servers: number
 }
 
 interface ImportResult {
@@ -85,6 +131,10 @@ interface ImportResult {
   rules_skipped: number
   skills_imported: number
   skills_skipped: number
+  codex_imported: number
+  codex_skipped: number
+  gemini_imported: number
+  gemini_skipped: number
   errors: string[]
 }
 
@@ -103,18 +153,26 @@ const importOptions = ref({
   import_mcp: true,
   import_rules: true,
   import_skills: true,
+  import_codex: true,
+  import_gemini: true,
   overwrite_existing: false,
 })
 
 // 计算统计
 const previewStats = computed(() => {
   if (!previewData.value) return null
+  const codexConfig = previewData.value.codex_config
+  const geminiConfig = previewData.value.gemini_config
   return {
     providers: previewData.value.providers.length,
     models: previewData.value.providers.reduce((sum, p) => sum + p.models.length, 0),
     mcp_servers: previewData.value.mcp_servers.length,
     rules: previewData.value.rules.length,
     skills: previewData.value.skills.length,
+    codex_providers: codexConfig?.model_providers?.length || 0,
+    codex_mcp_servers: codexConfig?.mcp_servers?.length || 0,
+    gemini_configured: !!(geminiConfig?.env?.gemini_api_key || geminiConfig?.env?.google_gemini_api_key),
+    gemini_mcp_servers: geminiConfig?.mcp_servers?.length || 0,
   }
 })
 
@@ -192,6 +250,8 @@ async function handleImport() {
         mcp: result.mcp_imported,
         rules: result.rules_imported,
         skills: result.skills_imported,
+        codex: result.codex_imported,
+        gemini: result.gemini_imported,
       })
     } else {
       importMessage.value = t('backup.importPartial', {
@@ -199,6 +259,8 @@ async function handleImport() {
         mcp: result.mcp_imported,
         rules: result.rules_imported,
         skills: result.skills_imported,
+        codex: result.codex_imported,
+        gemini: result.gemini_imported,
         errors: result.errors.length,
       })
     }
@@ -315,26 +377,50 @@ function maskApiKey(key: string): string {
         </div>
         
         <!-- 统计信息 -->
-        <div v-if="previewStats" class="grid grid-cols-5 gap-3">
-          <div class="bg-surface rounded-lg p-3 text-center">
-            <div class="text-2xl font-bold text-accent">{{ previewStats.providers }}</div>
-            <div class="text-xs text-muted-foreground">{{ t('backup.providers') }}</div>
+        <div v-if="previewStats" class="space-y-3">
+          <!-- 基础配置统计 -->
+          <div class="grid grid-cols-5 gap-3">
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-accent">{{ previewStats.providers }}</div>
+              <div class="text-xs text-muted-foreground">{{ t('backup.providers') }}</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-blue-500">{{ previewStats.models }}</div>
+              <div class="text-xs text-muted-foreground">{{ t('backup.models') }}</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-purple-500">{{ previewStats.mcp_servers }}</div>
+              <div class="text-xs text-muted-foreground">MCP</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-orange-500">{{ previewStats.rules }}</div>
+              <div class="text-xs text-muted-foreground">{{ t('backup.rules') }}</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-green-500">{{ previewStats.skills }}</div>
+              <div class="text-xs text-muted-foreground">Skills</div>
+            </div>
           </div>
-          <div class="bg-surface rounded-lg p-3 text-center">
-            <div class="text-2xl font-bold text-blue-500">{{ previewStats.models }}</div>
-            <div class="text-xs text-muted-foreground">{{ t('backup.models') }}</div>
-          </div>
-          <div class="bg-surface rounded-lg p-3 text-center">
-            <div class="text-2xl font-bold text-purple-500">{{ previewStats.mcp_servers }}</div>
-            <div class="text-xs text-muted-foreground">MCP</div>
-          </div>
-          <div class="bg-surface rounded-lg p-3 text-center">
-            <div class="text-2xl font-bold text-orange-500">{{ previewStats.rules }}</div>
-            <div class="text-xs text-muted-foreground">{{ t('backup.rules') }}</div>
-          </div>
-          <div class="bg-surface rounded-lg p-3 text-center">
-            <div class="text-2xl font-bold text-green-500">{{ previewStats.skills }}</div>
-            <div class="text-xs text-muted-foreground">skills</div>
+          
+          <!-- CLI 配置统计 -->
+          <div v-if="previewStats.codex_providers > 0 || previewStats.codex_mcp_servers > 0 || previewStats.gemini_configured || previewStats.gemini_mcp_servers > 0" 
+               class="grid grid-cols-4 gap-3">
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-cyan-500">{{ previewStats.codex_providers }}</div>
+              <div class="text-xs text-muted-foreground">Codex {{ t('backup.providers') }}</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-cyan-400">{{ previewStats.codex_mcp_servers }}</div>
+              <div class="text-xs text-muted-foreground">Codex MCP</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-pink-500">{{ previewStats.gemini_configured ? '1' : '0' }}</div>
+              <div class="text-xs text-muted-foreground">Gemini ENV</div>
+            </div>
+            <div class="bg-surface rounded-lg p-3 text-center">
+              <div class="text-2xl font-bold text-pink-400">{{ previewStats.gemini_mcp_servers }}</div>
+              <div class="text-xs text-muted-foreground">Gemini MCP</div>
+            </div>
           </div>
         </div>
         
@@ -368,6 +454,24 @@ function maskApiKey(key: string): string {
                    class="w-4 h-4 rounded border-border accent-accent" />
             <span class="text-sm">{{ t('backup.importSkills') }}</span>
             <span class="text-xs text-muted-foreground">({{ previewStats?.skills || 0 }} {{ t('backup.items') }})</span>
+          </label>
+          
+          <!-- Codex CLI 配置 -->
+          <label v-if="previewStats && (previewStats.codex_providers > 0 || previewStats.codex_mcp_servers > 0)"
+                 class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" v-model="importOptions.import_codex"
+                   class="w-4 h-4 rounded border-border accent-cyan-500" />
+            <span class="text-sm text-cyan-500">{{ t('backup.importCodex') }}</span>
+            <span class="text-xs text-muted-foreground">({{ (previewStats?.codex_providers || 0) + (previewStats?.codex_mcp_servers || 0) }} {{ t('backup.items') }})</span>
+          </label>
+          
+          <!-- Gemini CLI 配置 -->
+          <label v-if="previewStats && (previewStats.gemini_configured || previewStats.gemini_mcp_servers > 0)"
+                 class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" v-model="importOptions.import_gemini"
+                   class="w-4 h-4 rounded border-border accent-pink-500" />
+            <span class="text-sm text-pink-500">{{ t('backup.importGemini') }}</span>
+            <span class="text-xs text-muted-foreground">({{ (previewStats?.gemini_configured ? 1 : 0) + (previewStats?.gemini_mcp_servers || 0) }} {{ t('backup.items') }})</span>
           </label>
           
           <div class="border-t border-border pt-3 mt-3">
@@ -440,6 +544,8 @@ function maskApiKey(key: string): string {
               <li>• {{ t('backup.includeMcp') }}</li>
               <li>• {{ t('backup.includeRules') }}</li>
               <li>• {{ t('backup.includeSkills') }}</li>
+              <li>• {{ t('backup.includeCodex') }}</li>
+              <li>• {{ t('backup.includeGemini') }}</li>
             </ul>
           </div>
           <div class="pt-2 border-t border-border">

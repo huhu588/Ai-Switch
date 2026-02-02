@@ -254,8 +254,8 @@ export default {
     selectFile: 'バックアップファイルを選択',
     importing: 'インポート中...',
     importBtn: 'インポート開始',
-    importSuccess: 'インポート成功！ {providers}プロバイダー、{mcp} MCP、{rules}ルール、{skills}スキル',
-    importPartial: '部分インポート: {providers}プロバイダー、{mcp} MCP、{rules}ルール、{skills}スキル ({errors}エラー)',
+    importSuccess: 'インポート成功！ {providers}プロバイダー、{mcp} MCP、{rules}ルール、{skills}スキル、{codex} Codex、{gemini} Gemini',
+    importPartial: '部分インポート: {providers}プロバイダー、{mcp} MCP、{rules}ルール、{skills}スキル、{codex} Codex、{gemini} Gemini ({errors}エラー)',
     importFailed: 'インポート失敗',
     previewFailed: 'バックアップファイルの読み込みに失敗',
     
@@ -271,6 +271,8 @@ export default {
     importMcp: 'MCPサーバーをインポート',
     importRules: 'ルールをインポート',
     importSkills: 'スキルをインポート',
+    importCodex: 'Codex CLI設定をインポート',
+    importGemini: 'Gemini CLI設定をインポート',
     overwriteExisting: '既存の設定を上書き',
     overwriteHint: 'チェック時、同名の既存設定は上書きされます。未チェック時はスキップされます',
     
@@ -281,6 +283,8 @@ export default {
     includeMcp: 'MCPサーバー設定',
     includeRules: 'グローバルルールファイル',
     includeSkills: 'グローバルスキルファイル',
+    includeCodex: 'Codex CLI設定（モデルプロバイダー、MCP）',
+    includeGemini: 'Gemini CLI設定（APIキー、MCP）',
     securityWarning: 'バックアップファイルには機密のAPIキー情報が含まれています。安全に保管してください！'
   },
 

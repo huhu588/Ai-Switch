@@ -246,7 +246,7 @@ export default {
     exportDesc: '将当前所有配置导出为一个 JSON 文件，可用于迁移到其他设备或备份保存。',
     exportBtn: '导出备份文件',
     exporting: '导出中...',
-    exportSuccess: '导出成功！包含 {providers} 个服务商, {models} 个模型, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills',
+    exportSuccess: '导出成功！包含 {providers} 个服务商, {models} 个模型, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skills',
     exportFailed: '导出失败',
     
     importTitle: '导入配置',
@@ -254,8 +254,8 @@ export default {
     selectFile: '选择备份文件',
     importing: '导入中...',
     importBtn: '开始导入',
-    importSuccess: '导入成功！导入了 {providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills',
-    importPartial: '部分导入成功：{providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 skills ({errors} 个错误)',
+    importSuccess: '导入成功！导入了 {providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skills, {codex} 个 Codex, {gemini} 个 Gemini',
+    importPartial: '部分导入成功：{providers} 个服务商, {mcp} 个 MCP, {rules} 个规则, {skills} 个 Skills, {codex} 个 Codex, {gemini} 个 Gemini ({errors} 个错误)',
     importFailed: '导入失败',
     previewFailed: '读取备份文件失败',
     
@@ -271,6 +271,8 @@ export default {
     importMcp: '导入 MCP 服务器',
     importRules: '导入规则',
     importSkills: '导入 Skills',
+    importCodex: '导入 Codex CLI 配置',
+    importGemini: '导入 Gemini CLI 配置',
     overwriteExisting: '覆盖已存在的配置',
     overwriteHint: '勾选后，已存在的同名配置将被覆盖；否则将跳过已存在的配置',
     
@@ -281,6 +283,8 @@ export default {
     includeMcp: 'MCP 服务器配置',
     includeRules: '全局规则文件',
     includeSkills: '全局 Skills 文件',
+    includeCodex: 'Codex CLI 配置（Model Providers、MCP）',
+    includeGemini: 'Gemini CLI 配置（API Key、MCP）',
     securityWarning: '备份文件包含敏感的 API Key 信息，请妥善保管！'
   },
 

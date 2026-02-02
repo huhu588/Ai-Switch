@@ -246,7 +246,7 @@ export default {
     exportDesc: 'Export all current configurations to a JSON file for migration to other devices or backup.',
     exportBtn: 'Export Backup File',
     exporting: 'Exporting...',
-    exportSuccess: 'Export successful! Contains {providers} providers, {models} models, {mcp} MCP, {rules} rules, {skills} skills',
+    exportSuccess: 'Export successful! Contains {providers} providers, {models} models, {mcp} MCP, {rules} rules, {skills} Skills',
     exportFailed: 'Export failed',
     
     importTitle: 'Import Configuration',
@@ -254,8 +254,8 @@ export default {
     selectFile: 'Select Backup File',
     importing: 'Importing...',
     importBtn: 'Start Import',
-    importSuccess: 'Import successful! Imported {providers} providers, {mcp} MCP, {rules} rules, {skills} skills',
-    importPartial: 'Partial import: {providers} providers, {mcp} MCP, {rules} rules, {skills} skills ({errors} errors)',
+    importSuccess: 'Import successful! Imported {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills, {codex} Codex, {gemini} Gemini',
+    importPartial: 'Partial import: {providers} providers, {mcp} MCP, {rules} rules, {skills} Skills, {codex} Codex, {gemini} Gemini ({errors} errors)',
     importFailed: 'Import failed',
     previewFailed: 'Failed to read backup file',
     
@@ -271,6 +271,8 @@ export default {
     importMcp: 'Import MCP Servers',
     importRules: 'Import Rules',
     importSkills: 'Import Skills',
+    importCodex: 'Import Codex CLI Configuration',
+    importGemini: 'Import Gemini CLI Configuration',
     overwriteExisting: 'Overwrite existing configurations',
     overwriteHint: 'When checked, existing configurations with the same name will be overwritten; otherwise they will be skipped',
     
@@ -281,6 +283,8 @@ export default {
     includeMcp: 'MCP server configurations',
     includeRules: 'Global rule files',
     includeSkills: 'Global Skills files',
+    includeCodex: 'Codex CLI configuration (Model Providers, MCP)',
+    includeGemini: 'Gemini CLI configuration (API Key, MCP)',
     securityWarning: 'Backup file contains sensitive API Key information, please keep it safe!'
   },
 
