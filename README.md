@@ -194,7 +194,47 @@ git push origin vX.Y.Z
 # 8. 验证 latest.json 内容正确
 ```
 
-### 9. 故障排查
+### 9. 构建配置注意事项
+
+#### Cargo.toml 关键字段
+
+```toml
+[package]
+name = "open-switch"
+version = "1.4.28"      # 必须与其他文件同步
+edition = "2021"        # 只能是 2015/2018/2021/2024，不能用未来年份！
+```
+
+**常见构建错误**：
+
+| 错误信息 | 原因 | 解决方案 |
+|----------|------|----------|
+| `this version of Cargo is older than the 'XXXX' edition` | edition 设置了不支持的年份 | 改为 `edition = "2021"` |
+| `failed to parse manifest` | Cargo.toml 语法错误 | 检查 TOML 格式 |
+| `unresolved import` | 缺少依赖 | 检查 dependencies |
+
+**历史案例（v1.4.28 首次构建失败）**：
+- `edition = "2026"` 导致构建失败
+- Cargo 只支持 `2015`, `2018`, `2021`, `2024` editions
+- 修复：改为 `edition = "2021"`
+
+#### Node.js 和 Rust 版本要求
+
+GitHub Actions 中使用的版本：
+- **Node.js**: 20
+- **Rust**: stable (最新稳定版)
+
+本地开发环境要求：
+- **Node.js**: >= 18
+- **Rust**: >= 1.70
+
+#### 依赖版本锁定
+
+- `Cargo.lock` 和 `package-lock.json` 应提交到仓库
+- 避免使用 `*` 通配符版本号
+- 主要依赖使用固定大版本：`"2"` 而非 `"^2.0.0"`
+
+### 10. 故障排查
 
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
@@ -202,9 +242,11 @@ git push origin vX.Y.Z
 | 下载失败 404 | URL 文件名不匹配 | 检查 latest.json 中的 url |
 | 签名验证失败 | 签名为空或不匹配 | 检查 GitHub Secrets 配置 |
 | 安装后版本未变 | 版本号未同步 | 确保三个文件版本一致 |
-| GitHub Actions 失败 | Secrets 未配置 | 添加签名密钥到 Secrets |
+| GitHub Actions 失败 | Secrets 未配置 / 构建错误 | 检查 Secrets 和 Cargo.toml |
+| `edition` 错误 | 使用了不支持的 Rust edition | 改为 2021 |
+| npm ci 失败 | Node.js 版本不兼容 | 确保使用 Node.js 18+ |
 
-### 10. 验证更新功能
+### 11. 验证更新功能
 
 发布后，使用以下命令验证 `latest.json`：
 
