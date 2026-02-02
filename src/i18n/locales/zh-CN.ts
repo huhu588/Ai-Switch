@@ -719,6 +719,13 @@ export default {
     defaultPricing: '默认定价（全局）',
     noCustomPricing: '暂无自定义定价，点击添加按钮创建',
     modelId: '模型 ID',
-    selectModel: '请选择模型'
+    selectModel: '请选择模型',
+    // 模型趋势图
+    modelTokenUsage: '模型 Token 用量',
+    dailyUsage: '每日用量',
+    cumulativeUsage: '累计用量',
+    moreModels: '其他模型',
+    otherModels: '其他模型',
+    total: '总计'
   }
 }

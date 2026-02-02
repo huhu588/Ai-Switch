@@ -719,6 +719,13 @@ export default {
     defaultPricing: 'Default Pricing (Global)',
     noCustomPricing: 'No custom pricing yet. Click Add to create one.',
     modelId: 'Model ID',
-    selectModel: 'Select Model'
+    selectModel: 'Select Model',
+    // Model trend chart
+    modelTokenUsage: 'Model Token Usage',
+    dailyUsage: 'Daily',
+    cumulativeUsage: 'Cumulative',
+    moreModels: 'more models',
+    otherModels: 'other models',
+    total: 'Total'
   }
 }

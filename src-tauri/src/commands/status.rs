@@ -83,9 +83,10 @@ pub fn get_status(
 }
 
 /// 获取版本信息
+/// 注意：使用 tauri.conf.json 中的版本号，这与 updater 使用的版本一致
 #[tauri::command]
-pub fn get_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+pub fn get_version(app: tauri::AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 /// 获取公网 IP 地址

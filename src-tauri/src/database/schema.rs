@@ -281,6 +281,28 @@ pub struct UsageTrend {
     pub top_model: Option<String>,
 }
 
+/// 模型使用量（用于堆叠图）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelUsage {
+    pub model: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+    pub total_cost: f64,
+    pub request_count: u64,
+}
+
+/// 按模型分组的趋势数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelTrendData {
+    pub period: String,
+    pub models: Vec<ModelUsage>,
+    pub total_tokens: u64,
+    pub total_cost: f64,
+}
+
 /// Provider 统计
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -535,6 +557,108 @@ impl Database {
         }
 
         Ok(trends)
+    }
+
+    /// 获取按模型分组的使用趋势（用于堆叠柱形图）
+    pub fn get_usage_trend_by_model(
+        &self,
+        start_ts: Option<i64>,
+        end_ts: Option<i64>,
+        period: &str,
+        provider_id: Option<&str>,
+    ) -> Result<Vec<ModelTrendData>, AppError> {
+        let conn = lock_conn!(self.conn);
+
+        // 根据时间段决定分组粒度
+        let group_format = match period {
+            "24h" => "%Y-%m-%d %H:00",
+            "7d" => "%Y-%m-%d",
+            "30d" => "%Y-%m-%d",
+            "all" => "%Y-%m-%d",
+            _ => "%Y-%m-%d",
+        };
+
+        let mut conditions: Vec<String> = Vec::new();
+        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+
+        if let Some(start) = start_ts {
+            conditions.push("created_at >= ?".to_string());
+            params.push(start.into());
+        }
+        if let Some(end) = end_ts {
+            conditions.push("created_at <= ?".to_string());
+            params.push(end.into());
+        }
+        if let Some(pid) = provider_id {
+            conditions.push("provider_id = ?".to_string());
+            params.push(pid.to_string().into());
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+
+        // 查询每个时间段、每个模型的使用量
+        let sql = format!(
+            "SELECT
+                strftime('{group_format}', created_at, 'unixepoch', 'localtime') as period,
+                model,
+                COALESCE(SUM(input_tokens), 0) as input_tokens,
+                COALESCE(SUM(output_tokens), 0) as output_tokens,
+                COALESCE(SUM(input_tokens + output_tokens), 0) as total_tokens,
+                COALESCE(SUM(CAST(total_cost_usd AS REAL)), 0) as total_cost,
+                COUNT(*) as request_count
+            FROM proxy_request_logs
+            {where_clause}
+            GROUP BY period, model
+            ORDER BY period ASC, total_tokens DESC"
+        );
+
+        let mut stmt = conn.prepare(&sql)
+            .map_err(|e| AppError::Database(format!("准备查询失败: {e}")))?;
+
+        let mut rows = stmt.query(rusqlite::params_from_iter(params))
+            .map_err(|e| AppError::Database(format!("查询模型趋势失败: {e}")))?;
+
+        // 按时间段分组
+        let mut period_map: std::collections::BTreeMap<String, Vec<ModelUsage>> = std::collections::BTreeMap::new();
+        
+        while let Some(row) = rows.next().map_err(|e| AppError::Database(format!("读取行失败: {e}")))? {
+            let period: String = row.get(0).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?;
+            let model: String = row.get::<_, Option<String>>(1)
+                .map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?
+                .unwrap_or_else(|| "unknown".to_string());
+            
+            let model_usage = ModelUsage {
+                model,
+                input_tokens: row.get::<_, i64>(2).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
+                output_tokens: row.get::<_, i64>(3).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
+                total_tokens: row.get::<_, i64>(4).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
+                total_cost: row.get(5).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))?,
+                request_count: row.get::<_, i64>(6).map_err(|e| AppError::Database(format!("读取字段失败: {e}")))? as u64,
+            };
+
+            period_map.entry(period).or_default().push(model_usage);
+        }
+
+        // 转换为结果格式
+        let result: Vec<ModelTrendData> = period_map
+            .into_iter()
+            .map(|(period, models)| {
+                let total_tokens: u64 = models.iter().map(|m| m.total_tokens).sum();
+                let total_cost: f64 = models.iter().map(|m| m.total_cost).sum();
+                ModelTrendData {
+                    period,
+                    models,
+                    total_tokens,
+                    total_cost,
+                }
+            })
+            .collect();
+
+        Ok(result)
     }
 
     /// 获取每日趋势

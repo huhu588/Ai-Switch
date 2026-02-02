@@ -719,6 +719,13 @@ export default {
     defaultPricing: 'デフォルト価格（グローバル）',
     noCustomPricing: 'カスタム価格がありません。追加ボタンをクリックして作成してください。',
     modelId: 'モデル ID',
-    selectModel: 'モデルを選択'
+    selectModel: 'モデルを選択',
+    // モデルトレンドチャート
+    modelTokenUsage: 'モデルトークン使用量',
+    dailyUsage: '日別',
+    cumulativeUsage: '累計',
+    moreModels: '他のモデル',
+    otherModels: '他のモデル',
+    total: '合計'
   }
 }

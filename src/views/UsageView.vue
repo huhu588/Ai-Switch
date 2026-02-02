@@ -25,6 +25,22 @@ interface UsageTrend {
   topModel?: string | null
 }
 
+interface ModelUsage {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  totalCost: number
+  requestCount: number
+}
+
+interface ModelTrendData {
+  period: string
+  models: ModelUsage[]
+  totalTokens: number
+  totalCost: number
+}
+
 interface ProxyStatus {
   running: boolean
   address: string
@@ -96,10 +112,14 @@ const loading = ref(false)
 const period = ref<'24h' | '7d' | '30d' | 'all'>('30d')
 const summary = ref<UsageSummary | null>(null)
 const trend = ref<UsageTrend[]>([])
+const modelTrend = ref<ModelTrendData[]>([])
 const proxyStatus = ref<ProxyStatus | null>(null)
 const takeoverStatus = ref<TakeoverStatus>({ claude: false, codex: false, gemini: false })
 const providerStats = ref<ProviderStats[]>([])
 const proxyInitialized = ref(false)
+
+// 趋势图显示模式
+const trendChartMode = ref<'daily' | 'cumulative'>('daily')
 
 // 本地日志导入相关状态
 const showImportDialog = ref(false)
@@ -140,6 +160,132 @@ const filteredTrend = computed(() => trend.value)
 const maxFilteredTrendValue = computed(() => {
   if (filteredTrend.value.length === 0) return 1
   return Math.max(...filteredTrend.value.map(t => t.totalCost), 0.01)
+})
+
+// 预定义的模型颜色（按常见模型分配）
+const modelColors: Record<string, string> = {
+  // Claude 系列 - 橙色/黄色系
+  'claude 4.5 opus (thinking)': '#f59e0b',
+  'claude-opus-4-5-20251101': '#f59e0b',
+  'Claude Opus 4.5 (thinking)': '#3b82f6',
+  'claude 4.5 opus': '#ef4444',
+  'claude 4.5 sonnet': '#8b5cf6',
+  'Claude Sonnet 4.5': '#06b6d4',
+  'claude-sonnet-4-5-20250929': '#8b5cf6',
+  'claude-haiku-4-5-20251001': '#10b981',
+  'claude-opus-4-20250514': '#f97316',
+  'Claude Opus 4.5': '#22c55e',
+  // GPT 系列 - 绿色/青色系
+  'gpt-5.2 (xhigh reasoning)': '#10b981',
+  'GPT-5.2 (high reasoning)': '#14b8a6',
+  'gpt-5 (high reasoning)': '#f97316',
+  'gpt-5.1 codex max (xhig...)': '#3b82f6',
+  'gpt-5.2': '#22c55e',
+  'gpt-5.2-codex': '#06b6d4',
+  'gpt-5.1': '#0ea5e9',
+  'gpt-5.1-codex': '#38bdf8',
+  'gpt-5': '#6366f1',
+  // Gemini 系列 - 蓝色系
+  'gemini-3-pro-preview': '#6366f1',
+  'gemini-3-flash-preview': '#818cf8',
+  'gemini-2.5-pro': '#a78bfa',
+  'gemini-2.5-flash': '#c4b5fd',
+  // DeepSeek/Kimi 系列
+  'deepseek-v3.2': '#ec4899',
+  'deepseek-v3': '#f472b6',
+  'kimi-k2-thinking': '#a855f7',
+  'kimi-k2-0905': '#d946ef',
+}
+
+// 动态生成颜色的函数
+const colorPalette = [
+  '#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#8b5cf6',
+  '#06b6d4', '#f97316', '#22c55e', '#14b8a6', '#6366f1',
+  '#ec4899', '#a855f7', '#0ea5e9', '#84cc16', '#f43f5e',
+  '#8b5cf6', '#fbbf24', '#34d399', '#60a5fa', '#f472b6',
+]
+
+function getModelColor(model: string, index: number): string {
+  // 先尝试精确匹配
+  if (modelColors[model]) return modelColors[model]
+  // 尝试部分匹配
+  const lowerModel = model.toLowerCase()
+  for (const [key, color] of Object.entries(modelColors)) {
+    if (lowerModel.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerModel)) {
+      return color
+    }
+  }
+  // 使用调色板循环
+  return colorPalette[index % colorPalette.length]
+}
+
+// 获取所有出现的模型列表（按总使用量排序）
+const allModels = computed(() => {
+  const modelMap = new Map<string, number>()
+  for (const item of modelTrend.value) {
+    for (const m of item.models) {
+      modelMap.set(m.model, (modelMap.get(m.model) || 0) + m.totalTokens)
+    }
+  }
+  return Array.from(modelMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([model]) => model)
+})
+
+// 模型颜色映射（确保同一模型在所有图表中颜色一致）
+const modelColorMap = computed(() => {
+  const map: Record<string, string> = {}
+  allModels.value.forEach((model, index) => {
+    map[model] = getModelColor(model, index)
+  })
+  return map
+})
+
+// 计算每日增量数据的最大值
+const maxDailyTokens = computed(() => {
+  if (modelTrend.value.length === 0) return 1
+  return Math.max(...modelTrend.value.map(d => d.totalTokens), 1)
+})
+
+// 计算累计数据
+const cumulativeTrend = computed(() => {
+  const result: { period: string; models: Record<string, number>; total: number }[] = []
+  const runningTotals: Record<string, number> = {}
+  
+  for (const item of modelTrend.value) {
+    for (const m of item.models) {
+      runningTotals[m.model] = (runningTotals[m.model] || 0) + m.totalTokens
+    }
+    const total = Object.values(runningTotals).reduce((a, b) => a + b, 0)
+    result.push({
+      period: item.period,
+      models: { ...runningTotals },
+      total,
+    })
+  }
+  return result
+})
+
+// 累计数据的最大值
+const maxCumulativeTokens = computed(() => {
+  if (cumulativeTrend.value.length === 0) return 1
+  return Math.max(...cumulativeTrend.value.map(d => d.total), 1)
+})
+
+// 显示的前 N 个模型（用于图例）
+const topModels = computed(() => allModels.value.slice(0, 10))
+const otherModelsCount = computed(() => Math.max(0, allModels.value.length - 10))
+const otherModelsTokens = computed(() => {
+  const topSet = new Set(topModels.value)
+  let total = 0
+  for (const item of modelTrend.value) {
+    for (const m of item.models) {
+      if (!topSet.has(m.model)) {
+        total += m.totalTokens
+      }
+    }
+  }
+  return total
 })
 
 // 根据服务商筛选统计数据
@@ -227,16 +373,21 @@ async function loadProxyStatus() {
 async function loadData() {
   loading.value = true
   try {
-    const [summaryData, trendData, statsData] = await Promise.all([
+    const [summaryData, trendData, modelTrendData, statsData] = await Promise.all([
       invoke<UsageSummary>('get_proxy_usage_summary', { period: period.value }),
       invoke<UsageTrend[]>('get_proxy_usage_trend', { 
         period: period.value, 
+        providerId: getTrendProviderId(),
+      }),
+      invoke<ModelTrendData[]>('get_proxy_usage_trend_by_model', {
+        period: period.value,
         providerId: getTrendProviderId(),
       }),
       invoke<ProviderStats[]>('get_provider_stats', { period: period.value }),
     ])
     summary.value = summaryData
     trend.value = trendData
+    modelTrend.value = modelTrendData
     providerStats.value = statsData
   } catch (e) {
     console.error('加载使用统计失败:', e)
@@ -832,55 +983,183 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 使用趋势图表 -->
-    <div class="flex-1 min-h-[200px] p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <!-- 模型 Token 用量趋势图 -->
+    <div class="p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="font-semibold">{{ t('usage.trend') }}</h3>
-        <span class="text-sm text-gray-500">
-          {{ period === '24h' ? t('usage.past24h') : period === '7d' ? t('usage.past7d') : period === '30d' ? t('usage.past30d') : t('usage.pastAll') }}
-        </span>
-      </div>
-      
-      <!-- 简单的柱状图 -->
-      <div v-if="filteredTrend.length > 0" class="h-48 flex items-end gap-1 w-full">
-        <div
-          v-for="(item, index) in filteredTrend"
-          :key="index"
-          class="flex-1 min-w-0 h-full flex flex-col items-center justify-end gap-1"
-        >
-          <!-- 柱子 -->
-          <div 
-            class="w-full bg-blue-500 hover:bg-blue-600 rounded-t transition-all cursor-pointer relative group min-h-[4px]"
-            :style="{ height: `${Math.max((item.totalCost / maxFilteredTrendValue) * 100, 2)}%` }"
-          >
-            <!-- Tooltip -->
-            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-              <div>{{ item.period }}</div>
-              <div>{{ t('usage.requests') }}: {{ item.requestCount }}</div>
-              <div>{{ t('usage.cost') }}: {{ formatCost(item.totalCost) }}</div>
-              <div>{{ t('usage.model') }}: {{ item.topModel || t('usage.unknownModel') }}</div>
-              <div>Tokens: {{ formatTokens(item.inputTokens + item.outputTokens) }}</div>
-            </div>
+        <h3 class="font-semibold">{{ t('usage.modelTokenUsage') }}</h3>
+        <div class="flex items-center gap-4">
+          <!-- 图表模式切换 -->
+          <div class="flex rounded-lg bg-gray-100 dark:bg-gray-700 overflow-hidden text-sm">
+            <button
+              @click="trendChartMode = 'daily'"
+              :class="[
+                'px-3 py-1 transition-colors',
+                trendChartMode === 'daily'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+              ]"
+            >
+              {{ t('usage.dailyUsage') }}
+            </button>
+            <button
+              @click="trendChartMode = 'cumulative'"
+              :class="[
+                'px-3 py-1 transition-colors',
+                trendChartMode === 'cumulative'
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+              ]"
+            >
+              {{ t('usage.cumulativeUsage') }}
+            </button>
           </div>
-          <!-- 标签（只显示部分） -->
-          <span 
-            v-if="index % Math.ceil(filteredTrend.length / 12) === 0 || index === filteredTrend.length - 1"
-            class="text-[10px] text-gray-500 truncate w-full text-center"
-          >
-            {{ item.period.split(' ').pop() }}
+          <span class="text-sm text-gray-500">
+            {{ period === '24h' ? t('usage.past24h') : period === '7d' ? t('usage.past7d') : period === '30d' ? t('usage.past30d') : t('usage.pastAll') }}
           </span>
         </div>
       </div>
       
-      <!-- 空状态 -->
-      <div v-else class="h-48 flex items-center justify-center text-gray-400">
-        {{ t('usage.noData') }}
+      <!-- 堆叠柱状图 - 每日增量 -->
+      <div v-if="modelTrend.length > 0 && trendChartMode === 'daily'" class="h-64">
+        <div class="h-full flex items-end gap-1">
+          <div
+            v-for="(item, index) in modelTrend"
+            :key="index"
+            class="flex-1 min-w-0 h-full flex flex-col items-center justify-end"
+          >
+            <!-- 堆叠柱子 -->
+            <div 
+              class="w-full flex flex-col-reverse relative group cursor-pointer"
+              :style="{ height: `${Math.max((item.totalTokens / maxDailyTokens) * 100, 2)}%` }"
+            >
+              <!-- 每个模型的柱子段 -->
+              <div
+                v-for="(modelUsage, mIndex) in item.models"
+                :key="modelUsage.model"
+                class="w-full transition-opacity hover:opacity-80"
+                :style="{
+                  height: item.totalTokens > 0 ? `${(modelUsage.totalTokens / item.totalTokens) * 100}%` : '0%',
+                  backgroundColor: modelColorMap[modelUsage.model] || colorPalette[mIndex % colorPalette.length],
+                  minHeight: modelUsage.totalTokens > 0 ? '2px' : '0',
+                }"
+              ></div>
+              
+              <!-- Tooltip -->
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-xl max-w-xs">
+                <div class="font-semibold mb-1 border-b border-gray-700 pb-1">{{ item.period.split('-').slice(1).join('/') }}</div>
+                <div v-for="m in item.models.slice(0, 5)" :key="m.model" class="flex items-center gap-2 py-0.5">
+                  <span 
+                    class="w-2 h-2 rounded-full flex-shrink-0" 
+                    :style="{ backgroundColor: modelColorMap[m.model] }"
+                  ></span>
+                  <span class="truncate max-w-[120px]">{{ m.model }}</span>
+                  <span class="font-medium ml-auto">{{ formatTokens(m.totalTokens) }}</span>
+                </div>
+                <div v-if="item.models.length > 5" class="text-gray-400 pt-1 border-t border-gray-700 mt-1">
+                  + {{ item.models.length - 5 }} {{ t('usage.moreModels') }}
+                </div>
+                <div class="font-semibold pt-1 border-t border-gray-700 mt-1">
+                  {{ t('usage.total') }}: {{ formatTokens(item.totalTokens) }}
+                </div>
+              </div>
+            </div>
+            <!-- 日期标签 -->
+            <span 
+              v-if="index % Math.ceil(modelTrend.length / 12) === 0 || index === modelTrend.length - 1"
+              class="text-[10px] text-gray-500 mt-1 truncate w-full text-center"
+            >
+              {{ item.period.split('-').slice(1).join('/') }}
+            </span>
+          </div>
+        </div>
+        <!-- Y 轴标签 -->
+        <div class="flex justify-between text-xs text-gray-400 mt-2">
+          <span>0</span>
+          <span>{{ formatTokens(maxDailyTokens) }}</span>
+        </div>
+      </div>
+
+      <!-- 堆叠柱状图 - 累计 -->
+      <div v-else-if="cumulativeTrend.length > 0 && trendChartMode === 'cumulative'" class="h-64">
+        <div class="h-full flex items-end gap-1">
+          <div
+            v-for="(item, index) in cumulativeTrend"
+            :key="index"
+            class="flex-1 min-w-0 h-full flex flex-col items-center justify-end"
+          >
+            <!-- 堆叠柱子 -->
+            <div 
+              class="w-full flex flex-col-reverse relative group cursor-pointer"
+              :style="{ height: `${Math.max((item.total / maxCumulativeTokens) * 100, 2)}%` }"
+            >
+              <!-- 每个模型的柱子段 -->
+              <div
+                v-for="(model, mIndex) in topModels"
+                :key="model"
+                class="w-full transition-opacity hover:opacity-80"
+                :style="{
+                  height: item.total > 0 && item.models[model] ? `${(item.models[model] / item.total) * 100}%` : '0%',
+                  backgroundColor: modelColorMap[model] || colorPalette[mIndex % colorPalette.length],
+                  minHeight: item.models[model] ? '2px' : '0',
+                }"
+              ></div>
+              
+              <!-- Tooltip -->
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-xl max-w-xs">
+                <div class="font-semibold mb-1 border-b border-gray-700 pb-1">{{ item.period.split('-').slice(1).join('/') }}</div>
+                <div v-for="model in topModels.filter(m => item.models[m])" :key="model" class="flex items-center gap-2 py-0.5">
+                  <span 
+                    class="w-2 h-2 rounded-full flex-shrink-0" 
+                    :style="{ backgroundColor: modelColorMap[model] }"
+                  ></span>
+                  <span class="truncate max-w-[120px]">{{ model }}</span>
+                  <span class="font-medium ml-auto">{{ formatTokens(item.models[model]) }}</span>
+                </div>
+                <div class="font-semibold pt-1 border-t border-gray-700 mt-1">
+                  {{ t('usage.total') }}: {{ formatTokens(item.total) }}
+                </div>
+              </div>
+            </div>
+            <!-- 日期标签 -->
+            <span 
+              v-if="index % Math.ceil(cumulativeTrend.length / 12) === 0 || index === cumulativeTrend.length - 1"
+              class="text-[10px] text-gray-500 mt-1 truncate w-full text-center"
+            >
+              {{ item.period.split('-').slice(1).join('/') }}
+            </span>
+          </div>
+        </div>
+        <!-- Y 轴标签 -->
+        <div class="flex justify-between text-xs text-gray-400 mt-2">
+          <span>0</span>
+          <span>{{ formatTokens(maxCumulativeTokens) }}</span>
+        </div>
       </div>
       
-      <!-- Y 轴标签 -->
-      <div v-if="filteredTrend.length > 0" class="flex justify-between text-xs text-gray-400 mt-2 px-2">
-        <span>0</span>
-        <span>{{ formatCost(maxFilteredTrendValue) }}</span>
+      <!-- 空状态 -->
+      <div v-else class="h-64 flex items-center justify-center text-gray-400">
+        {{ t('usage.noData') }}
+      </div>
+
+      <!-- 模型图例 -->
+      <div v-if="topModels.length > 0" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+          <div 
+            v-for="(model, index) in topModels" 
+            :key="model"
+            class="flex items-center gap-1.5"
+          >
+            <span class="text-gray-500">{{ index + 1 }}.</span>
+            <span 
+              class="w-3 h-3 rounded-sm flex-shrink-0" 
+              :style="{ backgroundColor: modelColorMap[model] }"
+            ></span>
+            <span class="text-gray-700 dark:text-gray-300 truncate max-w-[150px]" :title="model">{{ model }}</span>
+          </div>
+          <div v-if="otherModelsCount > 0" class="flex items-center gap-1.5 text-gray-400">
+            <span>+ {{ otherModelsCount }} {{ t('usage.otherModels') }} ({{ formatTokens(otherModelsTokens) }})</span>
+          </div>
+        </div>
       </div>
     </div>
 

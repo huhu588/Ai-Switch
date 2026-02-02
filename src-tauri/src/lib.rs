@@ -423,6 +423,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::update_proxy_config,
             commands::get_proxy_usage_summary,
             commands::get_proxy_usage_trend,
+            commands::get_proxy_usage_trend_by_model,
             commands::get_provider_stats,
             commands::clear_proxy_usage_stats,
             // Open Switch unified config commands

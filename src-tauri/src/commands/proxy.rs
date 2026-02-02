@@ -1,6 +1,6 @@
 //! 代理服务器相关命令
 
-use crate::database::schema::{ProviderStats, UsageSummary, UsageTrend};
+use crate::database::schema::{ModelTrendData, ProviderStats, UsageSummary, UsageTrend};
 use crate::database::Database;
 use crate::proxy::{ProxyServerInfo, ProxyService, ProxyStatus, ProxyTakeoverStatus};
 use serde::{Deserialize, Serialize};
@@ -173,6 +173,18 @@ pub async fn get_proxy_usage_trend(
 ) -> Result<Vec<UsageTrend>, String> {
     let (start_ts, end_ts) = get_time_range(&period);
     db.get_usage_trend(start_ts, end_ts, &period, provider_id.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+/// 获取按模型分组的使用趋势（用于堆叠柱形图）
+#[tauri::command]
+pub async fn get_proxy_usage_trend_by_model(
+    period: String,
+    provider_id: Option<String>,
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<ModelTrendData>, String> {
+    let (start_ts, end_ts) = get_time_range(&period);
+    db.get_usage_trend_by_model(start_ts, end_ts, &period, provider_id.as_deref())
         .map_err(|e| e.to_string())
 }
 
