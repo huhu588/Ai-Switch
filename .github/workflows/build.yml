@@ -208,7 +208,7 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Generate latest.json for updater (全平台支持)
+      - name: Generate latest.json for updater
         run: |
           VERSION=${{ steps.get_version.outputs.VERSION }}
           REPO="${{ github.repository }}"
@@ -217,13 +217,11 @@ jobs:
           echo "=== Looking for signature files ==="
           find artifacts -name "*.sig" -type f 2>/dev/null || echo "No .sig files found"
           
-          # 初始化签名和 URL 变量
           WIN_SIG=""
           WIN_URL=""
           MAC_SIG=""
           MAC_URL=""
           
-          # ===== Windows =====
           SIGFILE=$(find artifacts -name "*.exe.sig" -type f | head -1)
           if [ -n "$SIGFILE" ] && [ -f "$SIGFILE" ]; then
             WIN_SIG=$(cat "$SIGFILE")
@@ -237,7 +235,6 @@ jobs:
             echo "Windows URL: $WIN_URL"
           fi
           
-          # ===== macOS =====
           MACSIGFILE=$(find artifacts -name "*.tar.gz.sig" -type f | head -1)
           if [ -n "$MACSIGFILE" ] && [ -f "$MACSIGFILE" ]; then
             MAC_SIG=$(cat "$MACSIGFILE")
@@ -251,44 +248,34 @@ jobs:
             echo "macOS URL: $MAC_URL"
           fi
           
-          # ===== 生成 latest.json =====
           echo "Generating latest.json..."
           
-          # 构建 platforms JSON
-          PLATFORMS=""
+          echo "{" > artifacts/latest.json
+          echo "  \"version\": \"$VERSION\"," >> artifacts/latest.json
+          echo "  \"notes\": \"Open Switch v$VERSION release\"," >> artifacts/latest.json
+          echo "  \"pub_date\": \"$PUB_DATE\"," >> artifacts/latest.json
+          echo "  \"platforms\": {" >> artifacts/latest.json
           
-          # 添加 Windows
+          FIRST=true
           if [ -n "$WIN_SIG" ] && [ -n "$WIN_URL" ]; then
-            PLATFORMS="\"windows-x86_64\": {\"signature\": \"$WIN_SIG\", \"url\": \"$WIN_URL\"}"
+            echo "    \"windows-x86_64\": {\"signature\": \"$WIN_SIG\", \"url\": \"$WIN_URL\"}" >> artifacts/latest.json
+            FIRST=false
           fi
           
-          # 添加 macOS (同时支持 Intel 和 Apple Silicon)
           if [ -n "$MAC_SIG" ] && [ -n "$MAC_URL" ]; then
-            if [ -n "$PLATFORMS" ]; then
-              PLATFORMS="$PLATFORMS,"
+            if [ "$FIRST" = false ]; then
+              sed -i '$ s/$/,/' artifacts/latest.json
             fi
-            # Universal binary 同时支持两种架构
-            PLATFORMS="$PLATFORMS
-    \"darwin-aarch64\": {\"signature\": \"$MAC_SIG\", \"url\": \"$MAC_URL\"},
-    \"darwin-x86_64\": {\"signature\": \"$MAC_SIG\", \"url\": \"$MAC_URL\"}"
+            echo "    \"darwin-aarch64\": {\"signature\": \"$MAC_SIG\", \"url\": \"$MAC_URL\"}," >> artifacts/latest.json
+            echo "    \"darwin-x86_64\": {\"signature\": \"$MAC_SIG\", \"url\": \"$MAC_URL\"}" >> artifacts/latest.json
           fi
           
-          # 写入 latest.json
-          cat > artifacts/latest.json <<EOF
-{
-  "version": "$VERSION",
-  "notes": "Open Switch v$VERSION 发布",
-  "pub_date": "$PUB_DATE",
-  "platforms": {
-    $PLATFORMS
-  }
-}
-EOF
+          echo "  }" >> artifacts/latest.json
+          echo "}" >> artifacts/latest.json
           
           echo "Generated latest.json:"
           cat artifacts/latest.json
           
-          # 验证
           if [ -z "$WIN_SIG" ]; then
             echo "::warning::Windows signature is empty!"
           fi
