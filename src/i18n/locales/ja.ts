@@ -401,7 +401,6 @@ export default {
     // ルール管理
     manage: 'ルール管理',
     manageTitle: 'ルール管理',
-    installed: 'インストール済み',
     searchRule: 'ルールを検索...',
     deleteFromAll: '全てのアプリから削除',
     totalRules: '合計{count}件のルール'

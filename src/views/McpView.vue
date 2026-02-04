@@ -118,8 +118,6 @@ const importingApp = ref<string | null>(null)
 
 // 当前活动标签页: 'mcp' | 'rules'
 const activeTab = ref<'mcp' | 'rules'>('mcp')
-// 已部署应用展开状态
-const deployedAppsExpanded = ref(false)
 
 // MCP 管理弹窗
 const showMcpManageModal = ref(false)
@@ -502,7 +500,7 @@ async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex
     mcpStats.value = await invoke<McpStats>('get_mcp_stats')
   } catch (e) {
     console.error('切换 MCP 应用状态失败:', e)
-    installMessage.value = '切换失败: ' + (e as any).message || e
+    installMessage.value = '切换失败: ' + ((e as any)?.message || String(e))
   } finally {
     togglingMcp.value = null
   }
@@ -520,7 +518,7 @@ async function deleteMcpFromAll(mcp: ManagedMcp) {
     installMessage.value = `已删除 ${mcp.name}`
   } catch (e) {
     console.error('删除 MCP 失败:', e)
-    installMessage.value = '删除失败: ' + (e as any).message || e
+    installMessage.value = '删除失败: ' + ((e as any)?.message || String(e))
   }
 }
 
@@ -587,7 +585,7 @@ async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'co
     ruleStats.value = await invoke<RuleStats>('get_rule_stats')
   } catch (e) {
     console.error('切换规则应用状态失败:', e)
-    installMessage.value = '切换失败: ' + (e as any).message || e
+    installMessage.value = '切换失败: ' + ((e as any)?.message || String(e))
   } finally {
     togglingRule.value = null
   }
@@ -604,7 +602,7 @@ async function deleteRuleFromAll(rule: ManagedRule) {
     installMessage.value = `已删除 ${rule.name}`
   } catch (e) {
     console.error('删除规则失败:', e)
-    installMessage.value = '删除失败: ' + (e as any).message || e
+    installMessage.value = '删除失败: ' + ((e as any)?.message || String(e))
   }
 }
 

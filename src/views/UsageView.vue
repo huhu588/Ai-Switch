@@ -213,6 +213,21 @@ const selectedProvider = ref<'all' | 'claude' | 'codex' | 'gemini' | 'opencode' 
 const showTokenTooltip = ref(false)
 let tokenTooltipTimer: ReturnType<typeof setTimeout> | null = null
 
+// Token tooltip 辅助函数
+function startTokenTooltipTimer() {
+  tokenTooltipTimer = setTimeout(() => {
+    showTokenTooltip.value = true
+  }, 200)
+}
+
+function clearTokenTooltipTimer() {
+  if (tokenTooltipTimer) {
+    clearTimeout(tokenTooltipTimer)
+    tokenTooltipTimer = null
+  }
+  showTokenTooltip.value = false
+}
+
 // 模型定价相关状态
 const showPricingDialog = ref(false)
 const pricingList = ref<ModelPricing[]>([])
@@ -636,31 +651,6 @@ async function loadSessionStats() {
   }
 }
 
-// 格式化时间（毫秒转为人类可读格式）
-function formatTime(ms: number): string {
-  if (ms >= 3600000) {
-    const hours = Math.floor(ms / 3600000)
-    const minutes = Math.floor((ms % 3600000) / 60000)
-    return `${hours}h ${minutes}m`
-  }
-  if (ms >= 60000) {
-    const minutes = Math.floor(ms / 60000)
-    const seconds = Math.floor((ms % 60000) / 1000)
-    return `${minutes}m ${seconds}s`
-  }
-  if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(1)}s`
-  }
-  return `${ms}ms`
-}
-
-// 格式化平均时间
-function formatAvgTime(ms: number): string {
-  if (ms >= 1000) {
-    return `${(ms / 1000).toFixed(1)}s`
-  }
-  return `${Math.round(ms)}ms`
-}
 
 // 启动代理
 async function startProxy() {
@@ -1253,8 +1243,8 @@ onUnmounted(() => {
               v-if="selectedProvider === 'cursor'" 
               class="cursor-pointer relative"
               @click="showTokenTooltip = !showTokenTooltip"
-              @mouseenter="tokenTooltipTimer = setTimeout(() => showTokenTooltip = true, 200)"
-              @mouseleave="clearTimeout(tokenTooltipTimer); showTokenTooltip = false"
+              @mouseenter="startTokenTooltipTimer"
+              @mouseleave="clearTokenTooltipTimer"
             >
               <SvgIcon name="info" class="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
               <!-- Tooltip -->

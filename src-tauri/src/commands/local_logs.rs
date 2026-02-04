@@ -3062,7 +3062,6 @@ type CursorStatsResult = (u32, u32, u32, u32, u32, u32, u32, u32, HashMap<String
 
 /// 统计 Global Composer 数据 (cursorDiskKV)
 fn count_cursor_global_composer_stats(conn: &rusqlite::Connection) -> Result<CursorStatsResult, String> {
-    let mut conversations = 0u32;
     let mut messages = 0u32;
     let mut tool_calls = 0u32;
     let mut files_changed = 0u32;
@@ -3149,7 +3148,7 @@ fn count_cursor_global_composer_stats(conn: &rusqlite::Connection) -> Result<Cur
     }
 
     // 对话数 = inline 对话数 + bubble-only 对话数
-    conversations = (inline_composer_ids.len() + bubble_composer_ids.len()) as u32;
+    let conversations = (inline_composer_ids.len() + bubble_composer_ids.len()) as u32;
 
     Ok((conversations, messages, tool_calls, files_changed, code_blocks, diff_count, lines_added, lines_deleted, tool_details))
 }
@@ -3964,7 +3963,7 @@ fn parse_codex_session_stats(path: &PathBuf) -> SessionStats {
     };
     
     let mut files_modified: HashSet<String> = HashSet::new();
-    let mut last_user_timestamp: Option<i64> = None;
+    let mut _last_user_timestamp: Option<i64> = None;
     
     for line in content.lines() {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
@@ -3976,7 +3975,7 @@ fn parse_codex_session_stats(path: &PathBuf) -> SessionStats {
                     if let Some(payload) = json.get("payload") {
                         if payload.get("type").and_then(|t| t.as_str()) == Some("user_message") {
                             stats.conversation_count += 1;
-                            last_user_timestamp = extract_timestamp(&json);
+                            _last_user_timestamp = extract_timestamp(&json);
                         }
                     }
                 }
@@ -4000,7 +3999,7 @@ fn parse_codex_session_stats(path: &PathBuf) -> SessionStats {
                                     
                                     if !is_tool_result {
                                         stats.conversation_count += 1;
-                                        last_user_timestamp = extract_timestamp(&json);
+                                        _last_user_timestamp = extract_timestamp(&json);
                                     }
                                 }
                             }

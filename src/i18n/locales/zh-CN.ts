@@ -401,7 +401,6 @@ export default {
     // 规则管理
     manage: '规则管理',
     manageTitle: '规则管理',
-    installed: '已安装',
     searchRule: '搜索规则...',
     deleteFromAll: '从所有应用中删除',
     totalRules: '共 {count} 个规则'

@@ -401,7 +401,6 @@ export default {
     // Rule management
     manage: 'Rule Management',
     manageTitle: 'Rule Management',
-    installed: 'Installed',
     searchRule: 'Search rule...',
     deleteFromAll: 'Delete from all apps',
     totalRules: '{count} rules total'
