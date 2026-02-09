@@ -1,5 +1,5 @@
 // Ai Switch Tauri 库入口
-// v1.5.0 - 添加 Cursor 对话统计功能
+// v1.6.0 - 添加对话迁移、代理统计、本地日志导入功能
 
 pub mod commands;
 pub mod config;
@@ -311,9 +311,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_status,
             commands::get_version,
             commands::get_local_ip,
+            // CLI tools detection & update
+            commands::detect_cli_tools,
+            commands::check_cli_latest_version,
+            commands::update_cli_tool,
             // Backup commands
             commands::create_backup,
             commands::export_backup,
+            commands::export_backup_filtered,
             commands::preview_backup,
             commands::import_backup,
             // Settings commands
@@ -342,6 +347,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::save_ohmy_config,
             commands::install_and_configure,
             commands::uninstall_ohmy,
+            commands::update_ohmy,
             // Deep link commands
             commands::parse_deep_link,
             commands::generate_deep_link,
@@ -360,6 +366,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_claude_md,
             commands::save_claude_md,
             commands::clear_claude_code_config,
+            // Claude Code skip onboarding commands
+            commands::set_claude_code_skip_onboarding,
+            commands::clear_claude_code_skip_onboarding,
+            commands::get_claude_code_skip_onboarding,
             // Codex commands
             commands::get_codex_status,
             commands::get_codex_providers,
@@ -372,6 +382,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::sync_mcp_to_codex,
             commands::get_agents_md,
             commands::save_agents_md,
+            // Codex skip OAuth commands
+            commands::set_codex_api_key_skip_oauth,
+            commands::clear_codex_api_key,
+            commands::get_codex_api_key,
             // Gemini commands
             commands::get_gemini_status,
             commands::get_gemini_settings,
@@ -388,6 +402,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::get_gemini_md,
             commands::save_gemini_md,
             commands::clear_gemini_config,
+            // Gemini skip OAuth commands
+            commands::set_gemini_api_key_auth_mode,
+            commands::set_gemini_oauth_auth_mode,
+            commands::get_gemini_auth_selected_type,
+            commands::clear_gemini_auth_selected_type,
             // Prompts commands
             commands::get_prompts_status,
             commands::get_prompt,
@@ -462,6 +481,22 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // Session stats commands
             commands::get_session_stats_summary,
             commands::get_tool_call_stats,
+            // Dev environment management commands
+            commands::detect_all_dev_envs,
+            commands::detect_single_dev_env,
+            commands::get_installed_versions,
+            commands::switch_env_version,
+            commands::install_env_version,
+            commands::install_version_manager,
+            commands::uninstall_env_version,
+            commands::uninstall_version_manager,
+            // Chat migration commands
+            commands::scan_chat_sources,
+            commands::extract_conversations,
+            commands::export_conversations,
+            commands::import_migration_file,
+            commands::get_migrated_conversations,
+            commands::clear_migrated_conversations,
         ])
         .run(tauri::generate_context!())?;
 

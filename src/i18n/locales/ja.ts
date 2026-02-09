@@ -22,7 +22,10 @@ export default {
     optional: '任意',
     refresh: '更新',
     done: '完了',
-    close: '閉じる'
+    close: '閉じる',
+    noDescription: '説明なし',
+    recommended: '推奨',
+    notSelected: '未選択'
   },
 
   // Navigation
@@ -33,12 +36,14 @@ export default {
     ohmy: 'oh-my-opencode',
     backup: 'バックアップ',
     status: 'ステータス',
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'プロンプト',
-    speedTest: '速度テスト',
-    usage: '使用統計'
+    usage: '使用統計',
+    chatMigration: 'チャット移行',
+    devenv: '開発環境'
+  },
+
+  // ナビゲーションセクションタイトル
+  navExt: {
+    tools: 'ツール'
   },
 
   // System status
@@ -107,7 +112,48 @@ export default {
     noModels: 'モデルなし',
     // Ai Switch 統一設定
     saveToOpenSwitch: 'Ai Switch 統一設定に保存',
-    saveToOpenSwitchDesc: '設定を ~/.ai-switch/config.json に保存し、ツール間で共有できます'
+    saveToOpenSwitchDesc: '設定を ~/.ai-switch/config.json に保存し、ツール間で共有できます',
+    customConfig: 'カスタム設定',
+    modelProvider: 'モデルプロバイダー',
+    applyTo: '適用先',
+    applyToHint: 'このプロバイダー設定を適用するツールを選択',
+    baseUrlList: 'Base URL リスト',
+    autoAddV1Suffix: '/v1 サフィックスを自動追加',
+    baseUrlInputPlaceholder: 'Base URLを入力（例: https://api.example.com）',
+    testing: 'テスト中...',
+    testFailed: 'テスト失敗: {error}',
+    noTestResults: 'テスト結果がありません',
+    apiKeyRequiredFirst: 'まずAPI Keyを入力してください',
+    urlRequiredFirst: 'まずURLを追加してください',
+    baseUrlRequired: '少なくとも1つのBase URLを追加してください',
+    opencodeModelRequired: 'OpenCodeには少なくとも1つのモデルが必要です。モデルを追加するかOpenCodeのチェックを外してください',
+    deleteModelFailed: 'モデル削除失敗: {error}',
+    addModelFailed: 'モデル追加失敗: {error}',
+    modelGuidanceBoth: 'モデルの追加が必要です。OpenCodeはモデルリストを使用し、CLIツールは最初のモデルをデフォルトとして使用します。',
+    modelGuidanceOpencode: 'OpenCodeが正常に動作するにはモデルリストが必要です。少なくとも1つのモデルを追加してください。',
+    modelGuidanceCli: 'CLIツールにはAPI KeyとBase URLのみ必要です。モデルは任意です（ツールのデフォルトを使用）。',
+    quality: {
+      excellent: '優秀',
+      good: '良好',
+      fair: '普通',
+      poor: '不良',
+      failed: '失敗',
+      untested: '未テスト'
+    },
+    autoAddPresetModels: 'プリセットモデルを自動追加',
+    selectedPresetModels: '{selected} / {total} プリセットモデル選択済み',
+    addCustomModel: 'カスタムモデル追加',
+    customModelPlaceholder: 'モデル名を入力（例: gpt-4o-mini）',
+    customModelsAdded: '{count} 個のカスタムモデルを追加',
+    clearAllModels: 'すべてクリア',
+    modelIdPlaceholder: 'モデル ID を入力',
+    applyAllProviders: '全 {count} プロバイダー設定を適用',
+    disabled: '無効',
+    speedTesting: 'テスト中...',
+    testLatency: '遅延テスト',
+    clickToDisable: 'クリックで無効化',
+    clickToEnable: 'クリックで有効化',
+    protocolOpenAICompat: 'OpenAI 互換プロトコル'
   },
 
   // Model related
@@ -171,7 +217,10 @@ export default {
     projectPath: './.opencode/opencode.json',
     globalPath: '~/.opencode/opencode.json',
     selectTarget: '少なくとも1つの対象を選択してください',
-    cliTools: 'CLIツール'
+    cliTools: 'CLIツール',
+    selectProviderForCli: 'CLI設定用のプロバイダーを先に選択してください',
+    applyProvidersDesc: '{vendor}の{count}プロバイダー設定を適用:',
+    willUseProvider: '使用するプロバイダー:'
   },
 
   // Fetch models
@@ -252,7 +301,23 @@ export default {
     installed: 'インストール済み',
     searchMcp: 'MCPを検索...',
     deleteFromAll: '全てのアプリから削除',
-    totalMcps: '合計{count}件のMCP'
+    totalMcps: '合計{count}件のMCP',
+    deleteFromAllConfirm: '全てのアプリから "{name}" を削除しますか？',
+    toggleFailed: '切り替え失敗: {error}',
+    deleted: '{name} を削除しました',
+    deleteFailed: '削除失敗: {error}',
+    healthCheckFailed: 'ヘルスチェック失敗',
+    clickToAddServer: '右上のボタンをクリックしてMCPサーバーを追加',
+    locationLabels: {
+      global_opencode: 'OpenCode',
+      project_opencode: 'OpenCode プロジェクト',
+      project_root: 'ルート',
+      global_claude: 'Claude',
+      project_claude: 'Claude プロジェクト',
+      global_cursor: 'Cursor',
+      global_codex: 'Codex',
+      global_gemini: 'Gemini'
+    }
   },
 
   // Backup page
@@ -291,17 +356,28 @@ export default {
     importGemini: 'Gemini CLI設定をインポート',
     overwriteExisting: '既存の設定を上書き',
     overwriteHint: 'チェック時、同名の既存設定は上書きされます。未チェック時はスキップされます',
+    importUsageStats: '使用統計をインポート',
     
     providerPreview: 'プロバイダープレビュー',
     
+    // エクスポートオプション
+    exportOptions: 'エクスポート内容を選択',
+    includeUsageStats: '使用統計データ',
+    usageRecords: '件の記録',
+    
     whatIncluded: 'バックアップに含まれる内容',
-    includeProviders: 'プロバイダー設定（APIキー、URL、モデルリストを含む）',
+    includeProviders: 'プロバイダー設定（APIキー、URL、モデルリスト、Codex/Gemini CLI含む）',
     includeMcp: 'MCPサーバー設定',
     includeRules: 'グローバルルールファイル',
     includeSkills: 'グローバルスキルファイル',
-    includeCodex: 'Codex CLI設定（モデルプロバイダー、MCP）',
-    includeGemini: 'Gemini CLI設定（APIキー、MCP）',
-    securityWarning: 'バックアップファイルには機密のAPIキー情報が含まれています。安全に保管してください！'
+    includeUsageStatsDesc: '使用統計データ（リクエストログ、トークン使用量、コスト記録）',
+    securityWarning: 'バックアップファイルには機密のAPIキー情報が含まれています。安全に保管してください！',
+    // エクスポート詳細選択パネル
+    confirmExport: 'エクスポート確認',
+    chatRecords: '会話記録',
+    loadingData: 'データを読み込み中...',
+    noExtractedChat: '抽出された会話がありません。まずデータソースをスキャンして抽出してください。',
+    geminiEnvConfig: '環境設定',
   },
 
   // Skills page
@@ -356,7 +432,29 @@ export default {
       ProjectOpenCode: 'プロジェクトOpenCode (.opencode/skills/)',
       ProjectClaude: 'プロジェクトClaude (.claude/skills/)'
     },
-    rateLimitError: 'GitHub APIレート制限に達しました。後でお試しください'
+    rateLimitError: 'GitHub APIレート制限に達しました。後でお試しください',
+    manage: 'Skills管理',
+    manageTitle: 'Skills管理',
+    searchSkills: 'Skillsを検索...',
+    noInstalledSkills: 'インストール済みのSkillsがありません',
+    local: 'ローカル',
+    deleteFromAll: '全てのツールから削除',
+    deleteFromAllConfirm: '全てのツールから "{name}" を削除しますか？',
+    totalSkills: '合計{count}件のSkills',
+    statsInstalled: 'インストール済み · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    toggleFailed: '切り替え失敗: {error}',
+    deleteSuccess: '削除しました',
+    deleteFailed: '削除失敗: {error}',
+    readFailed: '読み取り失敗',
+    installSuccess: '{count}個のSkillsをインストールしました',
+    installFailed: '{count}個のSkillsのインストールに失敗',
+    repoAddSuccess: 'リポジトリを追加しました',
+    repoAddFailed: '追加失敗: {error}',
+    repoDeleted: 'リポジトリを削除しました',
+    repoDeleteFailed: '削除失敗: {error}',
+    operationFailed: '操作失敗: {error}',
+    discoverFailed: 'スキルリストの取得に失敗',
+    viewOnGithub: 'GitHubで表示'
   },
 
   // Rule page
@@ -403,7 +501,25 @@ export default {
     manageTitle: 'ルール管理',
     searchRule: 'ルールを検索...',
     deleteFromAll: '全てのアプリから削除',
-    totalRules: '合計{count}件のルール'
+    totalRules: '合計{count}件のルール',
+    deleteFromAllConfirm: '全てのアプリから "{name}" を削除しますか？',
+    deleteFromAllConfirmMultiple: '全てのアプリからルール "{name}" を削除しますか？（{count}件のコピー）',
+    toggleFailed: '切り替え失敗: {error}',
+    deleted: '{name} を削除しました',
+    deleteFailed: '削除失敗: {error}',
+    clickToAddRule: '右上のボタンをクリックしてルールを追加',
+    deployedTo: 'デプロイ先',
+    ruleContent: 'ルール内容',
+    categoryLabels: {
+      code_style: 'コードスタイル',
+      project: 'プロジェクト構造',
+      review: 'コードレビュー',
+      testing: 'テスト',
+      workflow: 'ワークフロー',
+      api: 'API',
+      security: 'セキュリティ',
+      documentation: 'ドキュメント'
+    }
   },
 
   // Status page
@@ -442,7 +558,22 @@ export default {
     noConflicts: '競合なし',
     conflictsFound: '{count}件の競合が検出されました',
     conflictVariable: '変数',
-    conflictSources: '競合元'
+    conflictSources: '競合元',
+    // CLIツールバージョン検出
+    cliTools: {
+      title: 'CLIツール',
+      notInstalled: '未インストール',
+      checkingLatest: '最新版を確認中...',
+      latest: '最新',
+      newAvailable: '更新あり',
+      upToDate: '最新版',
+      update: '更新',
+      updating: '更新中...',
+      updateSuccess: '更新完了',
+      install: 'インストール',
+      installing: 'インストール中...',
+      installSuccess: 'インストール完了'
+    }
   },
 
   // App Settings
@@ -502,6 +633,14 @@ export default {
     uninstallSuccess: 'oh-my-opencodeをアンインストールしました！',
     uninstallFailed: 'アンインストール失敗、ログを確認してください',
     
+    // アップデート
+    update: '更新',
+    updating: '更新中...',
+    startingUpdate: '更新開始...',
+    updateSuccess: 'oh-my-opencodeを更新しました！',
+    updateFailed: '更新失敗、ログを確認してください',
+    latestVersion: '最新バージョン',
+    
     // Agent descriptions
     agents: {
       sisyphus: {
@@ -552,7 +691,28 @@ export default {
     project: 'プロジェクト',
     models: 'モデル',
     removeAll: '全て削除',
-    syncAll: '全て同期'
+    syncAll: '全て同期',
+    modelsFixedSuccess: '{count}プロバイダーのモデルを補完しました',
+    noProvidersToFix: '補完が必要なプロバイダーはありません',
+    modelsFixFailed: '補完失敗: {names}',
+    externalTool: '外部ツール',
+    cannotDeleteSource: 'ソース "{tool}" のプロバイダーを削除できません',
+    partialDeleteFailed: '一部の削除に失敗: {names}',
+    importedFrom: '{tool} からインポート',
+    importedSuccess: '{count}件をインポートしました',
+    skippedExisting: '{count}件をスキップ（既存）',
+    selectProvidersToImport: 'インポートするプロバイダーを選択（{count}件選択済み）',
+    deselectAll: '全解除',
+    selectAll: '全選択',
+    apiKeyConfigured: 'API Key 設定済み',
+    configured: '設定済み',
+    fillMissingModels: 'モデル一括補完',
+    confirmImport: 'インポート確認 ({count})',
+    selectModelType: 'モデルタイプを選択',
+    selectModelTypeFor: '{name} のモデルタイプを選択',
+    claudeModelDesc: 'Anthropic Claude モデル',
+    codexModelDesc: 'OpenAI GPT / Codex モデル',
+    geminiModelDesc: 'Google Gemini モデル'
   },
 
   // Deep Link Configuration
@@ -573,97 +733,7 @@ export default {
     error: '追加に失敗しました'
   },
 
-  // Claude Code Configuration
-  claudeCode: {
-    description: 'Claude Code CLI設定を管理',
-    notConfigured: '未設定',
-    usingOfficial: '公式APIを使用中',
-    mcpServers: 'MCPサーバー',
-    servers: '',
-    setApiKey: 'APIキーを設定',
-    apiKeyPlaceholder: 'Anthropic APIキーを入力 (sk-ant-...)',
-    setBaseUrl: 'ベースURLを設定',
-    baseUrlPlaceholder: '公式APIは空欄、カスタムURLを入力',
-    baseUrlHint: '空欄でAnthropic公式API、カスタムURLでサードパーティプロキシ',
-    setModel: 'デフォルトモデルを設定',
-    modelPlaceholder: '例: claude-sonnet-4-5-20250929'
-  },
-
-  // Codex Configuration
-  codex: {
-    description: 'OpenAI Codex CLI設定を管理',
-    authStatus: '認証ステータス',
-    authenticated: '認証済み',
-    notAuthenticated: '未認証',
-    providers: 'モデルプロバイダー',
-    configured: '設定済み',
-    mcpServers: 'MCPサーバー',
-    servers: '',
-    modelProviders: 'モデルプロバイダー',
-    noProviders: 'カスタムモデルプロバイダーなし',
-    addProvider: 'プロバイダーを追加',
-    providerKey: 'プロバイダーキー',
-    providerKeyPlaceholder: '例: custom-provider',
-    displayName: '表示名',
-    displayNamePlaceholder: '例: My Custom Provider',
-    envKey: '環境変数',
-    envKeyPlaceholder: '例: CUSTOM_API_KEY'
-  },
-
-  // Gemini Configuration
-  gemini: {
-    description: 'Google Gemini CLI設定を管理',
-    notConfigured: '未設定',
-    authMode: '認証モード',
-    mcpServers: 'MCPサーバー',
-    servers: '',
-    setApiKey: 'APIキーを設定',
-    apiKeyPlaceholder: 'Gemini APIキーを入力',
-    setBaseUrl: 'ベースURLを設定',
-    baseUrlPlaceholder: '公式APIは空欄、カスタムURLを入力',
-    baseUrlHint: '空欄でGoogle公式API、カスタムURLでサードパーティプロキシ',
-    setModel: 'デフォルトモデルを設定',
-    modelPlaceholder: '例: gemini-2.5-pro'
-  },
-
-  // Prompts Management
-  prompts: {
-    title: 'プロンプト管理',
-    description: 'CLIツールのシステムプロンプトを管理',
-    characters: '文字',
-    placeholder: 'システムプロンプト内容を入力（Markdownサポート）...',
-    syncTo: '同期先',
-    sync: '同期',
-    presets: 'プリセットテンプレート',
-    saved: '保存しました',
-    confirmDelete: 'このプロンプトファイルを削除しますか？'
-  },
-
-  // Speed Test
-  speedTest: {
-    title: '速度テスト',
-    description: 'APIエンドポイントの応答遅延をテスト',
-    selectProviders: 'テストするプロバイダーを選択',
-    noProviders: '有効なプロバイダーがありません。先にプロバイダーを追加して有効にしてください。',
-    selectAll: '全選択',
-    runTest: 'テスト実行',
-    testing: 'テスト中...',
-    noResults: '「テスト実行」をクリックして選択したプロバイダーをテスト',
-    retest: '再テスト',
-    avgLatency: '平均遅延',
-    successRate: '成功率',
-    testCount: 'テスト回数'
-  },
-
-  // Extended Navigation
-  navExt: {
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'プロンプト',
-    speedTest: '速度テスト',
-    tools: 'ツール'
-  },
+  
 
   // Usage Statistics
   usage: {
@@ -781,5 +851,115 @@ export default {
     toolTypes: '種類のツール',
     calls: '回の呼び出し',
     viewAll: 'すべて表示 ({count} 種類)'
+  },
+
+  // チャット移行
+  chatMigration: {
+    title: 'チャット移行',
+    description: 'AIコーディングツールから完全な会話履歴を抽出し、JSONLファイルとしてエクスポート',
+    scan: 'スキャン',
+    scanning: 'スキャン中...',
+    extract: '抽出',
+    extracting: '抽出中...',
+    export: 'エクスポート',
+    exporting: 'エクスポート中...',
+    exportAll: 'すべてエクスポート',
+    exportSelected: '選択をエクスポート',
+    conversations: '件の会話',
+    messages: '件のメッセージ',
+    noData: 'データが検出されません',
+    notInstalled: '未インストール',
+    detected: '検出済み',
+    dataPath: 'データパス',
+    scanFirst: '先にデータソースをスキャンしてください',
+    scanComplete: 'スキャン完了',
+    extractComplete: '抽出完了',
+    exportComplete: 'エクスポート完了',
+    exportSuccess: '{count} 件の会話を {path} にエクスポートしました',
+    exportFailed: 'エクスポート失敗',
+    noConversations: 'エクスポートする会話がありません',
+    selectExportPath: 'エクスポート先を選択',
+    totalConversations: '総会話数',
+    totalMessages: '総メッセージ数',
+    preview: 'プレビュー',
+    close: '閉じる',
+    user: 'ユーザー',
+    assistant: 'アシスタント',
+    source: 'ソース',
+    createdAt: '作成日時',
+    toolUse: 'ツール呼び出し',
+    extractAll: 'すべて抽出',
+    extractAllDesc: 'すべての利用可能なツールから会話を抽出',
+    clear: 'クリア',
+    clearAll: 'すべてクリア',
+    confirmClear: '抽出されたすべての会話をクリアしますか？',
+    fileFormat: 'ファイル形式',
+    jsonl: 'JSONL（1行に1会話）',
+    // インポート
+    importFile: 'ファイルをインポート',
+    importDesc: '他のPCからエクスポートしたJSONLファイルから会話をインポート',
+    importSuccess: 'インポート完了：{imported}件追加、{skipped}件スキップ（重複）',
+    importFailed: 'インポート失敗',
+    imported: 'インポート済み',
+    skippedDup: 'スキップ（重複）',
+    viewImported: 'インポート済みを表示',
+    noImportedData: 'インポートされた会話はありません',
+    clearImported: 'インポート済みをクリア',
+    confirmClearImported: 'インポートされたすべての移行会話をクリアしますか？',
+    clearedImported: 'すべてのインポートデータをクリアしました',
+    // ツール名
+    tools: {
+      cursor: 'Cursor',
+      claude: 'Claude Code',
+      codex: 'Codex',
+      windsurf: 'Windsurf',
+      trae: 'Trae',
+      trae_cn: 'Trae CN'
+    }
+  },
+
+  // 開発環境管理
+  devenv: {
+    title: '開発環境管理',
+    subtitle: 'ローカル開発環境の検出、インストール、切り替え（グローバルTop 10）',
+    detecting: '検出中...',
+    detectAll: '一括検出',
+    refresh: '更新',
+    installed: 'インストール済み',
+    notInstalled: '未インストール',
+    currentVersion: '現在のバージョン',
+    noVersion: 'なし',
+    versionManager: 'バージョンマネージャー',
+    managerInstalled: 'インストール済み v{version}',
+    managerNotInstalled: '未インストール',
+    installManager: 'マネージャーをインストール',
+    installing: 'インストール中...',
+    installedVersions: 'インストール済みバージョン',
+    switchVersion: 'バージョン切り替え',
+    switching: '切り替え中...',
+    installVersion: 'バージョンインストール',
+    installingVersion: 'インストール中...',
+    recommendedVersions: '推奨バージョン',
+    forClaude: 'Claude対応',
+    stableVersion: '安定版',
+    customVersion: 'カスタムバージョン',
+    customVersionPlaceholder: 'バージョンを入力（例: 20.18.1）',
+    switchSuccess: '切り替え成功',
+    switchFailed: '切り替え失敗',
+    installSuccess: 'インストール成功',
+    installFailed: 'インストール失敗',
+    managerInstallSuccess: 'マネージャーインストール成功',
+    managerInstallFailed: 'マネージャーインストール失敗',
+    detectFailed: '検出失敗',
+    uninstall: 'アンインストール',
+    uninstalling: 'アンインストール中...',
+    uninstallSuccess: 'アンインストール成功',
+    uninstallFailed: 'アンインストール失敗',
+    uninstallManager: 'マネージャーをアンインストール',
+    managerUninstalling: 'アンインストール中...',
+    managerUninstallFailed: 'マネージャーアンインストール失敗',
+    operationLog: '操作ログ',
+    noLogs: 'ログなし',
+    clearLogs: 'ログをクリア'
   }
 }

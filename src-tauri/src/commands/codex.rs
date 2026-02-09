@@ -104,3 +104,29 @@ pub async fn save_agents_md(content: String) -> Result<(), String> {
     let manager = CodexConfigManager::new()?;
     manager.write_agents_md(&content)
 }
+
+/// 设置 Codex API Key 并跳过 OAuth 登录
+/// 直接配置 API Key 和 model_provider，避免 OAuth 登录流程
+#[tauri::command]
+pub async fn set_codex_api_key_skip_oauth(
+    api_key: String,
+    base_url: String,
+    provider_name: String,
+) -> Result<(), String> {
+    let manager = CodexConfigManager::new()?;
+    manager.set_api_key_skip_oauth(&api_key, &base_url, &provider_name)
+}
+
+/// 清除 Codex API Key 配置（恢复 OAuth 登录）
+#[tauri::command]
+pub async fn clear_codex_api_key() -> Result<(), String> {
+    let manager = CodexConfigManager::new()?;
+    manager.clear_api_key()
+}
+
+/// 获取 Codex 当前 API Key
+#[tauri::command]
+pub async fn get_codex_api_key() -> Result<Option<String>, String> {
+    let manager = CodexConfigManager::new()?;
+    manager.get_api_key()
+}

@@ -38,7 +38,16 @@ const router = createRouter({
       path: '/usage',
       name: 'usage',
       component: () => import('@/views/UsageView.vue')
-    }
+    },
+    {
+      path: '/devenv',
+      name: 'devenv',
+      component: () => import('@/views/DevEnvView.vue')
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/'
+    },
   ]
 })
 

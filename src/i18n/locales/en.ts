@@ -22,7 +22,10 @@ export default {
     optional: 'Optional',
     refresh: 'Refresh',
     done: 'Done',
-    close: 'Close'
+    close: 'Close',
+    noDescription: 'No description',
+    recommended: 'Recommended',
+    notSelected: 'Not selected'
   },
 
   // Navigation
@@ -33,12 +36,14 @@ export default {
     ohmy: 'oh-my-opencode',
     backup: 'Backup',
     status: 'Status',
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'Prompts',
-    speedTest: 'Speed Test',
-    usage: 'Usage Stats'
+    usage: 'Usage Stats',
+    chatMigration: 'Chat Migration',
+    devenv: 'Dev Env'
+  },
+
+  // Navigation section titles
+  navExt: {
+    tools: 'TOOLS'
   },
 
   // System status
@@ -107,7 +112,49 @@ export default {
     noModels: 'No models',
     // Ai Switch unified config
     saveToOpenSwitch: 'Save to Ai Switch Unified Config',
-    saveToOpenSwitchDesc: 'Save configuration to ~/.ai-switch/config.json for cross-tool sharing'
+    saveToOpenSwitchDesc: 'Save configuration to ~/.ai-switch/config.json for cross-tool sharing',
+    // i18n additions
+    customConfig: 'Custom Config',
+    modelProvider: 'Model Provider',
+    applyTo: 'Apply To',
+    applyToHint: 'Select tools to apply this provider configuration to',
+    baseUrlList: 'Base URL List',
+    autoAddV1Suffix: 'Auto add /v1 suffix',
+    baseUrlInputPlaceholder: 'Enter Base URL, e.g. https://api.example.com',
+    testing: 'Testing...',
+    testFailed: 'Test failed: {error}',
+    noTestResults: 'No test results available',
+    apiKeyRequiredFirst: 'Please fill in API Key first',
+    urlRequiredFirst: 'Please add a URL first',
+    baseUrlRequired: 'Please add at least one Base URL',
+    opencodeModelRequired: 'OpenCode requires at least one model, please add models or uncheck OpenCode',
+    deleteModelFailed: 'Failed to delete model: {error}',
+    addModelFailed: 'Failed to add model: {error}',
+    modelGuidanceBoth: 'Models required. OpenCode uses the model list, CLI tools will use the first model as default.',
+    modelGuidanceOpencode: 'OpenCode requires a model list to work properly, please add at least one model.',
+    modelGuidanceCli: 'CLI tools only need API Key and Base URL, models are optional (will use tool default).',
+    quality: {
+      excellent: 'Excellent',
+      good: 'Good',
+      fair: 'Fair',
+      poor: 'Poor',
+      failed: 'Failed',
+      untested: 'Untested'
+    },
+    autoAddPresetModels: 'Auto add preset models',
+    selectedPresetModels: '{selected} / {total} preset models selected',
+    addCustomModel: 'Add Custom Model',
+    customModelPlaceholder: 'Enter model name, e.g. gpt-4o-mini',
+    customModelsAdded: '{count} custom model(s) added',
+    clearAllModels: 'Clear All',
+    modelIdPlaceholder: 'Enter Model ID',
+    applyAllProviders: 'Apply all {count} provider configurations',
+    disabled: 'Disabled',
+    speedTesting: 'Testing...',
+    testLatency: 'Test Latency',
+    clickToDisable: 'Click to disable',
+    clickToEnable: 'Click to enable',
+    protocolOpenAICompat: 'OpenAI Compatible Protocol'
   },
 
   // Model related
@@ -171,7 +218,10 @@ export default {
     projectPath: './.opencode/opencode.json',
     globalPath: '~/.opencode/opencode.json',
     selectTarget: 'Please select at least one target',
-    cliTools: 'CLI Tools'
+    cliTools: 'CLI Tools',
+    selectProviderForCli: 'Please select a provider for CLI configuration first',
+    applyProvidersDesc: 'Apply {count} provider(s) from {vendor} to:',
+    willUseProvider: 'Will use provider:'
   },
 
   // Fetch models
@@ -252,7 +302,23 @@ export default {
     installed: 'Installed',
     searchMcp: 'Search MCP...',
     deleteFromAll: 'Delete from all apps',
-    totalMcps: '{count} MCPs total'
+    totalMcps: '{count} MCPs total',
+    deleteFromAllConfirm: 'Are you sure you want to delete "{name}" from all apps?',
+    toggleFailed: 'Toggle failed: {error}',
+    deleted: 'Deleted {name}',
+    deleteFailed: 'Delete failed: {error}',
+    healthCheckFailed: 'Health check failed',
+    clickToAddServer: 'Click the top-right button to add MCP server',
+    locationLabels: {
+      global_opencode: 'OpenCode',
+      project_opencode: 'OpenCode Project',
+      project_root: 'Root',
+      global_claude: 'Claude',
+      project_claude: 'Claude Project',
+      global_cursor: 'Cursor',
+      global_codex: 'Codex',
+      global_gemini: 'Gemini'
+    }
   },
 
   // Backup page
@@ -291,17 +357,28 @@ export default {
     importGemini: 'Import Gemini CLI Configuration',
     overwriteExisting: 'Overwrite existing configurations',
     overwriteHint: 'When checked, existing configurations with the same name will be overwritten; otherwise they will be skipped',
+    importUsageStats: 'Import Usage Statistics',
     
     providerPreview: 'Provider Preview',
     
+    // Export options
+    exportOptions: 'Select Export Content',
+    includeUsageStats: 'Usage Statistics',
+    usageRecords: 'records',
+    
     whatIncluded: 'What is included in the backup?',
-    includeProviders: 'Provider configurations (including API Keys, URLs, model lists)',
+    includeProviders: 'Provider configurations (API Keys, URLs, model lists, Codex/Gemini CLI)',
     includeMcp: 'MCP server configurations',
     includeRules: 'Global rule files',
     includeSkills: 'Global Skills files',
-    includeCodex: 'Codex CLI configuration (Model Providers, MCP)',
-    includeGemini: 'Gemini CLI configuration (API Key, MCP)',
-    securityWarning: 'Backup file contains sensitive API Key information, please keep it safe!'
+    includeUsageStatsDesc: 'Usage statistics (request logs, token usage, cost records)',
+    securityWarning: 'Backup file contains sensitive API Key information, please keep it safe!',
+    // Export detail selection panel
+    confirmExport: 'Confirm Export',
+    chatRecords: 'Chat Records',
+    loadingData: 'Loading data...',
+    noExtractedChat: 'No extracted conversations. Please scan and extract data sources first.',
+    geminiEnvConfig: 'Environment Config',
   },
 
   // Skills page
@@ -356,7 +433,29 @@ export default {
       ProjectOpenCode: 'Project OpenCode (.opencode/skills/)',
       ProjectClaude: 'Project Claude (.claude/skills/)'
     },
-    rateLimitError: 'GitHub API rate limit reached, please try again later'
+    rateLimitError: 'GitHub API rate limit reached, please try again later',
+    manage: 'Skills Management',
+    manageTitle: 'Skills Management',
+    searchSkills: 'Search Skills...',
+    noInstalledSkills: 'No Skills installed',
+    local: 'Local',
+    deleteFromAll: 'Delete from all tools',
+    deleteFromAllConfirm: 'Are you sure you want to delete "{name}" from all tools?',
+    totalSkills: '{count} Skills total',
+    statsInstalled: 'Installed · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    toggleFailed: 'Toggle failed: {error}',
+    deleteSuccess: 'Deleted successfully',
+    deleteFailed: 'Delete failed: {error}',
+    readFailed: 'Failed to read',
+    installSuccess: 'Successfully installed {count} skills',
+    installFailed: '{count} skills failed to install',
+    repoAddSuccess: 'Repository added successfully',
+    repoAddFailed: 'Failed to add: {error}',
+    repoDeleted: 'Repository deleted',
+    repoDeleteFailed: 'Failed to delete: {error}',
+    operationFailed: 'Operation failed: {error}',
+    discoverFailed: 'Failed to fetch skills list',
+    viewOnGithub: 'View on GitHub'
   },
 
   // Rule page
@@ -403,7 +502,25 @@ export default {
     manageTitle: 'Rule Management',
     searchRule: 'Search rule...',
     deleteFromAll: 'Delete from all apps',
-    totalRules: '{count} rules total'
+    totalRules: '{count} rules total',
+    deleteFromAllConfirm: 'Are you sure you want to delete "{name}" from all apps?',
+    deleteFromAllConfirmMultiple: 'Are you sure you want to delete rule "{name}" from all apps? ({count} copies)',
+    toggleFailed: 'Toggle failed: {error}',
+    deleted: 'Deleted {name}',
+    deleteFailed: 'Delete failed: {error}',
+    clickToAddRule: 'Click the top-right button to add rules',
+    deployedTo: 'Deployed To',
+    ruleContent: 'Rule Content',
+    categoryLabels: {
+      code_style: 'Code Style',
+      project: 'Project Structure',
+      review: 'Code Review',
+      testing: 'Testing',
+      workflow: 'Workflow',
+      api: 'API',
+      security: 'Security',
+      documentation: 'Documentation'
+    }
   },
 
   // Status page
@@ -442,7 +559,22 @@ export default {
     noConflicts: 'No Conflicts',
     conflictsFound: '{count} conflict(s) detected',
     conflictVariable: 'Variable',
-    conflictSources: 'Conflict Sources'
+    conflictSources: 'Conflict Sources',
+    // CLI tools version detection
+    cliTools: {
+      title: 'CLI Tools',
+      notInstalled: 'Not Installed',
+      checkingLatest: 'Checking latest...',
+      latest: 'Latest',
+      newAvailable: 'Update Available',
+      upToDate: 'Up to date',
+      update: 'Update',
+      updating: 'Updating...',
+      updateSuccess: 'Updated successfully',
+      install: 'Install',
+      installing: 'Installing...',
+      installSuccess: 'Installed successfully'
+    }
   },
 
   // App Settings
@@ -502,6 +634,14 @@ export default {
     uninstallSuccess: 'oh-my-opencode uninstalled successfully!',
     uninstallFailed: 'Uninstall failed, check the log',
     
+    // Update
+    update: 'Update',
+    updating: 'Updating...',
+    startingUpdate: 'Starting update...',
+    updateSuccess: 'oh-my-opencode updated successfully!',
+    updateFailed: 'Update failed, check the log',
+    latestVersion: 'Latest version',
+    
     // Agent descriptions (fallback, mainly use backend data)
     agents: {
       sisyphus: {
@@ -552,7 +692,28 @@ export default {
     project: 'Project',
     models: 'models',
     removeAll: 'Remove All',
-    syncAll: 'Sync All'
+    syncAll: 'Sync All',
+    modelsFixedSuccess: 'Fixed models for {count} providers',
+    noProvidersToFix: 'No providers need model fixing',
+    modelsFixFailed: 'Fix failed: {names}',
+    externalTool: 'External Tool',
+    cannotDeleteSource: 'Cannot delete provider from source "{tool}"',
+    partialDeleteFailed: 'Partial delete failed: {names}',
+    importedFrom: 'Imported from {tool}',
+    importedSuccess: 'Successfully imported {count}',
+    skippedExisting: 'Skipped {count} existing',
+    selectProvidersToImport: 'Click to select providers to import ({count} selected)',
+    deselectAll: 'Deselect All',
+    selectAll: 'Select All',
+    apiKeyConfigured: 'API Key configured',
+    configured: 'Configured',
+    fillMissingModels: 'Fill Missing Models',
+    confirmImport: 'Confirm Import ({count})',
+    selectModelType: 'Select Model Type',
+    selectModelTypeFor: 'Select model type for {name}',
+    claudeModelDesc: 'Anthropic Claude Models',
+    codexModelDesc: 'OpenAI GPT / Codex Models',
+    geminiModelDesc: 'Google Gemini Models'
   },
 
   // Deep Link Configuration
@@ -573,97 +734,7 @@ export default {
     error: 'Failed to add'
   },
 
-  // Claude Code Configuration
-  claudeCode: {
-    description: 'Manage Claude Code CLI configuration',
-    notConfigured: 'Not Configured',
-    usingOfficial: 'Using Official API',
-    mcpServers: 'MCP Servers',
-    servers: '',
-    setApiKey: 'Set API Key',
-    apiKeyPlaceholder: 'Enter Anthropic API Key (sk-ant-...)',
-    setBaseUrl: 'Set Base URL',
-    baseUrlPlaceholder: 'Leave empty for official API, or enter custom URL',
-    baseUrlHint: 'Leave empty to use Anthropic official API, enter custom URL for third-party proxy',
-    setModel: 'Set Default Model',
-    modelPlaceholder: 'e.g. claude-sonnet-4-5-20250929'
-  },
-
-  // Codex Configuration
-  codex: {
-    description: 'Manage OpenAI Codex CLI configuration',
-    authStatus: 'Auth Status',
-    authenticated: 'Authenticated',
-    notAuthenticated: 'Not Authenticated',
-    providers: 'Model Providers',
-    configured: 'configured',
-    mcpServers: 'MCP Servers',
-    servers: '',
-    modelProviders: 'Model Providers',
-    noProviders: 'No custom model providers',
-    addProvider: 'Add Provider',
-    providerKey: 'Provider Key',
-    providerKeyPlaceholder: 'e.g. custom-provider',
-    displayName: 'Display Name',
-    displayNamePlaceholder: 'e.g. My Custom Provider',
-    envKey: 'Environment Variable',
-    envKeyPlaceholder: 'e.g. CUSTOM_API_KEY'
-  },
-
-  // Gemini Configuration
-  gemini: {
-    description: 'Manage Google Gemini CLI configuration',
-    notConfigured: 'Not Configured',
-    authMode: 'Auth Mode',
-    mcpServers: 'MCP Servers',
-    servers: '',
-    setApiKey: 'Set API Key',
-    apiKeyPlaceholder: 'Enter Gemini API Key',
-    setBaseUrl: 'Set Base URL',
-    baseUrlPlaceholder: 'Leave empty for official API, or enter custom URL',
-    baseUrlHint: 'Leave empty to use Google official API, enter custom URL for third-party proxy',
-    setModel: 'Set Default Model',
-    modelPlaceholder: 'e.g. gemini-2.5-pro'
-  },
-
-  // Prompts Management
-  prompts: {
-    title: 'Prompts Management',
-    description: 'Manage system prompts for CLI tools',
-    characters: 'characters',
-    placeholder: 'Enter system prompt content here (supports Markdown)...',
-    syncTo: 'Sync to',
-    sync: 'Sync',
-    presets: 'Preset Templates',
-    saved: 'Saved successfully',
-    confirmDelete: 'Are you sure you want to delete this Prompt file?'
-  },
-
-  // Speed Test
-  speedTest: {
-    title: 'Speed Test',
-    description: 'Test API endpoint response latency',
-    selectProviders: 'Select providers to test',
-    noProviders: 'No enabled providers. Please add and enable providers first.',
-    selectAll: 'Select All',
-    runTest: 'Run Test',
-    testing: 'Testing...',
-    noResults: 'Click "Run Test" to test selected providers',
-    retest: 'Retest',
-    avgLatency: 'Avg Latency',
-    successRate: 'Success Rate',
-    testCount: 'Test Count'
-  },
-
-  // Extended Navigation
-  navExt: {
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'Prompts',
-    speedTest: 'Speed Test',
-    tools: 'Tools'
-  },
+  
 
   // Usage Statistics
   usage: {
@@ -781,5 +852,115 @@ export default {
     toolTypes: 'tool types',
     calls: 'calls',
     viewAll: 'View all ({count} types)'
+  },
+
+  // Chat Migration
+  chatMigration: {
+    title: 'Chat Migration',
+    description: 'Extract complete conversation history from AI coding tools and export as JSONL files',
+    scan: 'Scan',
+    scanning: 'Scanning...',
+    extract: 'Extract',
+    extracting: 'Extracting...',
+    export: 'Export',
+    exporting: 'Exporting...',
+    exportAll: 'Export All',
+    exportSelected: 'Export Selected',
+    conversations: 'conversations',
+    messages: 'messages',
+    noData: 'No data detected',
+    notInstalled: 'Not installed',
+    detected: 'Detected',
+    dataPath: 'Data path',
+    scanFirst: 'Please scan data sources first',
+    scanComplete: 'Scan complete',
+    extractComplete: 'Extraction complete',
+    exportComplete: 'Export complete',
+    exportSuccess: 'Successfully exported {count} conversations to {path}',
+    exportFailed: 'Export failed',
+    noConversations: 'No conversations to export',
+    selectExportPath: 'Select export path',
+    totalConversations: 'Total Conversations',
+    totalMessages: 'Total Messages',
+    preview: 'Preview',
+    close: 'Close',
+    user: 'User',
+    assistant: 'Assistant',
+    source: 'Source',
+    createdAt: 'Created at',
+    toolUse: 'Tool calls',
+    extractAll: 'Extract All',
+    extractAllDesc: 'Extract conversations from all available tools',
+    clear: 'Clear',
+    clearAll: 'Clear All',
+    confirmClear: 'Are you sure you want to clear all extracted conversations?',
+    fileFormat: 'File format',
+    jsonl: 'JSONL (one conversation per line)',
+    // Import
+    importFile: 'Import File',
+    importDesc: 'Import conversations from a JSONL file exported from another computer',
+    importSuccess: 'Import complete: {imported} new, {skipped} skipped (duplicate)',
+    importFailed: 'Import failed',
+    imported: 'Imported',
+    skippedDup: 'Skipped (duplicate)',
+    viewImported: 'View Imported',
+    noImportedData: 'No imported conversations',
+    clearImported: 'Clear Imported',
+    confirmClearImported: 'Are you sure you want to clear all imported migration conversations?',
+    clearedImported: 'All imported data cleared',
+    // Tool names
+    tools: {
+      cursor: 'Cursor',
+      claude: 'Claude Code',
+      codex: 'Codex',
+      windsurf: 'Windsurf',
+      trae: 'Trae',
+      trae_cn: 'Trae CN'
+    }
+  },
+
+  // Dev Environment Management
+  devenv: {
+    title: 'Dev Environment Management',
+    subtitle: 'Detect, install and switch local development environments (Global Top 10)',
+    detecting: 'Detecting...',
+    detectAll: 'Detect All',
+    refresh: 'Refresh',
+    installed: 'Installed',
+    notInstalled: 'Not Installed',
+    currentVersion: 'Current Version',
+    noVersion: 'None',
+    versionManager: 'Version Manager',
+    managerInstalled: 'Installed v{version}',
+    managerNotInstalled: 'Not Installed',
+    installManager: 'Install Manager',
+    installing: 'Installing...',
+    installedVersions: 'Installed Versions',
+    switchVersion: 'Switch Version',
+    switching: 'Switching...',
+    installVersion: 'Install Version',
+    installingVersion: 'Installing...',
+    recommendedVersions: 'Recommended Versions',
+    forClaude: 'For Claude',
+    stableVersion: 'Stable',
+    customVersion: 'Custom Version',
+    customVersionPlaceholder: 'Enter version, e.g. 20.18.1',
+    switchSuccess: 'Switch successful',
+    switchFailed: 'Switch failed',
+    installSuccess: 'Installation successful',
+    installFailed: 'Installation failed',
+    managerInstallSuccess: 'Manager installed successfully',
+    managerInstallFailed: 'Manager installation failed',
+    detectFailed: 'Detection failed',
+    uninstall: 'Uninstall',
+    uninstalling: 'Uninstalling...',
+    uninstallSuccess: 'Uninstalled successfully',
+    uninstallFailed: 'Uninstall failed',
+    uninstallManager: 'Uninstall Manager',
+    managerUninstalling: 'Uninstalling...',
+    managerUninstallFailed: 'Manager uninstall failed',
+    operationLog: 'Operation Log',
+    noLogs: 'No logs',
+    clearLogs: 'Clear Logs'
   }
 }

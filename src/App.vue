@@ -190,7 +190,7 @@ function cancelCloseDialog() {
 // 动态更新文档标题
 watchEffect(() => {
   document.title = t('app.title')
-  document.documentElement.lang = locale.value === 'zh-CN' ? 'zh-CN' : 'en'
+  document.documentElement.lang = locale.value
 })
 
 // Theme state
@@ -219,11 +219,6 @@ const navItems = computed(() => [
     icon: 'robot' // oh-my-opencode 图标
   },
   { 
-    name: t('nav.backup'),
-    path: '/backup', 
-    icon: 'save' // 保存/备份图标
-  },
-  { 
     name: t('nav.status'), 
     path: '/status', 
     icon: 'activity' // 状态/活动图标
@@ -236,6 +231,16 @@ const toolNavItems = computed(() => [
     name: t('nav.usage'),
     path: '/usage',
     icon: 'activity'
+  },
+  {
+    name: t('nav.devenv'),
+    path: '/devenv',
+    icon: 'code' // 编程环境管理移动到工具分组
+  },
+  { 
+    name: t('nav.backup'),
+    path: '/backup', 
+    icon: 'save' // 备份（含对话迁移）
   }
 ])
 
@@ -451,20 +456,12 @@ onUnmounted(() => {
       <!-- Page View -->
       <div class="flex-1 overflow-auto p-6">
         <router-view v-slot="{ Component }">
-          <transition 
-            enter-active-class="transition-opacity duration-150 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-100 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-            mode="out-in"
-          >
-            <!-- 使用 KeepAlive 缓存所有页面组件，避免重复创建和数据加载 -->
+          <template v-if="Component">
+            <!-- 为彻底解决切换空白问题，去掉过渡动画，仅使用 KeepAlive 保持状态 -->
             <KeepAlive :max="10">
-              <component :is="Component" :key="route.path" />
+              <component :is="Component" :key="route.fullPath" />
             </KeepAlive>
-          </transition>
+          </template>
         </router-view>
       </div>
     </main>
@@ -516,3 +513,6 @@ onUnmounted(() => {
     <DeepLinkDialog ref="deepLinkDialogRef" />
   </div>
 </template>
+
+<style scoped>
+</style>

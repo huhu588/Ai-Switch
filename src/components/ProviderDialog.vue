@@ -8,6 +8,7 @@ import {
   PROVIDER_PRESETS, 
   getModelsByType,
   getNpmPackageByProtocol,
+  getProtocolDisplayName,
   type ApiProtocol
 } from '@/config/providerPresets'
 import { MODEL_TYPES, type ModelType } from '@/config/modelTypes'
@@ -119,17 +120,17 @@ const modelGuidance = computed(() => {
   if (hasOpencode && hasCli) {
     return {
       type: 'info',
-      message: '需要添加模型。OpenCode 使用模型列表，CLI 工具将使用第一个模型作为默认模型。'
+      message: t('provider.modelGuidanceBoth')
     }
   } else if (hasOpencode) {
     return {
       type: 'required',
-      message: 'OpenCode 需要模型列表才能正常工作，请添加至少一个模型。'
+      message: t('provider.modelGuidanceOpencode')
     }
   } else if (hasCli) {
     return {
       type: 'optional',
-      message: 'CLI 工具只需要 API Key 和 Base URL，模型可选（将使用工具默认模型）。'
+      message: t('provider.modelGuidanceCli')
     }
   }
   return null
@@ -195,7 +196,12 @@ function onModelTypeChange(typeId: ModelType) {
   form.value.protocol = protocolMap[typeId] || 'anthropic'
 }
 
+// 标记是否正在加载编辑数据（防止 watcher 干扰编辑模式初始化）
+const isLoadingEditData = ref(false)
+
 watch(() => form.value.model_type, (newType) => {
+  // 编辑模式加载数据期间，不要让 watcher 覆盖状态
+  if (isLoadingEditData.value) return
   if (currentPreset.value?.name === '智谱 AI') return
   selectedModels.value = presetModels.value.map(m => m.id)
   
@@ -247,7 +253,7 @@ function onUrlKeydown(e: KeyboardEvent) {
 
 async function testSingleUrl(url: string) {
   if (!form.value.api_key) {
-    error.value = '请先填写 API Key'
+    error.value = t('provider.apiKeyRequiredFirst')
     return
   }
   
@@ -272,7 +278,7 @@ async function testSingleUrl(url: string) {
     }
   } catch (e) {
     console.error('测试失败:', e)
-    error.value = `测试失败: ${String(e)}`
+    error.value = t('provider.testFailed', { error: String(e) })
   } finally {
     testingUrl.value = null
   }
@@ -280,12 +286,12 @@ async function testSingleUrl(url: string) {
 
 async function testAllUrls() {
   if (!form.value.api_key) {
-    error.value = '请先填写 API Key'
+    error.value = t('provider.apiKeyRequiredFirst')
     return
   }
   
   if (baseUrls.value.length === 0) {
-    error.value = '请先添加 URL'
+    error.value = t('provider.urlRequiredFirst')
     return
   }
   
@@ -317,7 +323,7 @@ async function testAllUrls() {
     }
   } catch (e) {
     console.error('测试失败:', e)
-    error.value = `测试失败: ${String(e)}`
+    error.value = t('provider.testFailed', { error: String(e) })
   } finally {
     testing.value = false
   }
@@ -326,7 +332,7 @@ async function testAllUrls() {
 function autoSelectFastest() {
   const tested = baseUrls.value.filter(u => u.latency_ms !== null)
   if (tested.length === 0) {
-    error.value = '没有可用的测试结果'
+    error.value = t('provider.noTestResults')
     return
   }
   
@@ -349,12 +355,12 @@ function getQualityColor(quality: string) {
 
 function getQualityLabel(quality: string) {
   switch (quality) {
-    case 'excellent': return '优秀'
-    case 'good': return '良好'
-    case 'fair': return '一般'
-    case 'poor': return '较差'
-    case 'failed': return '失败'
-    default: return '未测试'
+    case 'excellent': return t('provider.quality.excellent')
+    case 'good': return t('provider.quality.good')
+    case 'fair': return t('provider.quality.fair')
+    case 'poor': return t('provider.quality.poor')
+    case 'failed': return t('provider.quality.failed')
+    default: return t('provider.quality.untested')
   }
 }
 
@@ -406,7 +412,7 @@ async function confirmDeleteModel() {
     existingModels.value = existingModels.value.filter(m => m.id !== deleteModelTarget.value)
   } catch (e) {
     console.error('删除模型失败:', e)
-    error.value = `删除模型失败: ${String(e)}`
+    error.value = t('provider.deleteModelFailed', { error: String(e) })
   }
   
   showDeleteModelDialog.value = false
@@ -427,7 +433,7 @@ async function addModelToExisting() {
     customModelInput.value = ''
   } catch (e) {
     console.error('添加模型失败:', e)
-    error.value = `添加模型失败: ${String(e)}`
+    error.value = t('provider.addModelFailed', { error: String(e) })
   }
 }
 
@@ -438,6 +444,7 @@ async function addModelToExisting() {
 watch(() => props.visible, async (visible) => {
   if (visible && props.editing) {
     // 编辑模式
+    isLoadingEditData.value = true
     try {
       const provider = await invoke<any>('get_provider', { name: props.editing })
       if (provider) {
@@ -482,21 +489,50 @@ watch(() => props.visible, async (visible) => {
         
         selectedPreset.value = '自定义'
         autoAddModels.value = false
+        customModels.value = []
+        customModelInput.value = ''
+        showApiKey.value = false
+        saveToOpenSwitch.value = true
         
         // 加载已有模型
         const models = await invoke<ModelItem[]>('get_models', { providerName: props.editing })
         existingModels.value = models
         
-        // 设置默认应用目标（编辑模式下默认只应用到 opencode）
+        // 从 Ai Switch 统一配置中读取之前保存的应用目标
         const modelType = provider.model_type || inferredModelType
-        const defaultTargets = ['opencode']
-        if (modelType === 'claude') defaultTargets.unshift('claude_code')
-        else if (modelType === 'codex') defaultTargets.unshift('codex')
-        else if (modelType === 'gemini') defaultTargets.unshift('gemini')
-        applyTargets.value = defaultTargets
+        let restoredTargets: string[] | null = null
+        try {
+          const allUnifiedProviders = await invoke<any[]>('get_open_switch_providers')
+          const matched = allUnifiedProviders.find((p: any) => p.name === props.editing)
+          if (matched && matched.apps) {
+            const targets: string[] = []
+            if (matched.apps.opencode) targets.push('opencode')
+            if (matched.apps.claude) targets.push('claude_code')
+            if (matched.apps.codex) targets.push('codex')
+            if (matched.apps.gemini) targets.push('gemini')
+            if (targets.length > 0) {
+              restoredTargets = targets
+            }
+          }
+        } catch (e) {
+          console.warn('读取统一配置失败，使用默认应用目标:', e)
+        }
+        
+        if (restoredTargets) {
+          applyTargets.value = restoredTargets
+        } else {
+          // 未找到统一配置记录时，使用默认值
+          const defaultTargets = ['opencode']
+          if (modelType === 'claude') defaultTargets.unshift('claude_code')
+          else if (modelType === 'codex') defaultTargets.unshift('codex')
+          else if (modelType === 'gemini') defaultTargets.unshift('gemini')
+          applyTargets.value = defaultTargets
+        }
       }
     } catch (e) {
       console.error('加载 Provider 失败:', e)
+    } finally {
+      isLoadingEditData.value = false
     }
   } else if (visible) {
     // 新增模式
@@ -510,6 +546,8 @@ watch(() => props.visible, async (visible) => {
     baseUrls.value = []
     activeBaseUrl.value = ''
     existingModels.value = []
+    showApiKey.value = false
+    saveToOpenSwitch.value = true
     
     // 设置默认应用目标
     const defaultTargets = ['opencode']
@@ -552,7 +590,7 @@ async function save() {
     return
   }
   if (baseUrls.value.length === 0) {
-    error.value = '请至少添加一个 Base URL'
+    error.value = t('provider.baseUrlRequired')
     return
   }
   
@@ -562,7 +600,7 @@ async function save() {
                     existingModels.value.length > 0
   
   if (applyTargets.value.includes('opencode') && !hasModels) {
-    error.value = 'OpenCode 需要至少一个模型，请添加模型或取消勾选 OpenCode'
+    error.value = t('provider.opencodeModelRequired')
     return
   }
 
@@ -741,36 +779,54 @@ async function save() {
           opencodeModels[modelId] = { name: modelDef?.name || modelId }
         }
         
-        await invoke('add_open_switch_provider', {
-          input: {
-            name: form.value.name,
-            base_url: activeUrl,
-            api_key: form.value.api_key,
-            apps: {
-              opencode: applyTargets.value.includes('opencode'),
-              claude: applyTargets.value.includes('claude_code'),
-              codex: applyTargets.value.includes('codex'),
-              gemini: applyTargets.value.includes('gemini'),
-            },
-            models: {
-              opencode: applyTargets.value.includes('opencode') ? {
-                npm: getNpmPackageByProtocol(form.value.protocol),
-                models: opencodeModels,
-              } : undefined,
-              claude: applyTargets.value.includes('claude_code') ? {
-                model: firstModelId,
-              } : undefined,
-              codex: applyTargets.value.includes('codex') ? {
-                model: firstModelId,
-                reasoning_effort: 'high',
-              } : undefined,
-              gemini: applyTargets.value.includes('gemini') ? {
-                model: firstModelId,
-              } : undefined,
-            },
-            notes: form.value.description || undefined,
+        const unifiedInput = {
+          name: form.value.name,
+          base_url: activeUrl,
+          api_key: form.value.api_key,
+          apps: {
+            opencode: applyTargets.value.includes('opencode'),
+            claude: applyTargets.value.includes('claude_code'),
+            codex: applyTargets.value.includes('codex'),
+            gemini: applyTargets.value.includes('gemini'),
+          },
+          models: {
+            opencode: applyTargets.value.includes('opencode') ? {
+              npm: getNpmPackageByProtocol(form.value.protocol),
+              models: opencodeModels,
+            } : undefined,
+            claude: applyTargets.value.includes('claude_code') ? {
+              model: firstModelId,
+            } : undefined,
+            codex: applyTargets.value.includes('codex') ? {
+              model: firstModelId,
+              reasoning_effort: 'high',
+            } : undefined,
+            gemini: applyTargets.value.includes('gemini') ? {
+              model: firstModelId,
+            } : undefined,
+          },
+          notes: form.value.description || undefined,
+        }
+        
+        // 编辑模式下，查找已有的统一配置记录并更新
+        if (props.editing) {
+          try {
+            const allUnifiedProviders = await invoke<any[]>('get_open_switch_providers')
+            const existing = allUnifiedProviders.find((p: any) => p.name === props.editing)
+            if (existing) {
+              await invoke('update_open_switch_provider', {
+                input: { ...unifiedInput, id: existing.id }
+              })
+            } else {
+              await invoke('add_open_switch_provider', { input: unifiedInput })
+            }
+          } catch (e) {
+            // 如果查找失败，降级为新增
+            await invoke('add_open_switch_provider', { input: unifiedInput })
           }
-        })
+        } else {
+          await invoke('add_open_switch_provider', { input: unifiedInput })
+        }
       } catch (e) {
         console.warn('保存到 Ai Switch 统一配置失败:', e)
         // 不中断整个流程
@@ -825,7 +881,7 @@ async function save() {
                         ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
                         : 'border-border text-primary hover:border-purple-400 hover:bg-surface-hover']"
                   >
-                    自定义配置
+                    {{ t('provider.customConfig') }}
                   </button>
                   <button
                     v-for="preset in flatPresets"
@@ -845,14 +901,14 @@ async function save() {
                   <button type="button" @click="openApiKeyUrl"
                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 transition-all shadow-md hover:shadow-lg">
                     <SvgIcon name="key" :size="16" />
-                    <span>获取 API Key</span>
+                    <span>{{ t('provider.getApiKey') }}</span>
                   </button>
                 </div>
               </div>
 
               <!-- 模型提供商 -->
               <div class="space-y-2">
-                <label class="block text-sm font-medium">模型提供商</label>
+                <label class="block text-sm font-medium">{{ t('provider.modelProvider') }}</label>
                 <div class="flex flex-wrap gap-2">
                   <button
                     v-for="type in MODEL_TYPES"
@@ -872,7 +928,7 @@ async function save() {
 
               <!-- 应用目标选择 -->
               <div class="space-y-2">
-                <label class="block text-sm font-medium">应用到</label>
+                <label class="block text-sm font-medium">{{ t('provider.applyTo') }}</label>
                 <div class="flex flex-wrap gap-3">
                   <label
                     v-for="target in availableTargets"
@@ -892,7 +948,7 @@ async function save() {
                     <span class="text-sm font-medium">{{ target.label }}</span>
                   </label>
                 </div>
-                <p class="text-xs text-muted-foreground">选择要将此服务商配置应用到的工具</p>
+                <p class="text-xs text-muted-foreground">{{ t('provider.applyToHint') }}</p>
               </div>
 
               <!-- 保存到 Ai Switch 统一配置 -->
@@ -933,10 +989,10 @@ async function save() {
               <!-- Base URL 管理 -->
               <div class="space-y-2 border-t border-border pt-4">
                 <div class="flex items-center justify-between">
-                  <label class="text-sm font-medium">Base URL 列表</label>
+                  <label class="text-sm font-medium">{{ t('provider.baseUrlList') }}</label>
                   <label class="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" v-model="autoAddV1Suffix" class="w-3.5 h-3.5 rounded text-accent-500" />
-                    <span class="text-xs text-muted-foreground">自动添加 /v1 后缀</span>
+                    <span class="text-xs text-muted-foreground">{{ t('provider.autoAddV1Suffix') }}</span>
                   </label>
                 </div>
                 
@@ -968,7 +1024,7 @@ async function save() {
                         <span v-if="urlConfig.latency_ms !== null" :class="['text-xs font-medium', getQualityColor(urlConfig.quality)]">
                           {{ urlConfig.latency_ms }}ms · {{ getQualityLabel(urlConfig.quality) }}
                         </span>
-                        <span v-else class="text-xs text-gray-400">未测试</span>
+                        <span v-else class="text-xs text-gray-400">{{ t('provider.quality.untested') }}</span>
                         <button type="button" @click.stop="testSingleUrl(urlConfig.url)" :disabled="testingUrl === urlConfig.url"
                           class="p-1 hover:bg-surface-hover rounded transition-colors">
 <SvgIcon v-if="testingUrl === urlConfig.url" name="loading" :size="14" class="animate-spin" />
@@ -990,9 +1046,9 @@ async function save() {
                       class="flex-1 px-3 py-2 text-sm rounded-lg border border-border hover:bg-surface-hover disabled:opacity-50 transition-colors">
                       <span v-if="testing" class="flex items-center justify-center gap-2">
                         <SvgIcon name="loading" :size="14" class="animate-spin" />
-                        测试中...
+                        {{ t('provider.testing') }}
                       </span>
-                      <span v-else>测试所有 URL</span>
+                      <span v-else>{{ t('provider.testAllUrls') }}</span>
                     </button>
                   </div>
                   <!-- 自动选择最快 URL 开关 -->
@@ -1002,7 +1058,7 @@ async function save() {
                       v-model="autoSelectFastestEnabled"
                       class="w-4 h-4 rounded text-blue-500"
                     />
-                    <span class="text-sm">自动选择最快 URL</span>
+                    <span class="text-sm">{{ t('provider.autoSelectFastest') }}</span>
                   </label>
                 </div>
               </div>
@@ -1013,7 +1069,7 @@ async function save() {
                 <div class="flex gap-4">
                   <label v-for="protocol in supportedProtocols" :key="protocol" class="flex items-center gap-2 cursor-pointer">
                     <input type="radio" :value="protocol" v-model="form.protocol" class="w-4 h-4 text-accent-500" />
-                    <span class="text-sm">{{ protocol === 'anthropic' ? 'Anthropic 协议' : 'OpenAI 协议' }}</span>
+                    <span class="text-sm">{{ protocol === 'anthropic' ? t('provider.protocolAnthropic') : protocol === 'openai-compatible' ? t('provider.protocolOpenAICompat') : t('provider.protocolOpenAI') }}</span>
                   </label>
                 </div>
               </div>
@@ -1028,7 +1084,7 @@ async function save() {
 
             <!-- 右侧：模型管理 -->
             <div class="w-1/2 flex flex-col border-l border-border pl-6">
-              <h4 class="text-lg font-semibold mb-2">模型管理</h4>
+              <h4 class="text-lg font-semibold mb-2">{{ t('provider.modelManagement') }}</h4>
               
               <!-- 模型提示信息 -->
               <div v-if="modelGuidance && !editing" 
@@ -1045,7 +1101,7 @@ async function save() {
               <div v-if="editing" class="flex-1 flex flex-col gap-4 min-h-0">
                 <div class="flex-1 overflow-y-auto space-y-2">
                   <div v-if="existingModels.length === 0" class="text-center py-8 text-muted-foreground">
-                    暂无模型
+                    {{ t('provider.noModels') }}
                   </div>
                   <div v-for="model in existingModels" :key="model.id"
                     class="p-3 rounded-lg border border-border hover:border-accent-500/50 transition-all flex items-center justify-between">
@@ -1062,14 +1118,14 @@ async function save() {
                 
                 <!-- 添加模型 -->
                 <div class="flex-shrink-0 space-y-2 border-t border-border pt-4">
-                  <label class="block text-sm font-medium">添加模型</label>
+                  <label class="block text-sm font-medium">{{ t('provider.addModel') }}</label>
                   <div class="flex gap-2">
                     <input v-model="customModelInput" type="text" placeholder="输入模型 ID"
                       @keydown="e => e.key === 'Enter' && addModelToExisting()"
                       class="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-primary text-sm font-mono" />
                     <button type="button" @click="addModelToExisting" :disabled="!customModelInput.trim()"
                       class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-                      添加
+                      {{ t('common.add') }}
                     </button>
                   </div>
                 </div>
@@ -1081,18 +1137,18 @@ async function save() {
                 <div>
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" v-model="autoAddModels" class="w-4 h-4 rounded text-accent-500" />
-                    <span class="text-sm font-medium">自动添加预设模型</span>
+                    <span class="text-sm font-medium">{{ t('provider.autoAddPresetModels') }}</span>
                     <span v-if="needsModels && !autoAddModels && customModels.length === 0" 
-                      class="text-xs text-amber-500">(推荐)</span>
+                      class="text-xs text-amber-500">({{ t('common.recommended') }})</span>
                   </label>
                   
                   <div v-if="autoAddModels" class="mt-3 space-y-2">
                     <div class="flex items-center justify-between">
                       <span class="text-xs text-muted-foreground">
-                        已选择 {{ selectedModels.length }} / {{ presetModels.length }} 个预设模型
+                        {{ t('provider.selectedPresetModels', { selected: selectedModels.length, total: presetModels.length }) }}
                       </span>
                       <button type="button" @click="toggleAllModels" class="text-xs text-accent-500 hover:underline">
-                        {{ selectedModels.length === presetModels.length ? '取消全选' : '全选' }}
+                        {{ selectedModels.length === presetModels.length ? t('provider.unselectAll') : t('provider.selectAll') }}
                       </button>
                     </div>
                     <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 rounded-lg bg-surface">
@@ -1106,7 +1162,7 @@ async function save() {
                 
                 <!-- 自定义模型添加 -->
                 <div class="border-t border-border pt-4">
-                  <label class="block text-sm font-medium mb-2">添加自定义模型</label>
+                  <label class="block text-sm font-medium mb-2">{{ t('provider.addCustomModel') }}</label>
                   <div class="flex gap-2">
                     <input v-model="customModelInput" type="text" placeholder="输入模型名称，如 gpt-4o-mini"
                       @keydown="onCustomModelKeydown"
@@ -1120,10 +1176,10 @@ async function save() {
                   <div v-if="customModels.length > 0" class="mt-3">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-xs text-muted-foreground">
-                        已添加 {{ customModels.length }} 个自定义模型
+                        {{ t('provider.customModelsAdded', { count: customModels.length }) }}
                       </span>
                       <button type="button" @click="customModels = []" class="text-xs text-red-500 hover:underline">
-                        清空全部
+                        {{ t('provider.clearAllModels') }}
                       </button>
                     </div>
                     <div class="flex flex-wrap gap-2">

@@ -22,6 +22,26 @@ pub struct GeminiMcpServer {
     pub url: Option<String>,
 }
 
+/// Gemini security.auth 配置结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GeminiSecurityAuth {
+    #[serde(rename = "selectedType", skip_serializing_if = "Option::is_none")]
+    pub selected_type: Option<String>,
+    /// 其他未知字段保留
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
+/// Gemini security 配置结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GeminiSecurity {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<GeminiSecurityAuth>,
+    /// 其他未知字段保留
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
 /// Gemini settings.json 配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GeminiSettings {
@@ -29,6 +49,9 @@ pub struct GeminiSettings {
     pub auth_mode: Option<String>,
     #[serde(rename = "mcpServers", default, skip_serializing_if = "HashMap::is_empty")]
     pub mcp_servers: HashMap<String, GeminiMcpServer>,
+    /// security 配置（包含 auth.selectedType）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security: Option<GeminiSecurity>,
     /// 其他未知字段保留
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
@@ -354,6 +377,66 @@ impl GeminiConfigManager {
         env.google_gemini_base_url = None;
         env.gemini_model = None;
         self.write_env(&env)
+    }
+
+    /// 设置认证类型为 API Key 模式（跳过 OAuth 登录）
+    /// 写入 settings.json 中的 security.auth.selectedType: "gemini-api-key"
+    pub fn set_api_key_auth_mode(&self) -> Result<(), String> {
+        self.set_auth_selected_type("gemini-api-key")
+    }
+
+    /// 设置认证类型为 OAuth 模式（Google 官方）
+    /// 写入 settings.json 中的 security.auth.selectedType: "oauth-personal"
+    pub fn set_oauth_auth_mode(&self) -> Result<(), String> {
+        self.set_auth_selected_type("oauth-personal")
+    }
+
+    /// 设置 security.auth.selectedType
+    fn set_auth_selected_type(&self, selected_type: &str) -> Result<(), String> {
+        self.ensure_gemini_dir()?;
+        
+        let mut settings = self.read_settings()?;
+        
+        // 确保 security 存在
+        if settings.security.is_none() {
+            settings.security = Some(GeminiSecurity::default());
+        }
+        
+        // 确保 security.auth 存在
+        if let Some(ref mut security) = settings.security {
+            if security.auth.is_none() {
+                security.auth = Some(GeminiSecurityAuth::default());
+            }
+            
+            // 设置 selectedType
+            if let Some(ref mut auth) = security.auth {
+                auth.selected_type = Some(selected_type.to_string());
+            }
+        }
+        
+        self.write_settings(&settings)
+    }
+
+    /// 获取当前认证类型
+    pub fn get_auth_selected_type(&self) -> Result<Option<String>, String> {
+        let settings = self.read_settings()?;
+        Ok(settings
+            .security
+            .and_then(|s| s.auth)
+            .and_then(|a| a.selected_type))
+    }
+
+    /// 清除认证类型设置
+    pub fn clear_auth_selected_type(&self) -> Result<(), String> {
+        let mut settings = self.read_settings()?;
+        
+        if let Some(ref mut security) = settings.security {
+            if let Some(ref mut auth) = security.auth {
+                auth.selected_type = None;
+            }
+        }
+        
+        self.write_settings(&settings)
     }
 }
 

@@ -28,6 +28,19 @@ pub struct OhMyStatus {
     pub ohmy_installed: bool,
     /// 当前配置
     pub config: Option<OhMyConfig>,
+    /// oh-my-opencode 版本信息
+    pub version_info: Option<OhMyVersionInfo>,
+}
+
+/// oh-my-opencode 版本信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OhMyVersionInfo {
+    /// 当前安装的版本
+    pub current_version: Option<String>,
+    /// 远程最新版本
+    pub latest_version: Option<String>,
+    /// 是否有更新
+    pub has_update: bool,
 }
 
 /// oh-my-opencode 配置结构
@@ -169,6 +182,152 @@ fn read_ohmy_config() -> Option<OhMyConfig> {
     serde_json::from_str(&content).ok()
 }
 
+/// 获取当前安装的 oh-my-opencode 版本
+fn get_installed_ohmy_version() -> Option<String> {
+    // 优先使用 bun 检查
+    if let Some(bun_path) = get_bun_path() {
+        #[cfg(target_os = "windows")]
+        let output = Command::new("cmd")
+            .args(["/C", &bun_path.to_string_lossy(), "pm", "ls", "-g"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        
+        #[cfg(not(target_os = "windows"))]
+        let output = Command::new(&bun_path)
+            .args(["pm", "ls", "-g"])
+            .output();
+        
+        if let Ok(out) = output {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                // 解析 bun pm ls 输出，查找 oh-my-opencode
+                for line in stdout.lines() {
+                    if line.contains("oh-my-opencode") {
+                        // 匹配版本号，如 "oh-my-opencode@3.4.0"
+                        if let Some(version) = extract_version_from_line(line) {
+                            return Some(version);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // 回退使用 npm list
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd")
+        .args(["/C", "npm", "list", "-g", "oh-my-opencode", "--depth=0"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new("npm")
+        .args(["list", "-g", "oh-my-opencode", "--depth=0"])
+        .output();
+    
+    if let Ok(out) = output {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        // 解析 npm list 输出，如 "oh-my-opencode@3.4.0"
+        for line in stdout.lines() {
+            if line.contains("oh-my-opencode@") {
+                if let Some(version) = extract_version_from_line(line) {
+                    return Some(version);
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+/// 从输出行中提取版本号
+fn extract_version_from_line(line: &str) -> Option<String> {
+    // 匹配模式如 "oh-my-opencode@3.4.0" 或 "oh-my-opencode@^3.4.0"
+    if let Some(pos) = line.find("oh-my-opencode@") {
+        let start = pos + "oh-my-opencode@".len();
+        let rest = &line[start..];
+        // 跳过可能的前缀如 ^ 或 ~
+        let version_start = rest.chars().position(|c| c.is_ascii_digit()).unwrap_or(0);
+        let version_end = rest[version_start..]
+            .chars()
+            .position(|c| !c.is_ascii_digit() && c != '.')
+            .map(|p| version_start + p)
+            .unwrap_or(rest.len());
+        let version = &rest[version_start..version_end];
+        if !version.is_empty() {
+            return Some(version.to_string());
+        }
+    }
+    None
+}
+
+/// 获取 npm 上最新的 oh-my-opencode 版本
+fn get_latest_ohmy_version() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd")
+        .args(["/C", "npm", "view", "oh-my-opencode", "version"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new("npm")
+        .args(["view", "oh-my-opencode", "version"])
+        .output();
+    
+    match output {
+        Ok(out) if out.status.success() => {
+            let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !version.is_empty() {
+                Some(version)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// 比较版本号，返回 true 如果 latest > current
+fn is_newer_version(current: &str, latest: &str) -> bool {
+    let parse_version = |v: &str| -> Vec<u32> {
+        v.split('.')
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect()
+    };
+    
+    let current_parts = parse_version(current);
+    let latest_parts = parse_version(latest);
+    
+    for i in 0..std::cmp::max(current_parts.len(), latest_parts.len()) {
+        let c = current_parts.get(i).copied().unwrap_or(0);
+        let l = latest_parts.get(i).copied().unwrap_or(0);
+        if l > c {
+            return true;
+        } else if l < c {
+            return false;
+        }
+    }
+    false
+}
+
+/// 获取 oh-my-opencode 版本信息
+fn get_ohmy_version_info() -> Option<OhMyVersionInfo> {
+    let current_version = get_installed_ohmy_version();
+    let latest_version = get_latest_ohmy_version();
+    
+    let has_update = match (&current_version, &latest_version) {
+        (Some(current), Some(latest)) => is_newer_version(current, latest),
+        (None, Some(_)) => true, // 未安装但有最新版本
+        _ => false,
+    };
+    
+    Some(OhMyVersionInfo {
+        current_version,
+        latest_version,
+        has_update,
+    })
+}
+
 /// 检测 oh-my-opencode 安装状态
 #[tauri::command]
 pub async fn check_ohmy_status() -> Result<OhMyStatus, String> {
@@ -176,6 +335,7 @@ pub async fn check_ohmy_status() -> Result<OhMyStatus, String> {
     let npm_installed = check_npm_installed();
     let ohmy_installed = check_ohmy_installed();
     let config = if ohmy_installed { read_ohmy_config() } else { None };
+    let version_info = get_ohmy_version_info();
     
     Ok(OhMyStatus {
         bun_installed,
@@ -183,6 +343,7 @@ pub async fn check_ohmy_status() -> Result<OhMyStatus, String> {
         npm_installed,
         ohmy_installed,
         config,
+        version_info,
     })
 }
 
@@ -385,51 +546,78 @@ fn get_bun_path() -> Option<PathBuf> {
     None
 }
 
-/// 安装 oh-my-opencode (需要 Bun 运行时)
+/// 安装 oh-my-opencode (全局安装，方便版本管理)
 #[tauri::command]
 pub async fn install_ohmy() -> Result<String, String> {
-    // 尝试获取 Bun 的完整路径（处理刚安装但还没加入 PATH 的情况）
+    let mut log = String::new();
+    
+    // 尝试获取 Bun 的完整路径
     let bun_cmd = if let Some(bun_path) = get_bun_path() {
         bun_path.to_string_lossy().to_string()
     } else {
-        // 回退到使用系统 PATH 中的 bun
         "bun".to_string()
     };
     
-    // 使用 bun x 而不是 bunx（更可靠）
+    // 步骤 1: 全局安装 oh-my-opencode
+    log.push_str("正在全局安装 oh-my-opencode...\n");
+    
     #[cfg(target_os = "windows")]
-    let output = Command::new("cmd")
-        .args(["/C", &bun_cmd, "x", "oh-my-opencode", "install"])
-        .creation_flags(CREATE_NO_WINDOW) // 隐藏终端窗口
+    let install_output = Command::new("cmd")
+        .args(["/C", &bun_cmd, "add", "-g", "oh-my-opencode@latest"])
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
     
     #[cfg(not(target_os = "windows"))]
-    let output = Command::new(&bun_cmd)
-        .args(["x", "oh-my-opencode", "install"])
+    let install_output = Command::new(&bun_cmd)
+        .args(["add", "-g", "oh-my-opencode@latest"])
         .output();
     
-    match output {
+    match install_output {
         Ok(out) => {
             let stdout = String::from_utf8_lossy(&out.stdout).to_string();
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             
+            if !out.status.success() {
+                return Err(format!(
+                    "全局安装 oh-my-opencode 失败\n退出码: {:?}\n输出: {}\n错误: {}",
+                    out.status.code(), stdout, stderr
+                ));
+            }
+            log.push_str(&format!("✓ 全局安装完成\n{}", stdout));
+        }
+        Err(e) => return Err(format!("执行 bun add 失败: {}", e)),
+    }
+    
+    // 步骤 2: 运行 oh-my-opencode install 配置插件
+    log.push_str("正在配置 oh-my-opencode 插件...\n");
+    
+    #[cfg(target_os = "windows")]
+    let config_output = Command::new("cmd")
+        .args(["/C", &bun_cmd, "x", "oh-my-opencode", "install"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    
+    #[cfg(not(target_os = "windows"))]
+    let config_output = Command::new(&bun_cmd)
+        .args(["x", "oh-my-opencode", "install"])
+        .output();
+    
+    match config_output {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+            
             if out.status.success() {
-                Ok(format!("✓ oh-my-opencode 安装成功\n{}", stdout))
+                log.push_str(&format!("✓ oh-my-opencode 配置完成\n{}", stdout));
+                Ok(log)
             } else {
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                 Err(format!(
-                    "bun x oh-my-opencode install 失败\n退出码: {:?}\n输出: {}\n错误: {}\n\n使用的 Bun 路径: {}",
-                    out.status.code(),
-                    stdout,
-                    stderr,
-                    bun_cmd
+                    "{}\n\noh-my-opencode install 失败\n输出: {}\n错误: {}",
+                    log, stdout, stderr
                 ))
             }
         }
-        Err(e) => Err(format!(
-            "执行 bun 命令失败: {}\n\n使用的路径: {}\n\n请重启应用后再试，或手动将 Bun 添加到 PATH 环境变量。",
-            e,
-            bun_cmd
-        )),
+        Err(e) => Err(format!("{}\n\n执行 oh-my-opencode install 失败: {}", log, e)),
     }
 }
 
@@ -568,4 +756,91 @@ pub async fn uninstall_ohmy() -> Result<String, String> {
     
     log.push_str("oh-my-opencode 卸载完成！\n");
     Ok(log)
+}
+
+/// 更新 oh-my-opencode 到最新版本
+#[tauri::command]
+pub async fn update_ohmy() -> Result<String, String> {
+    let mut log = String::new();
+    
+    // 获取当前版本和最新版本
+    let current = get_installed_ohmy_version();
+    let latest = get_latest_ohmy_version();
+    
+    log.push_str(&format!("当前版本: {}\n", current.as_deref().unwrap_or("未安装")));
+    log.push_str(&format!("最新版本: {}\n", latest.as_deref().unwrap_or("未知")));
+    
+    // 使用 bun add -g 全局更新
+    if let Some(bun_path) = get_bun_path() {
+        log.push_str("正在使用 bun 全局更新...\n");
+        
+        #[cfg(target_os = "windows")]
+        let output = Command::new("cmd")
+            .args(["/C", &bun_path.to_string_lossy(), "add", "-g", "oh-my-opencode@latest"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+        
+        #[cfg(not(target_os = "windows"))]
+        let output = Command::new(&bun_path)
+            .args(["add", "-g", "oh-my-opencode@latest"])
+            .output();
+        
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                
+                if out.status.success() {
+                    log.push_str(&format!("✓ 更新成功\n{}\n", stdout));
+                    
+                    // 确认新版本
+                    if let Some(new_ver) = get_installed_ohmy_version() {
+                        log.push_str(&format!("当前版本: {}\n", new_ver));
+                    }
+                    
+                    return Ok(log);
+                } else {
+                    log.push_str(&format!("bun 更新失败: {}\n{}", stdout, stderr));
+                }
+            }
+            Err(e) => {
+                log.push_str(&format!("bun 命令执行失败: {}\n", e));
+            }
+        }
+    }
+    
+    // 回退使用 npm
+    log.push_str("正在使用 npm 全局更新...\n");
+    
+    #[cfg(target_os = "windows")]
+    let output = Command::new("cmd")
+        .args(["/C", "npm", "install", "-g", "oh-my-opencode@latest"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new("npm")
+        .args(["install", "-g", "oh-my-opencode@latest"])
+        .output();
+    
+    match output {
+        Ok(out) => {
+            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+            
+            if out.status.success() {
+                log.push_str(&format!("✓ 更新成功\n{}\n", stdout));
+                
+                // 确认新版本
+                if let Some(new_ver) = get_installed_ohmy_version() {
+                    log.push_str(&format!("当前版本: {}\n", new_ver));
+                }
+                
+                Ok(log)
+            } else {
+                Err(format!("更新失败:\n{}\n{}\n{}", log, stdout, stderr))
+            }
+        }
+        Err(e) => Err(format!("执行 npm 命令失败: {}\n{}", e, log)),
+    }
 }

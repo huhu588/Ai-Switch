@@ -98,13 +98,13 @@ async function fillMissingModels() {
     }
     
     if (successCount > 0) {
-      successMessage.value = `已补齐 ${successCount} 个服务商模型`
+      successMessage.value = t('deployed.modelsFixedSuccess', { count: successCount })
     } else if (failedNames.length === 0) {
-      successMessage.value = '没有需要补齐的服务商'
+      successMessage.value = t('deployed.noProvidersToFix')
     }
     
     if (failedNames.length > 0) {
-      error.value = `补齐失败: ${failedNames.join(', ')}`
+      error.value = t('deployed.modelsFixFailed', { names: failedNames.join(', ') })
     }
     
     await store.loadProviders()
@@ -204,7 +204,7 @@ function getSourceLabel(provider: DeployedProviderItem): string {
   }
   // 外部工具来源
   if (provider.tool === 'cc_switch') {
-    return '外部工具'
+    return t('deployed.externalTool')
   }
   if (provider.tool && provider.tool !== 'opencode') {
     return getToolLabel(provider.tool)
@@ -261,7 +261,7 @@ async function deleteProviderByTool(provider: DeployedProviderItem) {
     default:
       // 其他来源尝试通用删除
       console.warn('未知的工具来源:', tool)
-      error.value = `无法删除来源为 "${tool}" 的服务商`
+      error.value = t('deployed.cannotDeleteSource', { tool })
       throw new Error('未知来源')
   }
 }
@@ -300,7 +300,7 @@ async function removeAll() {
     // 重新加载列表
     await loadData()
     if (failedNames.length > 0) {
-      error.value = `部分删除失败: ${failedNames.join(', ')}`
+      error.value = t('deployed.partialDeleteFailed', { names: failedNames.join(', ') })
     }
   } catch (e) {
     error.value = String(e)
@@ -326,7 +326,7 @@ async function importProvider(modelType: string) {
         name: provider.name,
         api_key: provider.api_key || '', // 使用获取到的 API Key，如果没有则为空
         base_url: provider.base_url,
-        description: `从 ${getToolLabel(provider.tool)} 导入`,
+        description: t('deployed.importedFrom', { tool: getToolLabel(provider.tool) }),
         model_type: modelType
       })
       await addPresetModels(provider.name, modelType, provider.base_url)
@@ -380,7 +380,7 @@ async function importSelected() {
             name: provider.name,
             api_key: provider.api_key || '',
             base_url: provider.base_url,
-            description: `从 ${getToolLabel(provider.tool)} 导入`,
+            description: t('deployed.importedFrom', { tool: getToolLabel(provider.tool) }),
             model_type: modelType
           })
           await addPresetModels(provider.name, modelType, provider.base_url)
@@ -400,8 +400,8 @@ async function importSelected() {
     
     // 显示结果提示
     const parts: string[] = []
-    if (successCount > 0) parts.push(`成功导入 ${successCount} 个`)
-    if (skipCount > 0) parts.push(`跳过已存在 ${skipCount} 个`)
+    if (successCount > 0) parts.push(t('deployed.importedSuccess', { count: successCount }))
+    if (skipCount > 0) parts.push(t('deployed.skippedExisting', { count: skipCount }))
     
     if (parts.length > 0) {
       successMessage.value = parts.join('，')
@@ -464,13 +464,13 @@ async function importSelected() {
             <div v-else class="space-y-2">
               <div class="flex items-center justify-between mb-3">
                 <p class="text-sm text-muted-foreground">
-                  点击选择要导入的服务商（已选 {{ selectedProviders.size }} 个）
+                  {{ t('deployed.selectProvidersToImport', { count: selectedProviders.size }) }}
                 </p>
                 <button 
                   @click="toggleSelectAll"
                   class="text-xs text-accent hover:underline"
                 >
-                  {{ selectedProviders.size === deployedProviders.length ? '取消全选' : '全选' }}
+                  {{ selectedProviders.size === deployedProviders.length ? t('deployed.deselectAll') : t('deployed.selectAll') }}
                 </button>
               </div>
               
@@ -519,10 +519,10 @@ async function importSelected() {
                         · {{ provider.current_model }}
                       </template>
                       <template v-else-if="provider.api_key">
-                        · 已配置 API Key
+                        · {{ t('deployed.apiKeyConfigured') }}
                       </template>
                       <template v-else-if="provider.tool && provider.tool !== 'opencode'">
-                        · 已配置
+                        · {{ t('deployed.configured') }}
                       </template>
                     </div>
                   </div>
@@ -571,7 +571,7 @@ async function importSelected() {
               :disabled="fixingModels || syncingAll || deleting !== null"
               class="px-4 py-2 text-sm font-medium rounded-lg text-emerald-600 border border-emerald-600/30 hover:bg-emerald-600/10 disabled:opacity-50 transition-colors"
             >
-              {{ fixingModels ? t('common.loading') : '一键补齐模型' }}
+              {{ fixingModels ? t('common.loading') : t('deployed.fillMissingModels') }}
             </button>
             <div class="flex-1"></div>
             <button
@@ -580,7 +580,7 @@ async function importSelected() {
               :disabled="syncingAll || deleting !== null || fixingModels"
               class="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
-              {{ syncingAll ? t('common.loading') : `确认导入 (${selectedProviders.size})` }}
+              {{ syncingAll ? t('common.loading') : t('deployed.confirmImport', { count: selectedProviders.size }) }}
             </button>
           </div>
         </div>
@@ -592,9 +592,9 @@ async function importSelected() {
       <div v-if="showModelTypeDialog" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" @click.self="showModelTypeDialog = false">
         <div class="w-full max-w-sm rounded-xl bg-background border border-border shadow-xl animate-slide-up">
           <div class="px-5 py-4 border-b border-border">
-            <h3 class="font-semibold text-lg">选择模型类型</h3>
+            <h3 class="font-semibold text-lg">{{ t('deployed.selectModelType') }}</h3>
             <p class="text-sm text-muted-foreground mt-1">
-              为 <span class="font-medium text-foreground">{{ importingProvider?.name }}</span> 选择所属的模型类型
+              {{ t('deployed.selectModelTypeFor', { name: importingProvider?.name }) }}
             </p>
           </div>
           
@@ -605,7 +605,7 @@ async function importSelected() {
               class="w-full px-4 py-3 text-left rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-colors disabled:opacity-50"
             >
               <div class="font-medium">Claude</div>
-              <div class="text-xs text-muted-foreground mt-0.5">Anthropic Claude 模型</div>
+              <div class="text-xs text-muted-foreground mt-0.5">{{ t('deployed.claudeModelDesc') }}</div>
             </button>
             
             <button
@@ -614,7 +614,7 @@ async function importSelected() {
               class="w-full px-4 py-3 text-left rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-colors disabled:opacity-50"
             >
               <div class="font-medium">Codex</div>
-              <div class="text-xs text-muted-foreground mt-0.5">OpenAI GPT / Codex 模型</div>
+              <div class="text-xs text-muted-foreground mt-0.5">{{ t('deployed.codexModelDesc') }}</div>
             </button>
             
             <button
@@ -623,7 +623,7 @@ async function importSelected() {
               class="w-full px-4 py-3 text-left rounded-lg border border-border hover:border-accent hover:bg-accent/5 transition-colors disabled:opacity-50"
             >
               <div class="font-medium">Gemini</div>
-              <div class="text-xs text-muted-foreground mt-0.5">Google Gemini 模型</div>
+              <div class="text-xs text-muted-foreground mt-0.5">{{ t('deployed.geminiModelDesc') }}</div>
             </button>
           </div>
           

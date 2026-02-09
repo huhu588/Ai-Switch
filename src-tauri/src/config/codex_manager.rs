@@ -48,6 +48,8 @@ pub struct CodexConfig {
     pub mcp_servers: HashMap<String, CodexMcpServer>,
     pub forced_login_method: Option<String>,
     pub forced_chatgpt_workspace_id: Option<String>,
+    /// 是否跳过 OAuth 登录，直接使用 API Key
+    pub skip_oauth_login: Option<bool>,
 }
 
 /// Codex Provider 信息（用于 Ai Switch 管理）
@@ -375,6 +377,58 @@ impl CodexConfigManager {
     /// 检查 Codex 是否已配置
     pub fn is_configured(&self) -> bool {
         self.auth_json.exists() || self.config_toml.exists()
+    }
+
+    /// 设置 API Key 并跳过 OAuth 登录
+    /// 这会在 auth.json 中写入 API Key 并配置 model_provider
+    pub fn set_api_key_skip_oauth(
+        &self,
+        api_key: &str,
+        base_url: &str,
+        provider_name: &str,
+    ) -> Result<(), String> {
+        self.ensure_codex_dir()?;
+        
+        // 写入 auth.json
+        let mut auth = self.read_auth()?;
+        auth.other.insert(
+            "apiKey".to_string(),
+            serde_json::Value::String(api_key.to_string()),
+        );
+        self.write_auth(&auth)?;
+        
+        // 配置 model_provider
+        let provider = CodexModelProvider {
+            name: provider_name.to_string(),
+            base_url: base_url.to_string(),
+            env_key: Some("OPENAI_API_KEY".to_string()),
+            requires_openai_auth: Some(false),
+        };
+        
+        let mut config = self.read_config()?;
+        config.model_providers.insert(provider_name.to_string(), provider);
+        // 设置凭据存储方式为 file（避免 keyring 的问题）
+        config.cli_auth_credentials_store = Some("file".to_string());
+        self.write_config(&config)?;
+        
+        Ok(())
+    }
+
+    /// 清除 API Key 配置（恢复 OAuth 登录）
+    pub fn clear_api_key(&self) -> Result<(), String> {
+        let mut auth = self.read_auth()?;
+        auth.other.remove("apiKey");
+        self.write_auth(&auth)
+    }
+
+    /// 获取当前 API Key
+    pub fn get_api_key(&self) -> Result<Option<String>, String> {
+        let auth = self.read_auth()?;
+        Ok(auth
+            .other
+            .get("apiKey")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()))
     }
 }
 

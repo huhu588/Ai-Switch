@@ -60,6 +60,9 @@ pub struct ClaudeMcpServer {
 pub struct ClaudeJsonConfig {
     #[serde(rename = "mcpServers", default, skip_serializing_if = "HashMap::is_empty")]
     pub mcp_servers: HashMap<String, ClaudeMcpServer>,
+    /// 是否已完成首次启动引导（跳过登录确认）
+    #[serde(rename = "hasCompletedOnboarding", default, skip_serializing_if = "Option::is_none")]
+    pub has_completed_onboarding: Option<bool>,
     /// 其他未知字段保留
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
@@ -302,6 +305,41 @@ impl ClaudeCodeConfigManager {
     /// 检查 Claude Code 是否已配置
     pub fn is_configured(&self) -> bool {
         self.settings_json.exists() || self.claude_json.exists()
+    }
+
+    /// 设置 hasCompletedOnboarding 为 true（跳过首次登录确认）
+    /// 这会在 ~/.claude.json 中写入 hasCompletedOnboarding: true
+    pub fn set_has_completed_onboarding(&self) -> Result<bool, String> {
+        let mut config = self.read_claude_json()?;
+        
+        // 如果已经是 true，则无需再次写入
+        if config.has_completed_onboarding == Some(true) {
+            return Ok(false);
+        }
+        
+        config.has_completed_onboarding = Some(true);
+        self.write_claude_json(&config)?;
+        Ok(true)
+    }
+
+    /// 清除 hasCompletedOnboarding（恢复首次登录确认）
+    pub fn clear_has_completed_onboarding(&self) -> Result<bool, String> {
+        let mut config = self.read_claude_json()?;
+        
+        // 如果本来就没有该字段，则无需删除
+        if config.has_completed_onboarding.is_none() {
+            return Ok(false);
+        }
+        
+        config.has_completed_onboarding = None;
+        self.write_claude_json(&config)?;
+        Ok(true)
+    }
+
+    /// 获取 hasCompletedOnboarding 状态
+    pub fn get_has_completed_onboarding(&self) -> Result<bool, String> {
+        let config = self.read_claude_json()?;
+        Ok(config.has_completed_onboarding.unwrap_or(false))
     }
 }
 

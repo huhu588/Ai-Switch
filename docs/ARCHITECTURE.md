@@ -1,10 +1,10 @@
 # Ai Switch 架构设计
 
-> 版本: v1.4.0 | 更新: 2026-01-29
+> 版本: v1.6.0 | 更新: 2026-02-09
 
 ## 概述
 
-Ai Switch 是一个用于管理 OpenCode 配置的桌面应用工具，支持多 Provider、MCP 服务器、技能 (Skills)、规则 (Rule) 的统一管理，以及配置的备份与恢复。
+Ai Switch 是一个用于管理 AI 编程助手配置的桌面应用工具，支持 OpenCode、Claude Code、Codex CLI、Gemini CLI、Cursor 等多工具的 Provider、Model、MCP 服务器、技能 (Skills)、规则 (Rule) 的统一管理，以及使用统计、代理服务、配置备份与对话迁移。
 
 ## 技术栈
 
@@ -58,11 +58,12 @@ src/
 │
 ├── views/                   # 页面视图
 │   ├── ProvidersView.vue    # Provider 管理页
-│   ├── McpView.vue          # MCP 服务器管理页
+│   ├── McpView.vue          # MCP 服务器和规则管理页
 │   ├── SkillView.vue        # 技能管理页
-│   ├── OhMyView.vue         # Oh My 规则管理页
-│   ├── BackupView.vue       # 备份恢复页
-│   └── StatusView.vue       # 状态信息页
+│   ├── OhMyView.vue         # oh-my-opencode 管理页
+│   ├── StatusView.vue       # 状态信息和应用设置页
+│   ├── UsageView.vue        # 使用统计和代理服务页
+│   └── BackupView.vue       # 备份恢复和对话迁移页
 │
 ├── stores/                  # Pinia 状态库
 │   └── providers.ts         # Provider/Model 状态
@@ -101,11 +102,21 @@ src-tauri/src/
 │   ├── mcp.rs               # MCP 服务器命令
 │   ├── skills.rs            # Skills 管理命令
 │   ├── rule.rs              # Rule 管理命令
-│   ├── ohmy.rs              # Oh My 规则命令
+│   ├── ohmy.rs              # oh-my-opencode 命令
 │   ├── deeplink.rs          # 深链接处理命令
 │   ├── settings.rs          # 设置相关命令
 │   ├── backup.rs            # 备份导入导出命令
-│   └── status.rs            # 状态信息命令
+│   ├── status.rs            # 状态信息命令
+│   ├── claude_code.rs       # Claude Code 集成命令
+│   ├── codex.rs             # Codex CLI 集成命令
+│   ├── gemini.rs            # Gemini CLI 集成命令
+│   ├── proxy.rs             # 代理服务命令
+│   ├── usage.rs             # 使用统计命令
+│   ├── local_logs.rs        # 本地日志导入命令
+│   ├── chat_migration.rs    # 对话迁移命令
+│   ├── speedtest.rs         # 延迟测试命令
+│   ├── prompts.rs           # Prompts 管理命令
+│   └── open_switch.rs       # Ai Switch 统一配置命令
 │
 ├── config/                  # 配置管理模块
 │   ├── mod.rs               # 模块导出 + ConfigError
@@ -218,6 +229,7 @@ pub struct ConfigManager {
 |------|------|
 | `create_backup` | 创建备份数据 |
 | `export_backup` | 导出备份到文件 |
+| `export_backup_filtered` | 精细化导出（按名称过滤） |
 | `preview_backup` | 预览备份文件 |
 | `import_backup` | 导入备份 |
 
@@ -227,6 +239,34 @@ pub struct ConfigManager {
 | `get_status` | 获取应用状态 |
 | `get_version` | 获取版本信息 |
 | `get_local_ip` | 获取本地 IP |
+
+### CLI 工具集成命令
+| 命令 | 说明 |
+|------|------|
+| `get_claude_code_status` | 获取 Claude Code 状态 |
+| `apply_provider_to_claude_code` | 应用配置到 Claude Code |
+| `get_codex_status` | 获取 Codex CLI 状态 |
+| `apply_provider_to_codex` | 应用配置到 Codex CLI |
+| `get_gemini_status` | 获取 Gemini CLI 状态 |
+| `apply_provider_to_gemini` | 应用配置到 Gemini CLI |
+
+### 使用统计和代理命令
+| 命令 | 说明 |
+|------|------|
+| `get_usage_summary` | 获取使用概览 |
+| `get_usage_trend` | 获取使用趋势 |
+| `start_proxy` | 启动代理服务 |
+| `stop_proxy` | 停止代理服务 |
+| `scan_local_logs` | 扫描本地日志 |
+| `import_local_logs` | 导入本地日志 |
+
+### 对话迁移命令
+| 命令 | 说明 |
+|------|------|
+| `scan_chat_sources` | 扫描对话数据源 |
+| `extract_conversations` | 提取对话记录 |
+| `export_conversations` | 导出对话为 JSONL |
+| `import_migration_file` | 导入对话 JSONL |
 
 ## 前端状态管理
 
@@ -259,11 +299,12 @@ interface State {
 | 路径 | 视图 | 说明 |
 |------|------|------|
 | `/` | ProvidersView | Provider 和 Model 管理 (默认页) |
-| `/mcp` | McpView | MCP 服务器管理 |
+| `/mcp` | McpView | MCP 服务器和规则管理 |
 | `/skills` | SkillView | Skills 技能管理 |
-| `/ohmy` | OhMyView | Oh My 规则管理 |
-| `/backup` | BackupView | 备份与恢复 |
-| `/status` | StatusView | 状态信息 |
+| `/ohmy` | OhMyView | oh-my-opencode 管理 |
+| `/status` | StatusView | 状态信息和应用设置 |
+| `/usage` | UsageView | 使用统计和代理服务 |
+| `/backup` | BackupView | 备份恢复和对话迁移 |
 
 ## 配置文件说明
 

@@ -19,6 +19,8 @@ pub mod usage;
 pub mod proxy;
 pub mod open_switch;
 pub mod local_logs;
+pub mod chat_migration;
+pub mod devenv;
 
 pub use backup::*;
 pub use provider::*;
@@ -39,3 +41,5 @@ pub use usage::*;
 pub use proxy::*;
 pub use open_switch::*;
 pub use local_logs::*;
+pub use chat_migration::*;
+pub use devenv::*;

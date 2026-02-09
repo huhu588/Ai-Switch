@@ -146,3 +146,33 @@ pub async fn clear_gemini_config() -> Result<(), String> {
     let manager = GeminiConfigManager::new()?;
     manager.clear_provider_config()
 }
+
+/// 设置 Gemini 认证模式为 API Key（跳过 OAuth 登录）
+/// 写入 settings.json 中的 security.auth.selectedType: "gemini-api-key"
+#[tauri::command]
+pub async fn set_gemini_api_key_auth_mode() -> Result<(), String> {
+    let manager = GeminiConfigManager::new()?;
+    manager.set_api_key_auth_mode()
+}
+
+/// 设置 Gemini 认证模式为 OAuth（Google 官方）
+/// 写入 settings.json 中的 security.auth.selectedType: "oauth-personal"
+#[tauri::command]
+pub async fn set_gemini_oauth_auth_mode() -> Result<(), String> {
+    let manager = GeminiConfigManager::new()?;
+    manager.set_oauth_auth_mode()
+}
+
+/// 获取 Gemini 当前认证类型
+#[tauri::command]
+pub async fn get_gemini_auth_selected_type() -> Result<Option<String>, String> {
+    let manager = GeminiConfigManager::new()?;
+    manager.get_auth_selected_type()
+}
+
+/// 清除 Gemini 认证类型设置
+#[tauri::command]
+pub async fn clear_gemini_auth_selected_type() -> Result<(), String> {
+    let manager = GeminiConfigManager::new()?;
+    manager.clear_auth_selected_type()
+}

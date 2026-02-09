@@ -56,12 +56,12 @@ function getLatencyColor(provider: ProviderItem) {
 function handleSpeedTest(providerName: string) {
   testingProvider.value = providerName
   emit('speedTest', providerName)
-  // 3秒后重置状态（实际测试完成后应由父组件控制）
+  // 10秒后自动重置状态（兜底保护，正常情况由父组件通过 setTestingComplete 控制）
   setTimeout(() => {
     if (testingProvider.value === providerName) {
       testingProvider.value = null
     }
-  }, 5000)
+  }, 10000)
 }
 
 // 获取所有标识（已部署的工具）
@@ -73,7 +73,7 @@ function getToolBadges(provider: ProviderItem) {
   
   if (props.deployedToolsMap) {
     // 检查所有 base_url
-    const urlsToCheck = [provider.base_url, ...provider.base_urls.map(u => u.url)]
+    const urlsToCheck = [provider.base_url, ...(provider.base_urls || []).map(u => u.url)]
     
     for (const url of urlsToCheck) {
       const tools = props.deployedToolsMap.get(url)
@@ -199,7 +199,7 @@ defineExpose({
         @click="emit('apply')"
         :disabled="providers.length === 0"
         class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-surface hover:bg-surface-hover hover:border-accent/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 group"
-        :title="`应用全部 ${providers.length} 个服务商配置`"
+        :title="t('provider.applyAllProviders', { count: providers.length })"
       >
         <SvgIcon name="check" :size="12" class="group-hover:text-accent transition-colors" />
         <span>{{ t('provider.apply') }}</span>
@@ -255,7 +255,7 @@ defineExpose({
                 {{ badge.label }}
               </span>
               <span v-if="!provider.enabled" class="text-[10px] text-muted-foreground bg-surface px-1 rounded">
-                已禁用
+                {{ t('provider.disabled') }}
               </span>
               <!-- 显示当前 URL 的延迟 -->
               <span 
@@ -273,7 +273,7 @@ defineExpose({
                 @click.stop="handleSpeedTest(provider.name)"
                 :disabled="testingProvider === provider.name"
                 class="rounded p-1.5 text-blue-500 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
-                :title="testingProvider === provider.name ? '测速中...' : '测试延迟'"
+                :title="testingProvider === provider.name ? t('provider.speedTesting') : t('provider.testLatency')"
               >
                 <SvgIcon 
                   :name="testingProvider === provider.name ? 'loading' : 'activity'" 
@@ -286,7 +286,7 @@ defineExpose({
                 @click.stop="emit('toggle', provider.name, !provider.enabled)"
                 class="rounded p-1.5 transition-colors relative"
                 :class="provider.enabled ? 'text-green-500 hover:bg-green-500/10' : 'text-gray-400 hover:bg-gray-500/10'"
-                :title="provider.enabled ? '点击禁用' : '点击启用'"
+                :title="provider.enabled ? t('provider.clickToDisable') : t('provider.clickToEnable')"
               >
                 <!-- 开关样式 -->
                 <div 

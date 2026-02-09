@@ -154,3 +154,26 @@ pub async fn clear_claude_code_config() -> Result<(), String> {
     
     manager.write_settings(&settings)
 }
+
+/// 设置 Claude Code 跳过首次登录确认
+/// 写入 ~/.claude.json 中的 hasCompletedOnboarding: true
+#[tauri::command]
+pub async fn set_claude_code_skip_onboarding() -> Result<bool, String> {
+    let manager = ClaudeCodeConfigManager::new()?;
+    manager.set_has_completed_onboarding()
+}
+
+/// 清除 Claude Code 跳过首次登录确认
+/// 删除 ~/.claude.json 中的 hasCompletedOnboarding 字段
+#[tauri::command]
+pub async fn clear_claude_code_skip_onboarding() -> Result<bool, String> {
+    let manager = ClaudeCodeConfigManager::new()?;
+    manager.clear_has_completed_onboarding()
+}
+
+/// 获取 Claude Code 跳过首次登录确认状态
+#[tauri::command]
+pub async fn get_claude_code_skip_onboarding() -> Result<bool, String> {
+    let manager = ClaudeCodeConfigManager::new()?;
+    manager.get_has_completed_onboarding()
+}

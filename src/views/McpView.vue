@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -212,6 +213,16 @@ const selectedRule = ref<InstalledRule | null>(null)
 const selectedRuleContent = ref<string>('')
 const rulesLoading = ref(false)
 
+// 确认对话框相关
+const showDeleteRuleDialog = ref(false)
+const deleteRuleTarget = ref<{name: string, paths: string[]} | null>(null)
+const showDeleteMcpFromAllDialog = ref(false)
+const deleteMcpFromAllTarget = ref<string | null>(null)
+const showDeleteRuleFromAllDialog = ref(false)
+const deleteRuleFromAllTarget = ref<string | null>(null)
+const showDeleteMcpServerDialog = ref(false)
+const deleteMcpServerTarget = ref<string | null>(null)
+
 // 去重后的规则（聚合同名规则的部署状态）
 interface UniqueRule extends InstalledRule {
   deployedTo: string[]  // 部署到哪些应用
@@ -278,25 +289,28 @@ async function loadInstalledRules() {
 }
 
 // 删除规则（删除所有副本）
-async function deleteInstalledRule(rule: InstalledRule) {
+function deleteInstalledRule(rule: InstalledRule) {
   // 获取该规则的所有副本路径
   const uniqueRule = uniqueInstalledRules.value.find(r => r.name === rule.name) as UniqueRule | undefined
   const pathsToDelete = uniqueRule?.allPaths || [{ path: rule.path }]
   
-  const confirmMsg = pathsToDelete.length > 1 
-    ? `确定要从所有应用中删除规则 "${rule.name}" 吗？（共 ${pathsToDelete.length} 个副本）`
-    : t('rule.deleteConfirm', { name: rule.name })
-  
-  if (!confirm(confirmMsg)) return
+  deleteRuleTarget.value = { name: rule.name, paths: pathsToDelete.map(p => p.path) }
+  showDeleteRuleDialog.value = true
+}
+
+// 确认删除规则
+async function confirmDeleteInstalledRule() {
+  if (!deleteRuleTarget.value) return
+  const { name, paths } = deleteRuleTarget.value
   
   try {
     // 删除所有副本
-    for (const { path } of pathsToDelete) {
+    for (const path of paths) {
       await invoke('delete_rule', { path })
     }
-    installMessage.value = t('rule.deleted', { name: rule.name })
+    installMessage.value = t('rule.deleted', { name })
     await loadInstalledRules()
-    if (selectedRule.value?.name === rule.name) {
+    if (selectedRule.value?.name === name) {
       selectedRule.value = uniqueInstalledRules.value[0] || null
     }
     setTimeout(() => { installMessage.value = '' }, 3000)
@@ -365,17 +379,9 @@ async function saveEditedRule() {
 
 // 获取位置标签
 function getLocationLabel(location: string): string {
-  const labels: Record<string, string> = {
-    'global_opencode': 'OpenCode',
-    'project_opencode': 'OpenCode 项目',
-    'project_root': '根目录',
-    'global_claude': 'Claude',
-    'project_claude': 'Claude 项目',
-    'global_cursor': 'Cursor',
-    'global_codex': 'Codex',
-    'global_gemini': 'Gemini'
-  }
-  return labels[location] || location
+  const key = `mcp.locationLabels.${location}`
+  const translated = t(key)
+  return translated !== key ? translated : location
 }
 
 // 选中规则时加载内容
@@ -500,25 +506,32 @@ async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex
     mcpStats.value = await invoke<McpStats>('get_mcp_stats')
   } catch (e) {
     console.error('切换 MCP 应用状态失败:', e)
-    installMessage.value = '切换失败: ' + ((e as any)?.message || String(e))
+    installMessage.value = t('mcp.toggleFailed', { error: (e as any)?.message || String(e) })
   } finally {
     togglingMcp.value = null
   }
 }
 
 // 从所有应用删除 MCP
-async function deleteMcpFromAll(mcp: ManagedMcp) {
-  if (!confirm(`确定要从所有应用中删除 "${mcp.name}" 吗？`)) return
+function deleteMcpFromAll(mcp: ManagedMcp) {
+  deleteMcpFromAllTarget.value = mcp.name
+  showDeleteMcpFromAllDialog.value = true
+}
+
+// 确认从所有应用删除 MCP
+async function confirmDeleteMcpFromAll() {
+  if (!deleteMcpFromAllTarget.value) return
+  const name = deleteMcpFromAllTarget.value
   
   try {
-    await invoke('delete_mcp_from_all', { mcpName: mcp.name })
+    await invoke('delete_mcp_from_all', { mcpName: name })
     await loadManagedMcps()
     await loadServers()
     await loadAppsMcpStatus()
-    installMessage.value = `已删除 ${mcp.name}`
+    installMessage.value = t('mcp.deleted', { name })
   } catch (e) {
     console.error('删除 MCP 失败:', e)
-    installMessage.value = '删除失败: ' + ((e as any)?.message || String(e))
+    installMessage.value = t('mcp.deleteFailed', { error: (e as any)?.message || String(e) })
   }
 }
 
@@ -585,24 +598,31 @@ async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'co
     ruleStats.value = await invoke<RuleStats>('get_rule_stats')
   } catch (e) {
     console.error('切换规则应用状态失败:', e)
-    installMessage.value = '切换失败: ' + ((e as any)?.message || String(e))
+    installMessage.value = t('rule.toggleFailed', { error: (e as any)?.message || String(e) })
   } finally {
     togglingRule.value = null
   }
 }
 
 // 从所有应用删除规则
-async function deleteRuleFromAll(rule: ManagedRule) {
-  if (!confirm(`确定要从所有应用中删除 "${rule.name}" 吗？`)) return
+function deleteRuleFromAll(rule: ManagedRule) {
+  deleteRuleFromAllTarget.value = rule.name
+  showDeleteRuleFromAllDialog.value = true
+}
+
+// 确认从所有应用删除规则
+async function confirmDeleteRuleFromAll() {
+  if (!deleteRuleFromAllTarget.value) return
+  const name = deleteRuleFromAllTarget.value
   
   try {
-    await invoke('delete_rule_from_all', { ruleName: rule.name })
+    await invoke('delete_rule_from_all', { ruleName: name })
     await loadManagedRules()
     await loadInstalledRules()
-    installMessage.value = `已删除 ${rule.name}`
+    installMessage.value = t('rule.deleted', { name })
   } catch (e) {
     console.error('删除规则失败:', e)
-    installMessage.value = '删除失败: ' + ((e as any)?.message || String(e))
+    installMessage.value = t('rule.deleteFailed', { error: (e as any)?.message || String(e) })
   }
 }
 
@@ -643,7 +663,7 @@ async function checkServerHealth(name: string) {
     const result = await invoke<McpHealthResult>('check_mcp_server_health', { name })
     healthStatus.value[name] = result
   } catch (e) {
-    healthStatus.value[name] = { healthy: false, message: '检查失败' }
+    healthStatus.value[name] = { healthy: false, message: t('mcp.healthCheckFailed') }
   }
 }
 
@@ -657,8 +677,16 @@ async function toggleServer(name: string) {
 }
 
 // 删除 MCP 服务器
-async function deleteMcpServer(name: string) {
-  if (!confirm(t('mcp.deleteConfirm', { name }))) return
+function deleteMcpServer(name: string) {
+  deleteMcpServerTarget.value = name
+  showDeleteMcpServerDialog.value = true
+}
+
+// 确认删除 MCP 服务器
+async function confirmDeleteMcpServer() {
+  if (!deleteMcpServerTarget.value) return
+  const name = deleteMcpServerTarget.value
+  
   try {
     await invoke('delete_mcp_server', { name })
     installMessage.value = t('mcp.serverDeleted', { name })
@@ -1236,17 +1264,9 @@ async function addCustomRule() {
 
 // 获取规则分类标签
 function getRuleCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    'code_style': '代码风格',
-    'project': '项目结构',
-    'review': '代码审查',
-    'testing': '测试',
-    'workflow': '工作流',
-    'api': 'API',
-    'security': '安全',
-    'documentation': '文档'
-  }
-  return labels[category] || category
+  const key = `rule.categoryLabels.${category}`
+  const translated = t(key)
+  return translated !== key ? translated : category
 }
 
 onMounted(() => {
@@ -1410,7 +1430,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
             <div v-else-if="servers.length === 0" class="p-6 text-center text-muted-foreground">
               <SvgIcon name="terminal" :size="32" class="mx-auto mb-2 opacity-30" />
               <p class="text-sm">{{ t('mcp.noServers') }}</p>
-              <p class="text-xs mt-1">点击右上角添加 MCP 服务器</p>
+              <p class="text-xs mt-1">{{ t('mcp.clickToAddServer') }}</p>
             </div>
             <ul v-else class="p-2 space-y-1">
               <li
@@ -1461,7 +1481,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
             <div v-else-if="uniqueInstalledRules.length === 0" class="p-6 text-center text-muted-foreground">
               <SvgIcon name="code" :size="32" class="mx-auto mb-2 opacity-30" />
               <p class="text-sm">{{ t('rule.noRules') }}</p>
-              <p class="text-xs mt-1">点击右上角添加规则</p>
+              <p class="text-xs mt-1">{{ t('rule.clickToAddRule') }}</p>
             </div>
             <ul v-else class="p-2 space-y-1">
               <li
@@ -1643,7 +1663,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
             
             <!-- 部署状态 -->
             <div class="p-3 rounded-lg bg-surface/50 border border-border">
-              <span class="text-xs text-muted-foreground block mb-2">已部署到</span>
+              <span class="text-xs text-muted-foreground block mb-2">{{ t('rule.deployedTo') }}</span>
               <div class="flex flex-wrap gap-2">
                 <span 
                   v-for="app in (selectedRuleDeployment?.deployedTo || [getLocationLabel(selectedRule.location)])" 
@@ -1664,7 +1684,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
             
             <!-- 规则内容预览 -->
             <div class="space-y-2">
-              <span class="text-sm font-medium">{{ t('rule.content') || '规则内容' }}</span>
+              <span class="text-sm font-medium">{{ t('rule.ruleContent') }}</span>
               <div class="bg-surface/50 border border-border rounded-lg p-4 max-h-[350px] overflow-auto">
                 <pre class="text-sm font-mono whitespace-pre-wrap text-muted-foreground leading-relaxed">{{ selectedRuleContent || selectedRule.description }}</pre>
               </div>
@@ -1730,7 +1750,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="font-semibold">{{ server.name }}</span>
-                    <span v-if="installedRecommended.has(server.name)" class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500">已安装</span>
+                    <span v-if="installedRecommended.has(server.name)" class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500">{{ t('mcp.installed') }}</span>
                     <a 
                       :href="server.url" 
                       target="_blank"
@@ -2285,7 +2305,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                 <div class="flex-1 min-w-0">
                   <h3 class="font-semibold text-foreground">{{ mcp.name }}</h3>
                   <p class="text-sm text-muted-foreground mt-1 truncate">
-                    {{ mcp.package_name || (mcp.command ? mcp.command.join(' ') : mcp.url) || '暂无描述' }}
+                    {{ mcp.package_name || (mcp.command ? mcp.command.join(' ') : mcp.url) || t('common.noDescription') }}
                   </p>
                   <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded" 
                         :class="mcp.server_type === 'local' ? 'bg-accent/20 text-accent' : 'bg-violet-500/20 text-violet-400'">
@@ -2465,7 +2485,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                 <!-- 左侧：名称和描述 -->
                 <div class="flex-1 min-w-0">
                   <h3 class="font-semibold text-foreground">{{ rule.name }}</h3>
-                  <p class="text-sm text-muted-foreground mt-1 line-clamp-2">{{ rule.description || '暂无描述' }}</p>
+                  <p class="text-sm text-muted-foreground mt-1 line-clamp-2">{{ rule.description || t('common.noDescription') }}</p>
                   <span class="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-violet-500/20 text-violet-400">
                     {{ rule.rule_type }}
                   </span>
@@ -2590,5 +2610,47 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
         </div>
       </div>
     </Teleport>
+
+    <!-- 删除规则确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteRuleDialog"
+      :title="t('confirm.deleteTitle')"
+      :message="deleteRuleTarget ? (deleteRuleTarget.paths.length > 1
+        ? t('rule.deleteFromAllConfirmMultiple', { name: deleteRuleTarget.name, count: deleteRuleTarget.paths.length })
+        : t('rule.deleteConfirm', { name: deleteRuleTarget.name })) : ''"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="confirmDeleteInstalledRule"
+    />
+
+    <!-- 从所有应用删除 MCP 确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteMcpFromAllDialog"
+      :title="t('confirm.deleteTitle')"
+      :message="deleteMcpFromAllTarget ? t('mcp.deleteFromAllConfirm', { name: deleteMcpFromAllTarget }) : ''"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="confirmDeleteMcpFromAll"
+    />
+
+    <!-- 从所有应用删除规则确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteRuleFromAllDialog"
+      :title="t('confirm.deleteTitle')"
+      :message="deleteRuleFromAllTarget ? t('rule.deleteFromAllConfirm', { name: deleteRuleFromAllTarget }) : ''"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="confirmDeleteRuleFromAll"
+    />
+
+    <!-- 删除 MCP 服务器确认对话框 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteMcpServerDialog"
+      :title="t('confirm.deleteTitle')"
+      :message="deleteMcpServerTarget ? t('mcp.deleteConfirm', { name: deleteMcpServerTarget }) : ''"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="confirmDeleteMcpServer"
+    />
   </div>
 </template>

@@ -6,14 +6,18 @@
 
 ## 功能特性
 
-- **Provider 管理** - 多 Provider 配置，支持 OpenAI、Claude、Gemini 等
+- **Provider 管理** - 多 Provider 配置，支持 OpenAI、Claude、Gemini 等，多 URL 管理与自动测速
 - **Model 管理** - 模型列表管理，支持从站点自动获取可用模型
-- **MCP 服务器** - MCP 服务器配置与管理
-- **技能管理** - 安装和管理 OpenCode 技能
-- **规则管理** - 自定义规则配置
+- **多工具集成** - 统一管理 OpenCode、Claude Code、Codex CLI、Gemini CLI、Cursor 配置
+- **MCP 服务器** - MCP 服务器配置与管理，支持跨工具同步
+- **技能管理** - 安装和管理 Skills，支持自定义仓库
+- **规则管理** - 自定义规则配置，支持多工具同步
+- **使用统计** - Token 用量、成本统计、模型定价管理、本地日志自动导入
+- **代理服务** - 内置 API 代理，自动拦截和统计 CLI 工具的 API 调用
+- **对话迁移** - 从 Cursor、Claude Code、Codex、Windsurf、Trae 提取对话历史
 - **深链接** - 支持 `aiswitch://` 协议一键配置
-- **备份恢复** - 配置导入导出功能
-- **多语言** - 支持中文和英文和日语界面
+- **备份恢复** - 配置精细化导出导入，支持按名称选择导出内容
+- **多语言** - 支持中文、英文和日语界面
 - **自动更新** - 全平台支持（Windows / macOS Intel / macOS Apple Silicon）
 
 ## 快速开始
@@ -69,15 +73,14 @@ GitHub Actions 中使用的版本：
 - **Node.js**: >= 18
 - **Rust**: >= 1.70
 
-移除该参数，让 Tauri 生成默认 bundle |
-
-
 
 ## 文档
 
 - [架构设计](docs/ARCHITECTURE.md)
 - [深链接配置](docs/DEEP_LINK.md)
 - [自动推断 Provider](docs/AUTO_IMPORT_PROVIDER.md)
+- [编程环境管理](docs/DEV_ENV_MANAGEMENT.md)
+- [Bug 跟踪](docs/BUGS.md)
 
 ## License
 

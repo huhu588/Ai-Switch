@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-shell'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -114,6 +115,10 @@ const managedSkills = ref<ManagedSkill[]>([])
 const skillsStats = ref<SkillsStats>({ claude_count: 0, codex_count: 0, gemini_count: 0, opencode_count: 0, cursor_count: 0 })
 const togglingTool = ref<string | null>(null) // 正在切换的 skill-tool 组合
 const manageSearchQuery = ref('')
+
+// 删除 skill（从所有工具中移除）确认弹窗
+const showDeleteSkillFromAllDialog = ref(false)
+const deleteSkillFromAllTarget = ref<ManagedSkill | null>(null)
 
 // 按位置分组的已安装 Skills
 const groupedSkills = computed(() => {
@@ -238,15 +243,22 @@ async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | '
     await loadInstalledSkills()
   } catch (e) {
     console.error(`切换 ${tool} 失败:`, e)
-    showMessage(`切换失败: ${e}`, 'error')
+    showMessage(t('skills.toggleFailed', { error: String(e) }), 'error')
   } finally {
     togglingTool.value = null
   }
 }
 
-// 删除 skill（从所有工具中移除）
-async function deleteSkillFromAll(skill: ManagedSkill) {
-  if (!confirm(`确定要从所有工具中删除 "${skill.name}" 吗？`)) return
+// 打开删除 skill（从所有工具中移除）确认弹窗
+function openDeleteSkillFromAll(skill: ManagedSkill) {
+  deleteSkillFromAllTarget.value = skill
+  showDeleteSkillFromAllDialog.value = true
+}
+
+// 确认删除 skill（从所有工具中移除）
+async function confirmDeleteSkillFromAll() {
+  const skill = deleteSkillFromAllTarget.value
+  if (!skill) return
   
   try {
     // 依次从各个工具中删除
@@ -267,13 +279,16 @@ async function deleteSkillFromAll(skill: ManagedSkill) {
       }
     }
     
-    showMessage('删除成功', 'success')
+    showMessage(t('skills.deleteSuccess'), 'success')
     await loadManagedSkills()
     await loadInstalledSkills()
   } catch (e) {
     console.error('删除失败:', e)
-    showMessage(`删除失败: ${e}`, 'error')
+    showMessage(t('skills.deleteFailed', { error: String(e) }), 'error')
   }
+  
+  showDeleteSkillFromAllDialog.value = false
+  deleteSkillFromAllTarget.value = null
 }
 
 // ==================== 结束 Skills 管理功能 ====================
@@ -356,10 +371,10 @@ async function installSelected() {
     await loadInstalledSkills()
     
     if (successCount > 0) {
-      showMessage(`成功安装 ${successCount} 个 skills`, 'success')
+      showMessage(t('skills.installSuccess', { count: successCount }), 'success')
     }
     if (failCount > 0) {
-      showMessage(`${failCount} 个 skills 安装失败`, 'error')
+      showMessage(t('skills.installFailed', { count: failCount }), 'error')
     }
   } finally {
     installing.value = false
@@ -374,7 +389,7 @@ async function viewSkillContent(skill: InstalledSkill) {
     showContentModal.value = true
   } catch (e) {
     console.error('读取 Skill 内容失败:', e)
-    showMessage('读取失败', 'error')
+    showMessage(t('skills.readFailed'), 'error')
   }
 }
 
@@ -392,10 +407,10 @@ async function deleteskills() {
     await invoke('delete_skills', { skillsPath: skillToDelete.value.path })
     showDeleteConfirm.value = false
     await loadInstalledSkills()
-    showMessage('删除成功', 'success')
+    showMessage(t('skills.deleteSuccess'), 'success')
   } catch (e) {
     console.error('删除失败:', e)
-    showMessage('删除失败', 'error')
+    showMessage(t('skills.deleteFailed', { error: '' }), 'error')
   }
 }
 
@@ -482,9 +497,9 @@ async function addRepo() {
     
     repos.value = await invoke<SkillsRepository[]>('add_skills_repo', { repo })
     newRepoUrl.value = ''
-    showMessage('仓库添加成功', 'success')
+    showMessage(t('skills.repoAddSuccess'), 'success')
   } catch (e) {
-    showMessage(`添加失败: ${e}`, 'error')
+    showMessage(t('skills.repoAddFailed', { error: String(e) }), 'error')
   } finally {
     addingRepo.value = false
   }
@@ -494,9 +509,9 @@ async function addRepo() {
 async function deleteRepo(repoId: string) {
   try {
     repos.value = await invoke<SkillsRepository[]>('delete_skills_repo', { repoId })
-    showMessage('仓库已删除', 'success')
+    showMessage(t('skills.repoDeleted'), 'success')
   } catch (e) {
-    showMessage(`删除失败: ${e}`, 'error')
+    showMessage(t('skills.repoDeleteFailed', { error: String(e) }), 'error')
   }
 }
 
@@ -511,7 +526,7 @@ async function toggleRepo(repoId: string) {
       enabled: !repo.enabled
     })
   } catch (e) {
-    showMessage(`操作失败: ${e}`, 'error')
+    showMessage(t('skills.operationFailed', { error: String(e) }), 'error')
   }
 }
 
@@ -536,7 +551,7 @@ async function discoverSkills() {
     selectedDiscovered.value = new Set()
   } catch (e) {
     console.error('发现技能失败:', e)
-    showMessage('获取技能列表失败', 'error')
+    showMessage(t('skills.discoverFailed'), 'error')
   } finally {
     discoveringSkills.value = false
   }
@@ -589,10 +604,10 @@ async function installDiscoveredSkills() {
     await loadInstalledSkills()
     
     if (successCount > 0) {
-      showMessage(`成功安装 ${successCount} 个 skills`, 'success')
+      showMessage(t('skills.installSuccess', { count: successCount }), 'success')
     }
     if (failCount > 0) {
-      showMessage(`${failCount} 个 skills 安装失败`, 'error')
+      showMessage(t('skills.installFailed', { count: failCount }), 'error')
     }
   } finally {
     installing.value = false
@@ -641,7 +656,7 @@ onMounted(() => {
           class="px-4 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-medium text-sm transition-all flex items-center gap-2"
         >
           <SvgIcon name="settings" :size="16" />
-          Skills 管理
+          {{ t('skills.manage') }}
         </button>
         
         <button
@@ -1042,7 +1057,7 @@ onMounted(() => {
                         <button 
                           @click.stop="openUrl(getGithubViewUrl(skill.raw_url))"
                           class="text-xs text-accent/70 hover:text-accent hover:underline flex items-center gap-1 cursor-pointer"
-                          title="在 GitHub 上查看"
+                          :title="t('skills.viewOnGithub')"
                         >
                           <SvgIcon name="eye" :size="12" />
                           {{ t('skills.viewSource') }}
@@ -1203,7 +1218,7 @@ onMounted(() => {
           <div class="px-6 py-4 border-b border-border flex items-center justify-between">
             <h2 class="text-lg font-semibold flex items-center gap-2">
               <SvgIcon name="settings" :size="20" class="text-blue-400" />
-              Skills 管理
+              {{ t('skills.manageTitle') }}
             </h2>
             <button 
               @click="showManageModal = false"
@@ -1215,7 +1230,7 @@ onMounted(() => {
           
           <!-- 统计信息 -->
           <div class="px-6 py-3 border-b border-border bg-surface/30 text-sm text-muted-foreground">
-            已安装 · Claude: {{ skillsStats.claude_count }} · Codex: {{ skillsStats.codex_count }} · Gemini: {{ skillsStats.gemini_count }} · OpenCode: {{ skillsStats.opencode_count }} · Cursor: {{ skillsStats.cursor_count }}
+            {{ t('skills.statsInstalled', { claude: skillsStats.claude_count, codex: skillsStats.codex_count, gemini: skillsStats.gemini_count, opencode: skillsStats.opencode_count, cursor: skillsStats.cursor_count }) }}
           </div>
           
           <!-- 搜索框 -->
@@ -1231,7 +1246,7 @@ onMounted(() => {
           <!-- Skills 列表 -->
           <div class="p-4 max-h-[50vh] overflow-auto space-y-3">
             <div v-if="filteredManagedSkills.length === 0" class="text-center py-8 text-muted-foreground">
-              暂无已安装的 Skills
+              {{ t('skills.noInstalledSkills') }}
             </div>
             
             <div
@@ -1243,8 +1258,8 @@ onMounted(() => {
                 <!-- 左侧：名称和描述 -->
                 <div class="flex-1 min-w-0">
                   <h3 class="font-semibold text-foreground">{{ skill.name }}</h3>
-                  <p class="text-sm text-muted-foreground mt-1 line-clamp-2">{{ skill.description || '暂无描述' }}</p>
-                  <span v-if="skill.is_local" class="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-accent/20 text-accent">本地</span>
+                  <p class="text-sm text-muted-foreground mt-1 line-clamp-2">{{ skill.description || t('common.noDescription') }}</p>
+                  <span v-if="skill.is_local" class="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-accent/20 text-accent">{{ t('skills.local') }}</span>
                 </div>
                 
                 <!-- 右侧：工具开关 -->
@@ -1332,9 +1347,9 @@ onMounted(() => {
                 
                 <!-- 删除按钮 -->
                 <button
-                  @click="deleteSkillFromAll(skill)"
+                  @click="openDeleteSkillFromAll(skill)"
                   class="p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                  title="从所有工具中删除"
+                  :title="t('skills.deleteFromAll')"
                 >
                   <SvgIcon name="delete" :size="16" />
                 </button>
@@ -1345,7 +1360,7 @@ onMounted(() => {
           <!-- 底部 -->
           <div class="px-6 py-4 border-t border-border flex items-center justify-between">
             <span class="text-sm text-muted-foreground">
-              共 {{ managedSkills.length }} 个 Skills
+              {{ t('skills.totalSkills', { count: managedSkills.length }) }}
             </span>
             <div class="flex gap-2">
               <button
@@ -1366,6 +1381,16 @@ onMounted(() => {
         </div>
       </div>
     </Teleport>
+
+    <!-- 删除 Skill（从所有工具中移除）确认弹窗 -->
+    <ConfirmDialog
+      v-model:visible="showDeleteSkillFromAllDialog"
+      :title="t('confirm.deleteTitle')"
+      :message="t('skills.deleteFromAllConfirm', { name: deleteSkillFromAllTarget?.name || '' })"
+      :confirm-text="t('common.delete')"
+      danger
+      @confirm="confirmDeleteSkillFromAll"
+    />
   </div>
 </template>
 

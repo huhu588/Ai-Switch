@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -253,6 +254,25 @@ const toolStatsDefaultCount = 5 // 默认显示的工具数量
 const modelLegendExpanded = ref(false)
 
 let statusInterval: number | null = null
+
+// 确认对话框
+const confirmVisible = ref(false)
+const confirmConfig = ref<{ title: string; message: string; confirmText?: string; danger?: boolean; onConfirm: () => void }>({
+  title: '', message: '', danger: false, onConfirm: () => {}
+})
+function showConfirm(config: typeof confirmConfig.value) {
+  confirmConfig.value = config
+  confirmVisible.value = true
+}
+
+// Toast 消息
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error'>('success')
+function showToast(msg: string, type: 'success' | 'error' = 'error') {
+  toastMessage.value = msg
+  toastType.value = type
+  setTimeout(() => { toastMessage.value = '' }, 3000)
+}
 
 // 预定义的模型颜色（按常见模型分配）
 const modelColors: Record<string, string> = {
@@ -552,10 +572,6 @@ function formatDuration(ms: number): string {
   if (hours > 0) {
     return `${hours}h ${remainingMinutes}m`
   }
-  if (hours > 0) {
-    const remainingMinutes = minutes % 60
-    return `${hours}h ${remainingMinutes}m`
-  }
   if (minutes > 0) {
     const remainingSecs = seconds % 60
     return `${minutes}m ${remainingSecs}s`
@@ -669,7 +685,7 @@ async function startProxy() {
     await loadProxyStatus()
   } catch (e) {
     console.error('启动代理失败:', e)
-    alert(`启动代理失败: ${e}`)
+    showToast(`启动代理失败: ${e}`)
   }
 }
 
@@ -680,7 +696,7 @@ async function stopProxy() {
     await loadProxyStatus()
   } catch (e) {
     console.error('停止代理失败:', e)
-    alert(`停止代理失败: ${e}`)
+    showToast(`停止代理失败: ${e}`)
   }
 }
 
@@ -692,23 +708,28 @@ async function toggleTakeover(app: 'claude' | 'codex' | 'gemini') {
     await loadProxyStatus()
   } catch (e) {
     console.error('切换接管失败:', e)
-    alert(`切换接管失败: ${e}`)
+    showToast(`切换接管失败: ${e}`)
   }
 }
 
 // 清除统计
-async function clearStats() {
-  if (!confirm(t('usage.confirmClear'))) return
-  try {
-    await invoke('clear_proxy_usage_stats')
-    // 清除 Cursor 对话统计显示（Cursor 数据来自本地，清除后重新加载）
-    cursorConversationStats.value = null
-    sessionStats.value = null
-    toolCallStats.value = []
-    await loadData()
-  } catch (e) {
-    console.error('清除统计失败:', e)
-  }
+function clearStats() {
+  showConfirm({
+    title: t('usage.clearStats', t('confirm.title')),
+    message: t('usage.confirmClear'),
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await invoke('clear_proxy_usage_stats')
+        cursorConversationStats.value = null
+        sessionStats.value = null
+        toolCallStats.value = []
+        await loadData()
+      } catch (e) {
+        console.error('清除统计失败:', e)
+      }
+    }
+  })
 }
 
 // 打开导入对话框并扫描
@@ -750,23 +771,29 @@ async function importLocalLogs() {
     await loadData()
   } catch (e) {
     console.error('导入本地日志失败:', e)
-    alert(`${t('usage.importFailed')}: ${e}`)
+    showToast(`${t('usage.importFailed')}: ${e}`)
   } finally {
     importing.value = false
   }
 }
 
 // 清除本地导入的日志
-async function clearLocalLogs() {
-  if (!confirm(t('usage.confirmClearLocal'))) return
-  try {
-    const deleted = await invoke<number>('clear_local_logs')
-    alert(`${t('usage.clearedLocalLogs')}: ${deleted}`)
-    await scanLocalLogs()
-    await loadData()
-  } catch (e) {
-    console.error('清除本地日志失败:', e)
-  }
+function clearLocalLogs() {
+  showConfirm({
+    title: t('usage.clearLocalLogs', t('confirm.title')),
+    message: t('usage.confirmClearLocal'),
+    danger: true,
+    onConfirm: async () => {
+      try {
+        const deleted = await invoke<number>('clear_local_logs')
+        showToast(`${t('usage.clearedLocalLogs')}: ${deleted}`, 'success')
+        await scanLocalLogs()
+        await loadData()
+      } catch (e) {
+        console.error('清除本地日志失败:', e)
+      }
+    }
+  })
 }
 
 // 关闭导入对话框
@@ -895,7 +922,7 @@ async function savePricing() {
     await loadPricingList()
   } catch (e) {
     console.error('保存模型定价失败:', e)
-    alert(`保存失败: ${e}`)
+    showToast(`保存失败: ${e}`)
   }
 }
 
@@ -905,16 +932,21 @@ function cancelEditPricing() {
 }
 
 // 重置模型定价为默认值
-async function resetPricing() {
-  if (!confirm(t('usage.confirmResetPricing'))) return
-  
-  try {
-    await invoke('reset_model_pricing')
-    await loadPricingList()
-  } catch (e) {
-    console.error('重置模型定价失败:', e)
-    alert(`重置失败: ${e}`)
-  }
+function resetPricing() {
+  showConfirm({
+    title: t('usage.resetPricing', t('confirm.title')),
+    message: t('usage.confirmResetPricing'),
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await invoke('reset_model_pricing')
+        await loadPricingList()
+      } catch (e) {
+        console.error('重置模型定价失败:', e)
+        showToast(`重置失败: ${e}`)
+      }
+    }
+  })
 }
 
 // 关闭模型定价对话框
@@ -990,7 +1022,7 @@ async function saveProviderPricing() {
     await loadPricingProviders()
   } catch (e) {
     console.error('保存服务商定价失败:', e)
-    alert(`保存失败: ${e}`)
+    showToast(`保存失败: ${e}`)
   }
 }
 
@@ -1001,20 +1033,25 @@ function cancelEditProviderPricing() {
 }
 
 // 删除服务商定价
-async function deleteProviderPricing(pricing: ProviderModelPricing) {
-  if (!confirm(t('usage.confirmDeletePricing'))) return
-  
-  try {
-    await invoke('delete_provider_model_pricing', {
-      providerId: pricing.providerId,
-      modelId: pricing.modelId,
-    })
-    await loadProviderPricingList(selectedPricingProvider.value)
-    await loadPricingProviders()
-  } catch (e) {
-    console.error('删除服务商定价失败:', e)
-    alert(`删除失败: ${e}`)
-  }
+function deleteProviderPricing(pricing: ProviderModelPricing) {
+  showConfirm({
+    title: t('usage.deletePricing', t('confirm.title')),
+    message: t('usage.confirmDeletePricing'),
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await invoke('delete_provider_model_pricing', {
+          providerId: pricing.providerId,
+          modelId: pricing.modelId,
+        })
+        await loadProviderPricingList(selectedPricingProvider.value)
+        await loadPricingProviders()
+      } catch (e) {
+        console.error('删除服务商定价失败:', e)
+        showToast(`删除失败: ${e}`)
+      }
+    }
+  })
 }
 
 // 获取服务商显示名称
@@ -1079,6 +1116,22 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <ConfirmDialog
+    v-model:visible="confirmVisible"
+    :title="confirmConfig.title"
+    :message="confirmConfig.message"
+    :confirm-text="confirmConfig.confirmText"
+    :danger="confirmConfig.danger"
+    @confirm="confirmConfig.onConfirm"
+  />
+  <!-- Toast 消息 -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="toastMessage" class="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium max-w-md" :class="toastType === 'error' ? 'bg-red-500/90 text-white' : 'bg-emerald-500/90 text-white'">
+        {{ toastMessage }}
+      </div>
+    </Transition>
+  </Teleport>
   <div class="h-full flex flex-col gap-4 p-4 overflow-y-auto">
     <!-- 标题栏 -->
     <div class="flex items-center justify-between">

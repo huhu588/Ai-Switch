@@ -22,7 +22,10 @@ export default {
     optional: '可选',
     refresh: '刷新',
     done: '完成',
-    close: '关闭'
+    close: '关闭',
+    noDescription: '暂无描述',
+    recommended: '推荐',
+    notSelected: '未选择'
   },
 
   // 导航
@@ -33,12 +36,14 @@ export default {
     ohmy: 'oh-my-opencode',
     backup: '备份',
     status: '状态',
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'Prompts',
-    speedTest: '延迟测试',
-    usage: '使用统计'
+    usage: '使用统计',
+    chatMigration: '对话迁移',
+    devenv: '环境管理'
+  },
+
+  // 导航分组标题
+  navExt: {
+    tools: '工具'
   },
 
   // 系统状态
@@ -107,7 +112,49 @@ export default {
     // Ai Switch 统一配置
     saveToOpenSwitch: '保存到 Ai Switch 统一配置',
     saveToOpenSwitchDesc: '将配置保存到 ~/.ai-switch/config.json，支持跨工具共享',
-    noModels: '暂无模型'
+    noModels: '暂无模型',
+    // i18n 补充
+    customConfig: '自定义配置',
+    modelProvider: '模型提供商',
+    applyTo: '应用到',
+    applyToHint: '选择要将此服务商配置应用到的工具',
+    baseUrlList: 'Base URL 列表',
+    autoAddV1Suffix: '自动添加 /v1 后缀',
+    baseUrlInputPlaceholder: '输入 Base URL，如 https://api.example.com',
+    testing: '测试中...',
+    testFailed: '测试失败: {error}',
+    noTestResults: '没有可用的测试结果',
+    apiKeyRequiredFirst: '请先填写 API Key',
+    urlRequiredFirst: '请先添加 URL',
+    baseUrlRequired: '请至少添加一个 Base URL',
+    opencodeModelRequired: 'OpenCode 需要至少一个模型，请添加模型或取消勾选 OpenCode',
+    deleteModelFailed: '删除模型失败: {error}',
+    addModelFailed: '添加模型失败: {error}',
+    modelGuidanceBoth: '需要添加模型。OpenCode 使用模型列表，CLI 工具将使用第一个模型作为默认模型。',
+    modelGuidanceOpencode: 'OpenCode 需要模型列表才能正常工作，请添加至少一个模型。',
+    modelGuidanceCli: 'CLI 工具只需要 API Key 和 Base URL，模型可选（将使用工具默认模型）。',
+    quality: {
+      excellent: '优秀',
+      good: '良好',
+      fair: '一般',
+      poor: '较差',
+      failed: '失败',
+      untested: '未测试'
+    },
+    autoAddPresetModels: '自动添加预设模型',
+    selectedPresetModels: '已选择 {selected} / {total} 个预设模型',
+    addCustomModel: '添加自定义模型',
+    customModelPlaceholder: '输入模型名称，如 gpt-4o-mini',
+    customModelsAdded: '已添加 {count} 个自定义模型',
+    clearAllModels: '清空全部',
+    modelIdPlaceholder: '输入模型 ID',
+    applyAllProviders: '应用全部 {count} 个服务商配置',
+    disabled: '已禁用',
+    speedTesting: '测速中...',
+    testLatency: '测试延迟',
+    clickToDisable: '点击禁用',
+    clickToEnable: '点击启用',
+    protocolOpenAICompat: 'OpenAI 兼容协议'
   },
 
   // Model 相关
@@ -171,7 +218,11 @@ export default {
     projectPath: './.opencode/opencode.json',
     globalPath: '~/.opencode/opencode.json',
     selectTarget: '请至少选择一个应用目标',
-    cliTools: 'CLI 工具'
+    cliTools: 'CLI 工具',
+    // i18n 补充
+    selectProviderForCli: '请先选择一个服务商用于 CLI 配置',
+    applyProvidersDesc: '将 {vendor} 厂家的 {count} 个服务商配置应用到：',
+    willUseProvider: '将使用服务商：'
   },
 
   // 获取模型
@@ -252,7 +303,24 @@ export default {
     installed: '已安装',
     searchMcp: '搜索 MCP...',
     deleteFromAll: '从所有应用中删除',
-    totalMcps: '共 {count} 个 MCP'
+    totalMcps: '共 {count} 个 MCP',
+    // i18n 补充
+    deleteFromAllConfirm: '确定要从所有应用中删除 "{name}" 吗？',
+    toggleFailed: '切换失败: {error}',
+    deleted: '已删除 {name}',
+    deleteFailed: '删除失败: {error}',
+    healthCheckFailed: '检查失败',
+    clickToAddServer: '点击右上角添加 MCP 服务器',
+    locationLabels: {
+      global_opencode: 'OpenCode',
+      project_opencode: 'OpenCode 项目',
+      project_root: '根目录',
+      global_claude: 'Claude',
+      project_claude: 'Claude 项目',
+      global_cursor: 'Cursor',
+      global_codex: 'Codex',
+      global_gemini: 'Gemini'
+    }
   },
 
   // 备份页面
@@ -291,17 +359,28 @@ export default {
     importGemini: '导入 Gemini CLI 配置',
     overwriteExisting: '覆盖已存在的配置',
     overwriteHint: '勾选后，已存在的同名配置将被覆盖；否则将跳过已存在的配置',
+    importUsageStats: '导入使用统计',
     
     providerPreview: '服务商预览',
     
+    // 导出选项
+    exportOptions: '选择导出内容',
+    includeUsageStats: '使用统计数据',
+    usageRecords: '条记录',
+    
     whatIncluded: '备份包含哪些内容？',
-    includeProviders: '服务商配置（包含 API Key、URL、模型列表）',
+    includeProviders: '服务商配置（包含 API Key、URL、模型列表、Codex/Gemini CLI 配置）',
     includeMcp: 'MCP 服务器配置',
     includeRules: '全局规则文件',
     includeSkills: '全局 Skills 文件',
-    includeCodex: 'Codex CLI 配置（Model Providers、MCP）',
-    includeGemini: 'Gemini CLI 配置（API Key、MCP）',
-    securityWarning: '备份文件包含敏感的 API Key 信息，请妥善保管！'
+    includeUsageStatsDesc: '使用统计数据（请求日志、Token 用量、成本记录）',
+    securityWarning: '备份文件包含敏感的 API Key 信息，请妥善保管！',
+    // 导出详细选择面板
+    confirmExport: '确认导出',
+    chatRecords: '对话记录',
+    loadingData: '加载数据中...',
+    noExtractedChat: '暂无已提取的对话，请先扫描并提取数据源',
+    geminiEnvConfig: '环境配置',
   },
 
   // Skills 页面
@@ -356,7 +435,30 @@ export default {
       ProjectOpenCode: '项目 OpenCode (.opencode/skills/)',
       ProjectClaude: '项目 Claude (.claude/skills/)'
     },
-    rateLimitError: 'GitHub API 速率限制已达上限，请稍后再试'
+    rateLimitError: 'GitHub API 速率限制已达上限，请稍后再试',
+    // i18n 补充
+    manage: 'Skills 管理',
+    manageTitle: 'Skills 管理',
+    searchSkills: '搜索 Skills...',
+    noInstalledSkills: '暂无已安装的 Skills',
+    local: '本地',
+    deleteFromAll: '从所有工具中删除',
+    deleteFromAllConfirm: '确定要从所有工具中删除 "{name}" 吗？',
+    totalSkills: '共 {count} 个 Skills',
+    statsInstalled: '已安装 · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    toggleFailed: '切换失败: {error}',
+    deleteSuccess: '删除成功',
+    deleteFailed: '删除失败: {error}',
+    readFailed: '读取失败',
+    installSuccess: '成功安装 {count} 个 skills',
+    installFailed: '{count} 个 skills 安装失败',
+    repoAddSuccess: '仓库添加成功',
+    repoAddFailed: '添加失败: {error}',
+    repoDeleted: '仓库已删除',
+    repoDeleteFailed: '删除失败: {error}',
+    operationFailed: '操作失败: {error}',
+    discoverFailed: '获取技能列表失败',
+    viewOnGithub: '在 GitHub 上查看'
   },
 
   // 规则页面
@@ -403,7 +505,26 @@ export default {
     manageTitle: '规则管理',
     searchRule: '搜索规则...',
     deleteFromAll: '从所有应用中删除',
-    totalRules: '共 {count} 个规则'
+    totalRules: '共 {count} 个规则',
+    // i18n 补充
+    deleteFromAllConfirm: '确定要从所有应用中删除 "{name}" 吗？',
+    deleteFromAllConfirmMultiple: '确定要从所有应用中删除规则 "{name}" 吗？（共 {count} 个副本）',
+    toggleFailed: '切换失败: {error}',
+    deleted: '已删除 {name}',
+    deleteFailed: '删除失败: {error}',
+    clickToAddRule: '点击右上角添加规则',
+    deployedTo: '已部署到',
+    ruleContent: '规则内容',
+    categoryLabels: {
+      code_style: '代码风格',
+      project: '项目结构',
+      review: '代码审查',
+      testing: '测试',
+      workflow: '工作流',
+      api: 'API',
+      security: '安全',
+      documentation: '文档'
+    }
   },
 
   // 状态页面
@@ -442,7 +563,22 @@ export default {
     noConflicts: '无冲突',
     conflictsFound: '检测到 {count} 个冲突',
     conflictVariable: '变量',
-    conflictSources: '冲突来源'
+    conflictSources: '冲突来源',
+    // CLI 工具版本检测
+    cliTools: {
+      title: 'CLI 工具版本',
+      notInstalled: '未安装',
+      checkingLatest: '查询最新版本中...',
+      latest: '最新',
+      newAvailable: '可更新',
+      upToDate: '已是最新',
+      update: '更新',
+      updating: '更新中...',
+      updateSuccess: '更新成功',
+      install: '安装',
+      installing: '安装中...',
+      installSuccess: '安装成功'
+    }
   },
 
   // 应用设置
@@ -502,6 +638,14 @@ export default {
     uninstallSuccess: 'oh-my-opencode 卸载成功！',
     uninstallFailed: '卸载失败，请查看日志',
     
+    // 更新相关
+    update: '更新',
+    updating: '更新中...',
+    startingUpdate: '开始更新...',
+    updateSuccess: 'oh-my-opencode 更新成功！',
+    updateFailed: '更新失败，请查看日志',
+    latestVersion: '已是最新版本',
+    
     // Agent 介绍（备用，主要使用后端返回的数据）
     agents: {
       sisyphus: {
@@ -552,7 +696,29 @@ export default {
     project: '项目',
     models: '个模型',
     removeAll: '删除全部',
-    syncAll: '一键同步'
+    syncAll: '一键同步',
+    // i18n 补充
+    modelsFixedSuccess: '已补齐 {count} 个服务商模型',
+    noProvidersToFix: '没有需要补齐的服务商',
+    modelsFixFailed: '补齐失败: {names}',
+    externalTool: '外部工具',
+    cannotDeleteSource: '无法删除来源为 "{tool}" 的服务商',
+    partialDeleteFailed: '部分删除失败: {names}',
+    importedFrom: '从 {tool} 导入',
+    importedSuccess: '成功导入 {count} 个',
+    skippedExisting: '跳过已存在 {count} 个',
+    selectProvidersToImport: '点击选择要导入的服务商（已选 {count} 个）',
+    deselectAll: '取消全选',
+    selectAll: '全选',
+    apiKeyConfigured: '已配置 API Key',
+    configured: '已配置',
+    fillMissingModels: '一键补齐模型',
+    confirmImport: '确认导入 ({count})',
+    selectModelType: '选择模型类型',
+    selectModelTypeFor: '为 {name} 选择所属的模型类型',
+    claudeModelDesc: 'Anthropic Claude 模型',
+    codexModelDesc: 'OpenAI GPT / Codex 模型',
+    geminiModelDesc: 'Google Gemini 模型'
   },
 
   // 深链接配置
@@ -573,97 +739,7 @@ export default {
     error: '添加失败'
   },
 
-  // Claude Code 配置
-  claudeCode: {
-    description: '管理 Claude Code CLI 的配置',
-    notConfigured: '未配置',
-    usingOfficial: '使用官方 API',
-    mcpServers: 'MCP 服务器',
-    servers: '个',
-    setApiKey: '设置 API Key',
-    apiKeyPlaceholder: '输入 Anthropic API Key (sk-ant-...)',
-    setBaseUrl: '设置 Base URL',
-    baseUrlPlaceholder: '留空使用官方 API，或输入自定义 URL',
-    baseUrlHint: '留空将使用 Anthropic 官方 API，输入自定义 URL 可使用第三方代理',
-    setModel: '设置默认模型',
-    modelPlaceholder: '例如: claude-sonnet-4-5-20250929'
-  },
-
-  // Codex 配置
-  codex: {
-    description: '管理 OpenAI Codex CLI 的配置',
-    authStatus: '认证状态',
-    authenticated: '已认证',
-    notAuthenticated: '未认证',
-    providers: '模型提供商',
-    configured: '个已配置',
-    mcpServers: 'MCP 服务器',
-    servers: '个',
-    modelProviders: '模型提供商列表',
-    noProviders: '暂无自定义模型提供商',
-    addProvider: '添加提供商',
-    providerKey: '提供商 Key',
-    providerKeyPlaceholder: '例如: custom-provider',
-    displayName: '显示名称',
-    displayNamePlaceholder: '例如: My Custom Provider',
-    envKey: '环境变量名',
-    envKeyPlaceholder: '例如: CUSTOM_API_KEY'
-  },
-
-  // Gemini 配置
-  gemini: {
-    description: '管理 Google Gemini CLI 的配置',
-    notConfigured: '未配置',
-    authMode: '认证模式',
-    mcpServers: 'MCP 服务器',
-    servers: '个',
-    setApiKey: '设置 API Key',
-    apiKeyPlaceholder: '输入 Gemini API Key',
-    setBaseUrl: '设置 Base URL',
-    baseUrlPlaceholder: '留空使用官方 API，或输入自定义 URL',
-    baseUrlHint: '留空将使用 Google 官方 API，输入自定义 URL 可使用第三方代理',
-    setModel: '设置默认模型',
-    modelPlaceholder: '例如: gemini-2.5-pro'
-  },
-
-  // Prompts 管理
-  prompts: {
-    title: 'Prompts 管理',
-    description: '管理各 CLI 工具的系统提示文件',
-    characters: '字符',
-    placeholder: '在此输入系统提示内容（支持 Markdown）...',
-    syncTo: '同步到',
-    sync: '同步',
-    presets: '预设模板',
-    saved: '保存成功',
-    confirmDelete: '确定要删除此 Prompt 文件吗？'
-  },
-
-  // 速度测试
-  speedTest: {
-    title: '延迟测试',
-    description: '测试 API 端点的响应延迟',
-    selectProviders: '选择要测试的服务商',
-    noProviders: '暂无启用的服务商，请先在服务商页面添加并启用',
-    selectAll: '全选',
-    runTest: '开始测试',
-    testing: '测试中...',
-    noResults: '点击"开始测试"以测试选中的服务商',
-    retest: '重新测试',
-    avgLatency: '平均延迟',
-    successRate: '成功率',
-    testCount: '测试次数'
-  },
-
-  // 扩展导航
-  navExt: {
-    claudeCode: 'Claude Code',
-    codex: 'Codex',
-    gemini: 'Gemini',
-    prompts: 'Prompts',
-    speedTest: '延迟测试',
-    tools: '工具'
-  },
+  
 
   // 使用统计
   usage: {
@@ -781,5 +857,121 @@ export default {
     toolTypes: '种工具',
     calls: '次调用',
     viewAll: '查看全部 ({count} 种)'
+  },
+
+  // 对话迁移
+  chatMigration: {
+    title: '对话迁移',
+    description: '从 AI 编程工具中提取完整对话历史并导出为 JSONL 文件',
+    scan: '扫描',
+    scanning: '扫描中...',
+    extract: '提取',
+    extracting: '提取中...',
+    export: '导出',
+    exporting: '导出中...',
+    exportAll: '导出全部',
+    exportSelected: '导出选中',
+    conversations: '个对话',
+    messages: '条消息',
+    noData: '未检测到数据',
+    notInstalled: '未安装',
+    detected: '已检测到',
+    dataPath: '数据路径',
+    scanFirst: '请先扫描数据源',
+    scanComplete: '扫描完成',
+    extractComplete: '提取完成',
+    exportComplete: '导出完成',
+    exportSuccess: '成功导出 {count} 个对话到 {path}',
+    exportFailed: '导出失败',
+    noConversations: '暂无可导出的对话',
+    selectExportPath: '选择导出路径',
+    totalConversations: '总对话数',
+    totalMessages: '总消息数',
+    preview: '预览',
+    close: '关闭',
+    user: '用户',
+    assistant: '助手',
+    source: '来源',
+    createdAt: '创建时间',
+    toolUse: '工具调用',
+    extractAll: '全部提取',
+    extractAllDesc: '从所有可用工具中提取对话',
+    clear: '清除',
+    clearAll: '清除全部',
+    confirmClear: '确定要清除所有已提取的对话吗？',
+    fileFormat: '文件格式',
+    jsonl: 'JSONL (每行一个对话)',
+    // 导入
+    importFile: '导入文件',
+    importDesc: '从其他电脑导出的 JSONL 文件导入对话',
+    importSuccess: '导入完成：新增 {imported} 个，跳过 {skipped} 个（重复）',
+    importFailed: '导入失败',
+    imported: '已导入',
+    skippedDup: '跳过（重复）',
+    viewImported: '查看已导入',
+    noImportedData: '暂无已导入的对话',
+    clearImported: '清除已导入',
+    confirmClearImported: '确定要清除所有已导入的迁移对话吗？',
+    clearedImported: '已清除所有导入数据',
+    // 工具名称
+    tools: {
+      cursor: 'Cursor',
+      claude: 'Claude Code',
+      codex: 'Codex',
+      windsurf: 'Windsurf',
+      trae: 'Trae',
+      trae_cn: 'Trae CN'
+    }
+  },
+
+  // 编程环境管理
+  devenv: {
+    title: '编程环境管理',
+    subtitle: '检测、安装和切换本地编程环境（全球 Top 10）',
+    detecting: '检测中...',
+    detectAll: '一键检测',
+    refresh: '刷新',
+    // 状态
+    installed: '已安装',
+    notInstalled: '未安装',
+    currentVersion: '当前版本',
+    noVersion: '无',
+    // 版本管理器
+    versionManager: '版本管理器',
+    managerInstalled: '已安装 v{version}',
+    managerNotInstalled: '未安装',
+    installManager: '安装管理器',
+    installing: '安装中...',
+    // 版本操作
+    installedVersions: '已安装版本',
+    switchVersion: '切换版本',
+    switching: '切换中...',
+    installVersion: '安装版本',
+    installingVersion: '安装中...',
+    recommendedVersions: '推荐版本',
+    forClaude: '适配 Claude',
+    stableVersion: '稳定版',
+    customVersion: '自定义版本',
+    customVersionPlaceholder: '输入版本号，如 20.18.1',
+    // 操作结果
+    switchSuccess: '切换成功',
+    switchFailed: '切换失败',
+    installSuccess: '安装成功',
+    installFailed: '安装失败',
+    managerInstallSuccess: '管理器安装成功',
+    managerInstallFailed: '管理器安装失败',
+    detectFailed: '检测失败',
+    // 卸载
+    uninstall: '卸载',
+    uninstalling: '卸载中...',
+    uninstallSuccess: '卸载成功',
+    uninstallFailed: '卸载失败',
+    uninstallManager: '卸载管理器',
+    managerUninstalling: '卸载中...',
+    managerUninstallFailed: '管理器卸载失败',
+    // 日志
+    operationLog: '操作日志',
+    noLogs: '暂无日志',
+    clearLogs: '清除日志'
   }
 }

@@ -15,7 +15,7 @@ use crate::error::AppError;
 use super::model::build_variants;
 
 /// Backup file format version
-const BACKUP_VERSION: &str = "1.1.0";
+const BACKUP_VERSION: &str = "1.2.0";
 
 /// Exported Provider data
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +155,60 @@ pub struct ExportedGeminiConfig {
     pub mcp_servers: Vec<ExportedGeminiMcpServer>,
 }
 
+/// Exported usage stats record
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportedUsageRecord {
+    pub session_id: String,
+    pub timestamp: i64,
+    pub model: String,
+    pub source: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    #[serde(default)]
+    pub cache_read_tokens: u32,
+    #[serde(default)]
+    pub cache_creation_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+}
+
+/// 导出的对话消息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedChatMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_use: Option<serde_json::Value>,
+}
+
+/// 导出的对话记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportedChatConversation {
+    pub messages: Vec<ExportedChatMessage>,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<f64>,
+}
+
+/// 导出的开发环境（仅保存版本号，跨设备重装）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportedDevEnv {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
 /// Complete backup data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackupData {
@@ -171,6 +225,15 @@ pub struct BackupData {
     /// Gemini CLI 配置（v1.1.0 新增）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gemini_config: Option<ExportedGeminiConfig>,
+    /// 使用统计数据
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_stats: Option<Vec<ExportedUsageRecord>>,
+    /// 对话记录
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_conversations: Option<Vec<ExportedChatConversation>>,
+    /// 开发环境（仅版本号）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dev_envs: Option<Vec<ExportedDevEnv>>,
 }
 
 /// Export statistics
@@ -189,6 +252,69 @@ pub struct ExportStats {
     pub gemini_configured: bool,
     /// Gemini MCP servers 数量
     pub gemini_mcp_servers: usize,
+    /// 使用统计记录数
+    #[serde(default)]
+    pub usage_records: usize,
+    /// 对话记录数量
+    #[serde(default)]
+    pub chat_conversations: usize,
+}
+
+/// Export options - 选择性导出
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExportOptions {
+    #[serde(default = "default_true")]
+    pub include_providers: bool,
+    #[serde(default = "default_true")]
+    pub include_mcp: bool,
+    #[serde(default = "default_true")]
+    pub include_rules: bool,
+    #[serde(default = "default_true")]
+    pub include_skills: bool,
+    #[serde(default = "default_true")]
+    pub include_codex: bool,
+    #[serde(default = "default_true")]
+    pub include_gemini: bool,
+    /// 是否导出使用统计数据
+    #[serde(default)]
+    pub include_usage_stats: bool,
+}
+
+fn default_true() -> bool { true }
+
+/// 精细化导出选项 - 按名称级别过滤
+#[derive(Debug, Clone, Deserialize)]
+pub struct FilteredExportOptions {
+    /// 选中的 OpenCode provider 名称
+    #[serde(default)]
+    pub provider_names: Vec<String>,
+    /// 选中的 OpenCode MCP 服务器名称
+    #[serde(default)]
+    pub mcp_names: Vec<String>,
+    /// 选中的规则标识 "name|location"
+    #[serde(default)]
+    pub rule_ids: Vec<String>,
+    /// 选中的 skill 标识 "name|location"
+    #[serde(default)]
+    pub skill_ids: Vec<String>,
+    /// 选中的 Codex CLI provider 名称
+    #[serde(default)]
+    pub codex_provider_names: Vec<String>,
+    /// 选中的 Codex CLI MCP 服务器名称
+    #[serde(default)]
+    pub codex_mcp_names: Vec<String>,
+    /// 是否包含 Gemini 环境配置
+    #[serde(default)]
+    pub include_gemini_env: bool,
+    /// 选中的 Gemini CLI MCP 服务器名称
+    #[serde(default)]
+    pub gemini_mcp_names: Vec<String>,
+    /// 使用统计来源列表 (claude/codex/gemini/opencode/cursor)，空数组则不导出
+    #[serde(default)]
+    pub usage_sources: Vec<String>,
+    /// 需要备份的开发环境（仅版本号）
+    #[serde(default)]
+    pub dev_envs: Vec<ExportedDevEnv>,
 }
 
 /// Import options
@@ -205,6 +331,9 @@ pub struct ImportOptions {
     /// 是否导入 Gemini CLI 配置
     #[serde(default)]
     pub import_gemini: bool,
+    /// 是否导入使用统计数据
+    #[serde(default)]
+    pub import_usage_stats: bool,
 }
 
 /// Import result
@@ -227,6 +356,12 @@ pub struct ImportResult {
     pub gemini_imported: usize,
     /// Gemini 配置跳过数量
     pub gemini_skipped: usize,
+    /// 使用统计导入数量
+    #[serde(default)]
+    pub usage_imported: usize,
+    /// 使用统计跳过数量
+    #[serde(default)]
+    pub usage_skipped: usize,
     pub errors: Vec<String>,
 }
 
@@ -428,6 +563,9 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
         skills,
         codex_config,
         gemini_config,
+        usage_stats: None,
+        chat_conversations: None,
+        dev_envs: None,
     })
 }
 
@@ -538,10 +676,165 @@ pub fn create_backup(
 #[tauri::command]
 pub fn export_backup(
     file_path: String,
+    options: Option<ExportOptions>,
     config_manager: State<'_, Mutex<ConfigManager>>,
+    db: State<'_, std::sync::Arc<crate::database::Database>>,
 ) -> Result<ExportStats, AppError> {
     let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
-    let backup = create_backup_internal(&manager)?;
+    let mut backup = create_backup_internal(&manager)?;
+
+    let opts = options.unwrap_or(ExportOptions {
+        include_providers: true, include_mcp: true, include_rules: true,
+        include_skills: true, include_codex: true, include_gemini: true, include_usage_stats: false,
+    });
+
+    // 按选项过滤
+    if !opts.include_providers { backup.providers.clear(); }
+    if !opts.include_mcp { backup.mcp_servers.clear(); }
+    if !opts.include_rules { backup.rules.clear(); }
+    if !opts.include_skills { backup.skills.clear(); }
+    if !opts.include_codex { backup.codex_config = None; }
+    if !opts.include_gemini { backup.gemini_config = None; }
+
+    // 导出使用统计
+    if opts.include_usage_stats {
+        let conn = db.conn.lock().map_err(|e| AppError::Custom(format!("DB lock failed: {}", e)))?;
+        let mut usage_records = Vec::new();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT session_id, created_at, model, app_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost FROM proxy_request_logs ORDER BY created_at"
+        ) {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok(ExportedUsageRecord {
+                    session_id: row.get::<_, String>(0).unwrap_or_default(),
+                    timestamp: row.get::<_, i64>(1).unwrap_or(0),
+                    model: row.get::<_, String>(2).unwrap_or_default(),
+                    source: row.get::<_, String>(3).unwrap_or_default(),
+                    input_tokens: row.get::<_, u32>(4).unwrap_or(0),
+                    output_tokens: row.get::<_, u32>(5).unwrap_or(0),
+                    cache_read_tokens: row.get::<_, u32>(6).unwrap_or(0),
+                    cache_creation_tokens: row.get::<_, u32>(7).unwrap_or(0),
+                    cost: row.get::<_, f64>(8).ok(),
+                })
+            }) {
+                for r in rows.flatten() { usage_records.push(r); }
+            }
+        }
+        backup.usage_stats = Some(usage_records);
+    }
+
+    let stats = ExportStats {
+        providers: backup.providers.len(),
+        models: backup.providers.iter().map(|p| p.models.len()).sum(),
+        mcp_servers: backup.mcp_servers.len(),
+        rules: backup.rules.len(),
+        skills: backup.skills.len(),
+        codex_providers: backup.codex_config.as_ref().map(|c| c.model_providers.len()).unwrap_or(0),
+        codex_mcp_servers: backup.codex_config.as_ref().map(|c| c.mcp_servers.len()).unwrap_or(0),
+        gemini_configured: backup.gemini_config.is_some(),
+        gemini_mcp_servers: backup.gemini_config.as_ref().map(|c| c.mcp_servers.len()).unwrap_or(0),
+        usage_records: backup.usage_stats.as_ref().map(|r| r.len()).unwrap_or(0),
+        chat_conversations: 0,
+    };
+    
+    let content = serde_json::to_string_pretty(&backup)
+        .map_err(|e| AppError::Custom(format!("Failed to serialize: {}", e)))?;
+    
+    fs::write(&file_path, content)
+        .map_err(|e| AppError::Custom(format!("Failed to write file: {}", e)))?;
+    
+    Ok(stats)
+}
+
+#[tauri::command]
+pub fn export_backup_filtered(
+    file_path: String,
+    options: FilteredExportOptions,
+    chat_conversations: Option<Vec<ExportedChatConversation>>,
+    config_manager: State<'_, Mutex<ConfigManager>>,
+    db: State<'_, std::sync::Arc<crate::database::Database>>,
+) -> Result<ExportStats, AppError> {
+    let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
+    let mut backup = create_backup_internal(&manager)?;
+
+    // 按名称过滤 providers
+    backup.providers.retain(|p| options.provider_names.contains(&p.name));
+    
+    // 按名称过滤 MCP
+    backup.mcp_servers.retain(|m| options.mcp_names.contains(&m.name));
+    
+    // 按 "name|location" 过滤 rules
+    backup.rules.retain(|r| {
+        let id = format!("{}|{}", r.name, r.location);
+        options.rule_ids.contains(&id)
+    });
+    
+    // 按 "name|location" 过滤 skills
+    backup.skills.retain(|s| {
+        let id = format!("{}|{}", s.name, s.location);
+        options.skill_ids.contains(&id)
+    });
+    
+    // Codex CLI 过滤：按名称分别过滤 providers 和 MCP
+    if let Some(ref mut codex) = backup.codex_config {
+        codex.model_providers.retain(|p| options.codex_provider_names.contains(&p.name));
+        codex.mcp_servers.retain(|m| options.codex_mcp_names.contains(&m.name));
+        if codex.model_providers.is_empty() && codex.mcp_servers.is_empty() {
+            backup.codex_config = None;
+        }
+    }
+    // Gemini CLI 过滤：env 和 MCP 分别控制
+    if let Some(ref mut gemini) = backup.gemini_config {
+        if !options.include_gemini_env {
+            gemini.env = ExportedGeminiEnv {
+                gemini_api_key: None,
+                google_gemini_api_key: None,
+                google_gemini_base_url: None,
+                gemini_model: None,
+            };
+        }
+        gemini.mcp_servers.retain(|m| options.gemini_mcp_names.contains(&m.name));
+        let has_env = options.include_gemini_env;
+        if !has_env && gemini.mcp_servers.is_empty() {
+            backup.gemini_config = None;
+        }
+    }
+    
+    // 开发环境（直接使用前端传入的版本号）
+    if !options.dev_envs.is_empty() {
+        backup.dev_envs = Some(options.dev_envs.clone());
+    }
+
+    // 按来源导出使用统计
+    if !options.usage_sources.is_empty() {
+        let conn = db.conn.lock().map_err(|e| AppError::Custom(format!("DB lock failed: {}", e)))?;
+        let mut usage_records = Vec::new();
+        let placeholders: Vec<&str> = options.usage_sources.iter().map(|_| "?").collect();
+        let sql = format!(
+            "SELECT session_id, created_at, model, app_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost FROM proxy_request_logs WHERE app_type IN ({}) ORDER BY created_at",
+            placeholders.join(", ")
+        );
+        if let Ok(mut stmt) = conn.prepare(&sql) {
+            if let Ok(rows) = stmt.query_map(rusqlite::params_from_iter(options.usage_sources.iter()), |row| {
+                Ok(ExportedUsageRecord {
+                    session_id: row.get::<_, String>(0).unwrap_or_default(),
+                    timestamp: row.get::<_, i64>(1).unwrap_or(0),
+                    model: row.get::<_, String>(2).unwrap_or_default(),
+                    source: row.get::<_, String>(3).unwrap_or_default(),
+                    input_tokens: row.get::<_, u32>(4).unwrap_or(0),
+                    output_tokens: row.get::<_, u32>(5).unwrap_or(0),
+                    cache_read_tokens: row.get::<_, u32>(6).unwrap_or(0),
+                    cache_creation_tokens: row.get::<_, u32>(7).unwrap_or(0),
+                    cost: row.get::<_, f64>(8).ok(),
+                })
+            }) {
+                for r in rows.flatten() { usage_records.push(r); }
+            }
+        }
+        backup.usage_stats = Some(usage_records);
+    }
+    
+    // 添加对话记录
+    backup.chat_conversations = chat_conversations;
     
     let stats = ExportStats {
         providers: backup.providers.len(),
@@ -553,6 +846,8 @@ pub fn export_backup(
         codex_mcp_servers: backup.codex_config.as_ref().map(|c| c.mcp_servers.len()).unwrap_or(0),
         gemini_configured: backup.gemini_config.is_some(),
         gemini_mcp_servers: backup.gemini_config.as_ref().map(|c| c.mcp_servers.len()).unwrap_or(0),
+        usage_records: backup.usage_stats.as_ref().map(|r| r.len()).unwrap_or(0),
+        chat_conversations: backup.chat_conversations.as_ref().map(|c| c.len()).unwrap_or(0),
     };
     
     let content = serde_json::to_string_pretty(&backup)
@@ -580,6 +875,7 @@ pub fn import_backup(
     file_path: String,
     options: ImportOptions,
     config_manager: State<'_, Mutex<ConfigManager>>,
+    db: State<'_, std::sync::Arc<crate::database::Database>>,
 ) -> Result<ImportResult, AppError> {
     let content = fs::read_to_string(&file_path)
         .map_err(|e| AppError::Custom(format!("Failed to read file: {}", e)))?;
@@ -601,6 +897,8 @@ pub fn import_backup(
         codex_skipped: 0,
         gemini_imported: 0,
         gemini_skipped: 0,
+        usage_imported: 0,
+        usage_skipped: 0,
         errors: Vec::new(),
     };
     
@@ -837,6 +1135,47 @@ pub fn import_backup(
         }
     }
     
+    // 导入使用统计数据
+    if options.import_usage_stats {
+        if let Some(records) = &backup.usage_stats {
+            if let Ok(conn) = db.conn.lock() {
+                // 收集已有的 session_id+timestamp 用于去重
+                let mut existing_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+                if let Ok(mut stmt) = conn.prepare("SELECT session_id, created_at FROM proxy_request_logs") {
+                    if let Ok(rows) = stmt.query_map([], |row| {
+                        let sid: String = row.get(0)?;
+                        let ts: i64 = row.get(1)?;
+                        Ok(format!("{}|{}", sid, ts))
+                    }) {
+                        for key in rows.flatten() { existing_keys.insert(key); }
+                    }
+                }
+
+                let _ = conn.execute_batch("BEGIN IMMEDIATE");
+                for record in records {
+                    let dedup_key = format!("{}|{}", record.session_id, record.timestamp);
+                    if existing_keys.contains(&dedup_key) {
+                        result.usage_skipped += 1;
+                        continue;
+                    }
+                    let insert_result = conn.execute(
+                        "INSERT INTO proxy_request_logs (session_id, created_at, model, app_type, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost, success) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1)",
+                        rusqlite::params![
+                            record.session_id, record.timestamp, record.model, record.source,
+                            record.input_tokens, record.output_tokens, record.cache_read_tokens,
+                            record.cache_creation_tokens, record.cost.unwrap_or(0.0)
+                        ],
+                    );
+                    match insert_result {
+                        Ok(_) => { result.usage_imported += 1; }
+                        Err(_) => { result.usage_skipped += 1; }
+                    }
+                }
+                let _ = conn.execute_batch("COMMIT");
+            }
+        }
+    }
+
     result.success = result.errors.is_empty();
     Ok(result)
 }

@@ -110,12 +110,12 @@ async function apply() {
     }
     
     // 2. 应用到 CLI 工具（选中优先，否则取启用列表第一个）
-  if (hasCliTarget) {
-    const providerName = cliProviderName.value
-    if (!providerName) {
-      error.value = '请先选择一个服务商用于 CLI 配置'
-      return
-    }
+    if (hasCliTarget) {
+      const providerName = cliProviderName.value
+      if (!providerName) {
+        error.value = t('applyConfig.selectProviderForCli')
+        return
+      }
       if (!props.selectedProviderEnabled) {
         await invoke('toggle_provider', { name: providerName, enabled: true })
       }
@@ -185,8 +185,7 @@ async function apply() {
             </div>
 
             <p class="text-sm text-muted-foreground">
-              将 <span class="font-semibold text-accent-500">{{ modelTypeLabel }}</span> 厂家的
-              <span class="font-mono font-medium">{{ providerNames.length }}</span> 个服务商配置应用到：
+              {{ t('applyConfig.applyProvidersDesc', { vendor: modelTypeLabel, count: providerNames.length }) }}
             </p>
             <div class="mt-2 text-xs text-muted-foreground bg-surface rounded-lg p-2 max-h-20 overflow-y-auto">
               <div v-for="name in providerNames" :key="name" class="font-mono">• {{ name }}</div>
@@ -214,11 +213,11 @@ async function apply() {
             </div>
             
             <!-- CLI 工具配置 -->
-          <div class="space-y-2 pt-2 border-t border-border">
+            <div class="space-y-2 pt-2 border-t border-border">
               <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{{ t('applyConfig.cliTools') }}</div>
-            <div class="text-xs text-muted-foreground">
-              将使用服务商：<span class="font-mono text-primary">{{ cliProviderName || '未选择' }}</span>
-            </div>
+              <div class="text-xs text-muted-foreground">
+                {{ t('applyConfig.willUseProvider') }}<span class="font-mono text-primary">{{ cliProviderName || t('common.notSelected') }}</span>
+              </div>
               <div class="space-y-2 pl-1">
                 <label class="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" v-model="applyToClaudeCode" class="w-4 h-4 rounded border-border" />

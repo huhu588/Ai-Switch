@@ -3,16 +3,24 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import SvgIcon from '@/components/SvgIcon.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
 // 类型定义
+interface OhMyVersionInfo {
+  current_version: string | null
+  latest_version: string | null
+  has_update: boolean
+}
+
 interface OhMyStatus {
   bun_installed: boolean
   bun_version: string | null
   npm_installed: boolean
   ohmy_installed: boolean
   config: OhMyConfig | null
+  version_info: OhMyVersionInfo | null
 }
 
 interface OhMyConfig {
@@ -36,6 +44,7 @@ interface AgentInfo {
 const loading = ref(true)
 const installing = ref(false)
 const uninstalling = ref(false)
+const updating = ref(false)
 const installLog = ref('')
 const status = ref<OhMyStatus | null>(null)
 const availableModels = ref<AvailableModel[]>([])
@@ -47,6 +56,9 @@ const agentModels = ref<Record<string, string>>({})
 // 消息提示
 const message = ref('')
 const messageType = ref<'success' | 'error'>('success')
+
+// 卸载确认对话框
+const showUninstallConfirm = ref(false)
 
 // Agent 图标映射
 const agentIcons: Record<string, string> = {
@@ -146,6 +158,11 @@ async function loadStatus() {
     availableModels.value = modelsResult
     agentInfos.value = agentsResult
     
+    // 加载成功后清空日志（仅失败时保留）
+    if (!installLog.value.includes('❌')) {
+      installLog.value = ''
+    }
+    
     // 初始化模型选择
     initAgentModels()
   } catch (e) {
@@ -165,14 +182,15 @@ async function installAndConfigure() {
     const result = await invoke<string>('install_and_configure', {
       agents: agentModels.value
     })
-    installLog.value = result
+    // 成功时清空日志，不需要显示
+    installLog.value = ''
     showMessage(t('ohmy.installSuccess'), 'success')
     
     // 重新加载状态
     await loadStatus()
   } catch (e) {
     console.error('安装失败:', e)
-    // 保留之前的日志并附加错误信息
+    // 失败时保留日志并附加错误信息
     installLog.value = installLog.value + '\n❌ ' + String(e)
     showMessage(t('ohmy.installFailed'), 'error')
   } finally {
@@ -208,27 +226,48 @@ function setAllAgentsModel(model: string) {
 }
 
 // 卸载 oh-my-opencode
-async function uninstall() {
-  if (!confirm(t('ohmy.confirmUninstall'))) {
-    return
-  }
-  
+async function doUninstall() {
   uninstalling.value = true
   installLog.value = ''
   
   try {
-    const result = await invoke<string>('uninstall_ohmy')
-    installLog.value = result
+    await invoke<string>('uninstall_ohmy')
+    // 成功时清空日志
+    installLog.value = ''
     showMessage(t('ohmy.uninstallSuccess'), 'success')
     
     // 重新加载状态
     await loadStatus()
   } catch (e) {
     console.error('卸载失败:', e)
-    installLog.value = String(e)
+    // 失败时显示错误
+    installLog.value = '❌ ' + String(e)
     showMessage(t('ohmy.uninstallFailed'), 'error')
   } finally {
     uninstalling.value = false
+  }
+}
+
+// 更新 oh-my-opencode
+async function updateOhmy() {
+  updating.value = true
+  installLog.value = t('ohmy.startingUpdate') + '\n'
+  
+  try {
+    await invoke<string>('update_ohmy')
+    // 成功时清空日志
+    installLog.value = ''
+    showMessage(t('ohmy.updateSuccess'), 'success')
+    
+    // 重新加载状态
+    await loadStatus()
+  } catch (e) {
+    console.error('更新失败:', e)
+    // 失败时保留日志
+    installLog.value = installLog.value + '\n❌ ' + String(e)
+    showMessage(t('ohmy.updateFailed'), 'error')
+  } finally {
+    updating.value = false
   }
 }
 
@@ -238,6 +277,14 @@ onMounted(() => {
 </script>
 
 <template>
+  <ConfirmDialog
+    v-model:visible="showUninstallConfirm"
+    :title="t('ohmy.uninstallTitle', t('confirm.title'))"
+    :message="t('ohmy.confirmUninstall')"
+    :confirm-text="t('ohmy.uninstall', t('common.confirm'))"
+    danger
+    @confirm="doUninstall"
+  />
   <div class="h-full flex flex-col gap-4 overflow-auto">
     <!-- 标题区域 -->
     <div class="flex items-center justify-between flex-shrink-0">
@@ -338,6 +385,30 @@ onMounted(() => {
             ></div>
             <span class="text-sm">
               oh-my-opencode: {{ status?.ohmy_installed ? t('ohmy.installed') : t('ohmy.notInstalled') }}
+            </span>
+          </div>
+          
+          <!-- 版本信息 -->
+          <div v-if="status?.version_info?.current_version" class="flex items-center gap-2">
+            <span class="text-sm text-muted-foreground">
+              v{{ status.version_info.current_version }}
+            </span>
+            <!-- 有更新时显示更新提示 -->
+            <template v-if="status.version_info.has_update && status.version_info.latest_version">
+              <span class="text-xs text-yellow-500">→ v{{ status.version_info.latest_version }}</span>
+              <button
+                @click="updateOhmy"
+                :disabled="updating"
+                class="px-2 py-1 rounded text-xs bg-accent hover:bg-accent/90 text-white font-medium transition-all flex items-center gap-1 disabled:opacity-50"
+              >
+                <SvgIcon v-if="updating" name="refresh" :size="12" class="animate-spin" />
+                <SvgIcon v-else name="download" :size="12" />
+                {{ updating ? t('ohmy.updating') : t('ohmy.update') }}
+              </button>
+            </template>
+            <!-- 已是最新版本 -->
+            <span v-else-if="status.version_info.latest_version && !status.version_info.has_update" class="text-xs text-emerald-500">
+              ✓ {{ t('ohmy.latestVersion') }}
             </span>
           </div>
         </div>
@@ -444,7 +515,7 @@ onMounted(() => {
       <!-- 卸载按钮（仅已安装时显示） -->
       <div v-if="status?.ohmy_installed" class="pt-4 border-t border-border">
         <button
-          @click="uninstall"
+          @click="showUninstallConfirm = true"
           :disabled="uninstalling"
           class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >

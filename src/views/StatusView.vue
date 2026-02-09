@@ -12,6 +12,23 @@ const updateDialogRef = ref<InstanceType<typeof UpdateDialog> | null>(null)
 const isCheckingUpdate = ref(false)
 const updateMessage = ref('')
 
+// CLI 工具版本检测
+interface CliToolInfo {
+  id: string
+  name: string
+  installed: boolean
+  current_version: string | null
+  latest_version: string | null
+  has_update: boolean
+  npm_package: string
+  description: string
+}
+const cliTools = ref<CliToolInfo[]>([])
+const cliLoading = ref(false)
+const cliCheckingLatest = ref<Record<string, boolean>>({})
+const cliUpdating = ref<Record<string, boolean>>({})
+const cliUpdateMsg = ref<Record<string, string>>({})
+
 // 关闭行为设置
 type CloseAction = 'ask' | 'tray' | 'quit'
 const closeAction = ref<CloseAction>('ask')
@@ -94,6 +111,69 @@ async function loadEnvConflicts() {
   }
 }
 
+// 加载 CLI 工具信息
+async function loadCliTools() {
+  cliLoading.value = true
+  try {
+    cliTools.value = await invoke<CliToolInfo[]>('detect_cli_tools')
+    // 对已安装的工具自动查询最新版本
+    for (const tool of cliTools.value) {
+      if (tool.installed) {
+        checkLatestVersion(tool)
+      }
+    }
+  } catch (e) {
+    console.error('检测 CLI 工具失败:', e)
+  } finally {
+    cliLoading.value = false
+  }
+}
+
+// 查询单个工具最新版本
+async function checkLatestVersion(tool: CliToolInfo) {
+  cliCheckingLatest.value[tool.id] = true
+  try {
+    const latest = await invoke<string>('check_cli_latest_version', { npmPackage: tool.npm_package })
+    tool.latest_version = latest
+    tool.has_update = !!(tool.current_version && latest && tool.current_version !== latest)
+  } catch {
+    // 查询失败静默处理
+  } finally {
+    cliCheckingLatest.value[tool.id] = false
+  }
+}
+
+// 更新单个 CLI 工具
+async function updateCliTool(tool: CliToolInfo) {
+  cliUpdating.value[tool.id] = true
+  cliUpdateMsg.value[tool.id] = ''
+  try {
+    await invoke<string>('update_cli_tool', { npmPackage: tool.npm_package })
+    cliUpdateMsg.value[tool.id] = t('status.cliTools.updateSuccess')
+    // 刷新版本信息
+    await loadCliTools()
+  } catch (e) {
+    cliUpdateMsg.value[tool.id] = String(e)
+  } finally {
+    cliUpdating.value[tool.id] = false
+  }
+}
+
+// 安装 CLI 工具
+async function installCliTool(tool: CliToolInfo) {
+  cliUpdating.value[tool.id] = true
+  cliUpdateMsg.value[tool.id] = ''
+  try {
+    await invoke<string>('update_cli_tool', { npmPackage: tool.npm_package })
+    cliUpdateMsg.value[tool.id] = t('status.cliTools.installSuccess')
+    await loadCliTools()
+  } catch (e) {
+    cliUpdateMsg.value[tool.id] = String(e)
+  } finally {
+    cliUpdating.value[tool.id] = false
+  }
+}
+
 async function checkForUpdates() {
   isCheckingUpdate.value = true
   updateMessage.value = ''
@@ -140,6 +220,7 @@ onMounted(() => {
   loadCloseAction()
   loadAutoStart()
   loadEnvConflicts()
+  loadCliTools()
 })
 </script>
 
@@ -236,6 +317,86 @@ onMounted(() => {
             <div v-if="status.config_paths.project_opencode_dir" class="flex items-start gap-3">
               <span class="text-muted-foreground w-20 shrink-0">{{ t('status.projectConfig') }}</span>
               <span class="font-mono text-xs break-all">{{ status.config_paths.project_opencode_dir }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- CLI 工具版本检测 -->
+        <section>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            {{ t('status.cliTools.title') }}
+          </h3>
+          <div v-if="cliLoading" class="text-sm text-muted-foreground">
+            {{ t('common.loading') }}
+          </div>
+          <div v-else class="space-y-3">
+            <div
+              v-for="tool in cliTools"
+              :key="tool.id"
+              class="bg-surface rounded-lg p-4 flex items-center justify-between gap-4"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <!-- 状态圆点 -->
+                <span
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :class="tool.installed ? (tool.has_update ? 'bg-amber-400' : 'bg-emerald-500') : 'bg-gray-400'"
+                />
+                <div class="min-w-0">
+                  <div class="font-medium text-sm">{{ tool.name }}</div>
+                  <div class="text-xs text-muted-foreground truncate">
+                    <template v-if="tool.installed">
+                      v{{ tool.current_version }}
+                      <template v-if="cliCheckingLatest[tool.id]">
+                        · {{ t('status.cliTools.checkingLatest') }}
+                      </template>
+                      <template v-else-if="tool.latest_version">
+                        · {{ t('status.cliTools.latest') }}: v{{ tool.latest_version }}
+                        <span v-if="tool.has_update" class="text-amber-400 font-medium ml-1">{{ t('status.cliTools.newAvailable') }}</span>
+                      </template>
+                    </template>
+                    <template v-else>
+                      {{ t('status.cliTools.notInstalled') }}
+                    </template>
+                  </div>
+                  <!-- 更新/安装结果消息 -->
+                  <div v-if="cliUpdateMsg[tool.id]" class="text-[11px] mt-0.5" :class="cliUpdateMsg[tool.id].startsWith('更新失败') || cliUpdateMsg[tool.id].startsWith('执行') ? 'text-red-400' : 'text-emerald-400'">
+                    {{ cliUpdateMsg[tool.id] }}
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <!-- 已安装且有更新 -->
+                <button
+                  v-if="tool.installed && tool.has_update"
+                  @click="updateCliTool(tool)"
+                  :disabled="cliUpdating[tool.id]"
+                  class="px-3 py-1.5 text-xs font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <svg v-if="cliUpdating[tool.id]" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ cliUpdating[tool.id] ? t('status.cliTools.updating') : t('status.cliTools.update') }}
+                </button>
+                <!-- 已安装且是最新版 -->
+                <span
+                  v-else-if="tool.installed && !tool.has_update && tool.latest_version"
+                  class="text-xs text-emerald-500"
+                >{{ t('status.cliTools.upToDate') }}</span>
+                <!-- 未安装 -->
+                <button
+                  v-if="!tool.installed"
+                  @click="installCliTool(tool)"
+                  :disabled="cliUpdating[tool.id]"
+                  class="px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 hover:bg-accent/20 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <svg v-if="cliUpdating[tool.id]" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ cliUpdating[tool.id] ? t('status.cliTools.installing') : t('status.cliTools.install') }}
+                </button>
+              </div>
             </div>
           </div>
         </section>
