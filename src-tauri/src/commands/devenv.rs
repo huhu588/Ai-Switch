@@ -454,6 +454,40 @@ fn refresh_env_path() -> Result<(), String> {
     }
 }
 
+// ========== 非 Windows 平台 stub 函数 ==========
+
+#[cfg(not(target_os = "windows"))]
+fn refresh_env_path() -> Result<(), String> { Ok(()) }
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_scoop_installed() -> Result<(), String> {
+    Err("Scoop 仅在 Windows 上可用".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_msys2_installed() -> Result<(), String> {
+    Err("MSYS2 仅在 Windows 上可用".to_string())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn scoop_uninstall_manager_safely() -> Result<String, String> {
+    Err("Scoop 仅在 Windows 上可用".to_string())
+}
+
+/// 跨平台辅助：在 Windows 上以隐藏窗口运行 PowerShell 命令
+#[cfg(target_os = "windows")]
+fn run_powershell_hidden(cmd: &str) -> std::io::Result<std::process::Output> {
+    Command::new("powershell")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", cmd])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn run_powershell_hidden(_cmd: &str) -> std::io::Result<std::process::Output> {
+    Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "PowerShell 仅在 Windows 上可用"))
+}
+
 // ========== PATH 检查工具 ==========
 
 /// Windows 下检查已知目录并加入当前进程 PATH（解决安装后不在 PATH 中的问题）
@@ -604,6 +638,7 @@ fn detect_python() -> DevEnvInfo {
     let installed = py_version.is_some();
 
     // 检测 pyenv（先检查 PATH，Windows 下再检查已知安装路径）
+    #[allow(unused_mut)]
     let mut pyenv_version = run_cmd("pyenv", &["--version"])
         .map(|v| extract_version(&v));
 
@@ -1378,10 +1413,7 @@ pub async fn install_version_manager(env_name: String) -> Result<String, String>
                             if($p -notlike '*pyenv-win*'){{[Environment]::SetEnvironmentVariable('Path','{bin};{shims};'+$p,'User')}}",
                             pw = pyenv_win_dir, bin = pyenv_bin, shims = pyenv_shims
                         );
-                        let _ = Command::new("powershell")
-                            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &ps_cmd])
-                            .creation_flags(CREATE_NO_WINDOW)
-                            .output();
+                        let _ = run_powershell_hidden(&ps_cmd);
                     }
 
                     result.map(|out| format!("pyenv-win 安装完成\n{}", out))
@@ -1630,10 +1662,7 @@ pub async fn uninstall_version_manager(env_name: String) -> Result<String, Strin
                         $p=[Environment]::GetEnvironmentVariable('Path','User');\
                         $p=($p -split ';' | Where-Object { $_ -notlike '*pyenv*' }) -join ';';\
                         [Environment]::SetEnvironmentVariable('Path',$p,'User')";
-                    let _ = Command::new("powershell")
-                        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd])
-                        .creation_flags(CREATE_NO_WINDOW)
-                        .output();
+                    let _ = run_powershell_hidden(ps_cmd);
                     let _ = refresh_env_path();
                     result.map(|out| format!("pyenv-win 已卸载\n{}", out))
                         .map_err(|e| format!("pyenv-win 卸载失败: {}", e))
@@ -1661,7 +1690,7 @@ pub async fn uninstall_version_manager(env_name: String) -> Result<String, Strin
                     let result = scoop_uninstall_manager_safely();
                     if result.is_ok() {
                         let ps_cmd = "$p=[Environment]::GetEnvironmentVariable('Path','User');$p=($p -split ';' | Where-Object { $_ -notlike '*\\\\scoop\\\\shims*' }) -join ';';[Environment]::SetEnvironmentVariable('Path',$p,'User')";
-                        let _ = Command::new("powershell").args(["-NoProfile","-ExecutionPolicy","Bypass","-Command",ps_cmd]).creation_flags(CREATE_NO_WINDOW).output();
+                        let _ = run_powershell_hidden(ps_cmd);
                         let _ = refresh_env_path();
                     }
                     result.map(|out| format!("Scoop 已卸载\n{}", out))
@@ -1696,7 +1725,7 @@ pub async fn uninstall_version_manager(env_name: String) -> Result<String, Strin
                     let result = scoop_uninstall_manager_safely();
                     if result.is_ok() {
                         let ps_cmd = "$p=[Environment]::GetEnvironmentVariable('Path','User');$p=($p -split ';' | Where-Object { $_ -notlike '*\\\\scoop\\\\shims*' }) -join ';';[Environment]::SetEnvironmentVariable('Path',$p,'User')";
-                        let _ = Command::new("powershell").args(["-NoProfile","-ExecutionPolicy","Bypass","-Command",ps_cmd]).creation_flags(CREATE_NO_WINDOW).output();
+                        let _ = run_powershell_hidden(ps_cmd);
                         let _ = refresh_env_path();
                     }
                     result.map(|out| format!("Scoop 已卸载\n{}", out))
@@ -1709,7 +1738,7 @@ pub async fn uninstall_version_manager(env_name: String) -> Result<String, Strin
                     let result = scoop_uninstall_manager_safely();
                     if result.is_ok() {
                         let ps_cmd = "$p=[Environment]::GetEnvironmentVariable('Path','User');$p=($p -split ';' | Where-Object { $_ -notlike '*\\\\scoop\\\\shims*' }) -join ';';[Environment]::SetEnvironmentVariable('Path',$p,'User')";
-                        let _ = Command::new("powershell").args(["-NoProfile","-ExecutionPolicy","Bypass","-Command",ps_cmd]).creation_flags(CREATE_NO_WINDOW).output();
+                        let _ = run_powershell_hidden(ps_cmd);
                         let _ = refresh_env_path();
                     }
                     result.map(|out| format!("Scoop 已卸载\n{}", out))
