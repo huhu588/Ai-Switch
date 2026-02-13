@@ -1,5 +1,3 @@
-// Backup and Import module
-// Supports exporting and importing providers, MCP, rules, and skills
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,10 +12,8 @@ use crate::config::gemini_manager::GeminiConfigManager;
 use crate::error::AppError;
 use super::model::build_variants;
 
-/// Backup file format version
 const BACKUP_VERSION: &str = "1.2.0";
 
-/// Exported Provider data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedProvider {
     pub name: String,
@@ -30,7 +26,6 @@ pub struct ExportedProvider {
     pub models: Vec<ExportedModel>,
 }
 
-/// Exported Model data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedModel {
     pub id: String,
@@ -38,7 +33,6 @@ pub struct ExportedModel {
     pub reasoning_effort: Option<String>,
 }
 
-/// Exported OAuth config
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedOAuthConfig {
     pub client_id: Option<String>,
@@ -46,7 +40,6 @@ pub struct ExportedOAuthConfig {
     pub scope: Option<String>,
 }
 
-/// Exported MCP server data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedMcpServer {
     pub name: String,
@@ -57,19 +50,16 @@ pub struct ExportedMcpServer {
     pub environment: Option<HashMap<String, String>>,
     pub url: Option<String>,
     pub headers: Option<HashMap<String, String>>,
-    /// OAuth 配置（用于远程服务器认证）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oauth: Option<ExportedOAuthConfig>,
 }
 
-/// Exported Rule data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedRule {
     pub name: String,
     pub location: String,
     pub rule_type: String,
     pub content: String,
-    /// 文件扩展名 (md 或 mdc)，用于导入时正确恢复
     #[serde(default = "default_file_ext")]
     pub file_ext: String,
 }
@@ -78,7 +68,6 @@ fn default_file_ext() -> String {
     "md".to_string()
 }
 
-/// Exported skills data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedSkills {
     pub name: String,
@@ -86,9 +75,6 @@ pub struct ExportedSkills {
     pub content: String,
 }
 
-// ==================== Codex CLI 配置导出结构 ====================
-
-/// Exported Codex model provider
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedCodexProvider {
     pub name: String,
@@ -99,7 +85,6 @@ pub struct ExportedCodexProvider {
     pub requires_openai_auth: Option<bool>,
 }
 
-/// Exported Codex MCP server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedCodexMcpServer {
     pub name: String,
@@ -108,7 +93,6 @@ pub struct ExportedCodexMcpServer {
     pub env: HashMap<String, String>,
 }
 
-/// Exported Codex configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExportedCodexConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -117,9 +101,6 @@ pub struct ExportedCodexConfig {
     pub mcp_servers: Vec<ExportedCodexMcpServer>,
 }
 
-// ==================== Gemini CLI 配置导出结构 ====================
-
-/// Exported Gemini environment configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExportedGeminiEnv {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,7 +113,6 @@ pub struct ExportedGeminiEnv {
     pub gemini_model: Option<String>,
 }
 
-/// Exported Gemini MCP server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedGeminiMcpServer {
     pub name: String,
@@ -146,7 +126,6 @@ pub struct ExportedGeminiMcpServer {
     pub url: Option<String>,
 }
 
-/// Exported Gemini configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExportedGeminiConfig {
     #[serde(default)]
@@ -155,7 +134,6 @@ pub struct ExportedGeminiConfig {
     pub mcp_servers: Vec<ExportedGeminiMcpServer>,
 }
 
-/// Exported usage stats record
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedUsageRecord {
     pub session_id: String,
@@ -172,7 +150,6 @@ pub struct ExportedUsageRecord {
     pub cost: Option<f64>,
 }
 
-/// 导出的对话消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportedChatMessage {
@@ -186,7 +163,6 @@ pub struct ExportedChatMessage {
     pub tool_use: Option<serde_json::Value>,
 }
 
-/// 导出的对话记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportedChatConversation {
@@ -200,7 +176,6 @@ pub struct ExportedChatConversation {
     pub created_at: Option<f64>,
 }
 
-/// 导出的开发环境（仅保存版本号，跨设备重装）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportedDevEnv {
     pub id: String,
@@ -209,7 +184,6 @@ pub struct ExportedDevEnv {
     pub version: Option<String>,
 }
 
-/// Complete backup data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackupData {
     pub version: String,
@@ -219,24 +193,18 @@ pub struct BackupData {
     pub mcp_servers: Vec<ExportedMcpServer>,
     pub rules: Vec<ExportedRule>,
     pub skills: Vec<ExportedSkills>,
-    /// Codex CLI 配置（v1.1.0 新增）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_config: Option<ExportedCodexConfig>,
-    /// Gemini CLI 配置（v1.1.0 新增）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gemini_config: Option<ExportedGeminiConfig>,
-    /// 使用统计数据
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_stats: Option<Vec<ExportedUsageRecord>>,
-    /// 对话记录
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chat_conversations: Option<Vec<ExportedChatConversation>>,
-    /// 开发环境（仅版本号）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dev_envs: Option<Vec<ExportedDevEnv>>,
 }
 
-/// Export statistics
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportStats {
     pub providers: usize,
@@ -244,23 +212,16 @@ pub struct ExportStats {
     pub mcp_servers: usize,
     pub rules: usize,
     pub skills: usize,
-    /// Codex model providers 数量
     pub codex_providers: usize,
-    /// Codex MCP servers 数量
     pub codex_mcp_servers: usize,
-    /// Gemini 配置是否存在
     pub gemini_configured: bool,
-    /// Gemini MCP servers 数量
     pub gemini_mcp_servers: usize,
-    /// 使用统计记录数
     #[serde(default)]
     pub usage_records: usize,
-    /// 对话记录数量
     #[serde(default)]
     pub chat_conversations: usize,
 }
 
-/// Export options - 选择性导出
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExportOptions {
     #[serde(default = "default_true")]
@@ -275,49 +236,36 @@ pub struct ExportOptions {
     pub include_codex: bool,
     #[serde(default = "default_true")]
     pub include_gemini: bool,
-    /// 是否导出使用统计数据
     #[serde(default)]
     pub include_usage_stats: bool,
 }
 
 fn default_true() -> bool { true }
 
-/// 精细化导出选项 - 按名称级别过滤
 #[derive(Debug, Clone, Deserialize)]
 pub struct FilteredExportOptions {
-    /// 选中的 OpenCode provider 名称
     #[serde(default)]
     pub provider_names: Vec<String>,
-    /// 选中的 OpenCode MCP 服务器名称
     #[serde(default)]
     pub mcp_names: Vec<String>,
-    /// 选中的规则标识 "name|location"
     #[serde(default)]
     pub rule_ids: Vec<String>,
-    /// 选中的 skill 标识 "name|location"
     #[serde(default)]
     pub skill_ids: Vec<String>,
-    /// 选中的 Codex CLI provider 名称
     #[serde(default)]
     pub codex_provider_names: Vec<String>,
-    /// 选中的 Codex CLI MCP 服务器名称
     #[serde(default)]
     pub codex_mcp_names: Vec<String>,
-    /// 是否包含 Gemini 环境配置
     #[serde(default)]
     pub include_gemini_env: bool,
-    /// 选中的 Gemini CLI MCP 服务器名称
     #[serde(default)]
     pub gemini_mcp_names: Vec<String>,
-    /// 使用统计来源列表 (claude/codex/gemini/opencode/cursor)，空数组则不导出
     #[serde(default)]
     pub usage_sources: Vec<String>,
-    /// 需要备份的开发环境（仅版本号）
     #[serde(default)]
     pub dev_envs: Vec<ExportedDevEnv>,
 }
 
-/// Import options
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImportOptions {
     pub import_providers: bool,
@@ -325,18 +273,16 @@ pub struct ImportOptions {
     pub import_rules: bool,
     pub import_skills: bool,
     pub overwrite_existing: bool,
-    /// 是否导入 Codex CLI 配置
     #[serde(default)]
     pub import_codex: bool,
-    /// 是否导入 Gemini CLI 配置
     #[serde(default)]
     pub import_gemini: bool,
-    /// 是否导入使用统计数据
     #[serde(default)]
     pub import_usage_stats: bool,
+    #[serde(default)]
+    pub import_chat_conversations: bool,
 }
 
-/// Import result
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportResult {
     pub success: bool,
@@ -348,26 +294,23 @@ pub struct ImportResult {
     pub rules_skipped: usize,
     pub skills_imported: usize,
     pub skills_skipped: usize,
-    /// Codex 配置导入数量
     pub codex_imported: usize,
-    /// Codex 配置跳过数量
     pub codex_skipped: usize,
-    /// Gemini 配置导入数量
     pub gemini_imported: usize,
-    /// Gemini 配置跳过数量
     pub gemini_skipped: usize,
-    /// 使用统计导入数量
     #[serde(default)]
     pub usage_imported: usize,
-    /// 使用统计跳过数量
     #[serde(default)]
     pub usage_skipped: usize,
+    #[serde(default)]
+    pub chat_conversations_imported: usize,
+    #[serde(default)]
+    pub chat_conversations_skipped: usize,
     pub errors: Vec<String>,
 }
 
 fn get_skills_paths() -> Vec<(PathBuf, String)> {
     let mut paths = Vec::new();
-    // 与 opencode CLI 保持一致，所有平台使用 ~/.config/opencode
     if let Some(home_dir) = dirs::home_dir() {
         paths.push((
             home_dir.join(".config").join("opencode").join("skills"),
@@ -377,12 +320,10 @@ fn get_skills_paths() -> Vec<(PathBuf, String)> {
             home_dir.join(".claude").join("skills"),
             "global_claude".to_string(),
         ));
-        // Codex CLI skills 路径
         paths.push((
             home_dir.join(".codex").join("skills"),
             "global_codex".to_string(),
         ));
-        // Gemini CLI skills 路径
         paths.push((
             home_dir.join(".gemini").join("skills"),
             "global_gemini".to_string(),
@@ -396,9 +337,7 @@ fn get_rule_paths() -> HashMap<String, PathBuf> {
     if let Some(home) = dirs::home_dir() {
         paths.insert("global_opencode".to_string(), home.join(".config").join("opencode"));
         paths.insert("global_claude".to_string(), home.join(".claude"));
-        // Codex CLI rules 路径
         paths.insert("global_codex".to_string(), home.join(".codex"));
-        // Gemini CLI rules 路径
         paths.insert("global_gemini".to_string(), home.join(".gemini"));
     }
     paths
@@ -434,7 +373,6 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
     let mcp_servers: Vec<ExportedMcpServer> = mcp_config.servers
         .iter()
         .map(|(name, server)| {
-            // 转换 OAuth 配置
             let oauth = server.oauth.as_ref().map(|o| ExportedOAuthConfig {
                 client_id: o.client_id.clone(),
                 client_secret: o.client_secret.clone(),
@@ -459,7 +397,6 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
     let rule_paths = get_rule_paths();
     
     for (location_key, base_path) in &rule_paths {
-        // 读取 AGENTS.md (OpenCode 和 Codex)
         if location_key == "global_opencode" || location_key == "global_codex" {
             let agents_path = base_path.join("AGENTS.md");
             if agents_path.exists() {
@@ -475,7 +412,6 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
             }
         }
         
-        // 读取 GEMINI.md (Gemini CLI)
         if location_key == "global_gemini" {
             let gemini_md_path = base_path.join("GEMINI.md");
             if gemini_md_path.exists() {
@@ -547,12 +483,12 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
         }
     }
     
-    // 读取 Codex CLI 配置
     let codex_config = read_codex_config();
     
-    // 读取 Gemini CLI 配置
     let gemini_config = read_gemini_config();
     
+    let chat_conversations = read_migrated_conversations_for_backup();
+
     Ok(BackupData {
         version: BACKUP_VERSION.to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
@@ -564,16 +500,14 @@ fn create_backup_internal(manager: &ConfigManager) -> Result<BackupData, AppErro
         codex_config,
         gemini_config,
         usage_stats: None,
-        chat_conversations: None,
+        chat_conversations,
         dev_envs: None,
     })
 }
 
-/// 读取 Codex CLI 配置
 fn read_codex_config() -> Option<ExportedCodexConfig> {
     let codex_manager = CodexConfigManager::new().ok()?;
     
-    // 读取 model_providers
     let model_providers: Vec<ExportedCodexProvider> = codex_manager
         .get_model_providers()
         .ok()
@@ -590,7 +524,6 @@ fn read_codex_config() -> Option<ExportedCodexConfig> {
         })
         .unwrap_or_default();
     
-    // 读取 mcp_servers
     let mcp_servers: Vec<ExportedCodexMcpServer> = codex_manager
         .get_mcp_servers()
         .ok()
@@ -606,7 +539,6 @@ fn read_codex_config() -> Option<ExportedCodexConfig> {
         })
         .unwrap_or_default();
     
-    // 如果没有任何配置，返回 None
     if model_providers.is_empty() && mcp_servers.is_empty() {
         return None;
     }
@@ -617,11 +549,9 @@ fn read_codex_config() -> Option<ExportedCodexConfig> {
     })
 }
 
-/// 读取 Gemini CLI 配置
 fn read_gemini_config() -> Option<ExportedGeminiConfig> {
     let gemini_manager = GeminiConfigManager::new().ok()?;
     
-    // 读取环境配置（即使失败也继续，因为可能只有 MCP 配置）
     let env = gemini_manager.read_env().ok()
         .map(|env_config| ExportedGeminiEnv {
             gemini_api_key: env_config.gemini_api_key,
@@ -631,7 +561,6 @@ fn read_gemini_config() -> Option<ExportedGeminiConfig> {
         })
         .unwrap_or_default();
     
-    // 读取 MCP servers
     let mcp_servers: Vec<ExportedGeminiMcpServer> = gemini_manager
         .get_mcp_servers()
         .ok()
@@ -649,7 +578,6 @@ fn read_gemini_config() -> Option<ExportedGeminiConfig> {
         })
         .unwrap_or_default();
     
-    // 检查是否有任何配置
     let has_env = env.gemini_api_key.is_some() 
         || env.google_gemini_api_key.is_some() 
         || env.google_gemini_base_url.is_some()
@@ -688,7 +616,6 @@ pub fn export_backup(
         include_skills: true, include_codex: true, include_gemini: true, include_usage_stats: false,
     });
 
-    // 按选项过滤
     if !opts.include_providers { backup.providers.clear(); }
     if !opts.include_mcp { backup.mcp_servers.clear(); }
     if !opts.include_rules { backup.rules.clear(); }
@@ -696,7 +623,6 @@ pub fn export_backup(
     if !opts.include_codex { backup.codex_config = None; }
     if !opts.include_gemini { backup.gemini_config = None; }
 
-    // 导出使用统计
     if opts.include_usage_stats {
         let conn = db.conn.lock().map_err(|e| AppError::Custom(format!("DB lock failed: {}", e)))?;
         let mut usage_records = Vec::new();
@@ -756,25 +682,20 @@ pub fn export_backup_filtered(
     let manager = config_manager.lock().map_err(|e| AppError::Custom(e.to_string()))?;
     let mut backup = create_backup_internal(&manager)?;
 
-    // 按名称过滤 providers
     backup.providers.retain(|p| options.provider_names.contains(&p.name));
     
-    // 按名称过滤 MCP
     backup.mcp_servers.retain(|m| options.mcp_names.contains(&m.name));
     
-    // 按 "name|location" 过滤 rules
     backup.rules.retain(|r| {
         let id = format!("{}|{}", r.name, r.location);
         options.rule_ids.contains(&id)
     });
     
-    // 按 "name|location" 过滤 skills
     backup.skills.retain(|s| {
         let id = format!("{}|{}", s.name, s.location);
         options.skill_ids.contains(&id)
     });
     
-    // Codex CLI 过滤：按名称分别过滤 providers 和 MCP
     if let Some(ref mut codex) = backup.codex_config {
         codex.model_providers.retain(|p| options.codex_provider_names.contains(&p.name));
         codex.mcp_servers.retain(|m| options.codex_mcp_names.contains(&m.name));
@@ -782,7 +703,6 @@ pub fn export_backup_filtered(
             backup.codex_config = None;
         }
     }
-    // Gemini CLI 过滤：env 和 MCP 分别控制
     if let Some(ref mut gemini) = backup.gemini_config {
         if !options.include_gemini_env {
             gemini.env = ExportedGeminiEnv {
@@ -799,12 +719,10 @@ pub fn export_backup_filtered(
         }
     }
     
-    // 开发环境（直接使用前端传入的版本号）
     if !options.dev_envs.is_empty() {
         backup.dev_envs = Some(options.dev_envs.clone());
     }
 
-    // 按来源导出使用统计
     if !options.usage_sources.is_empty() {
         let conn = db.conn.lock().map_err(|e| AppError::Custom(format!("DB lock failed: {}", e)))?;
         let mut usage_records = Vec::new();
@@ -833,7 +751,6 @@ pub fn export_backup_filtered(
         backup.usage_stats = Some(usage_records);
     }
     
-    // 添加对话记录
     backup.chat_conversations = chat_conversations;
     
     let stats = ExportStats {
@@ -899,6 +816,8 @@ pub fn import_backup(
         gemini_skipped: 0,
         usage_imported: 0,
         usage_skipped: 0,
+        chat_conversations_imported: 0,
+        chat_conversations_skipped: 0,
         errors: Vec::new(),
     };
     
@@ -929,7 +848,6 @@ pub fn import_backup(
                     }
                 }
             
-                // 根据 model_type 生成 variants
                 let model_type = provider.model_type.clone().unwrap_or_else(|| "claude".to_string());
                 let variants = build_variants(&model_type);
             
@@ -948,7 +866,7 @@ pub fn import_backup(
                                 id: model.id.clone(),
                                 name: model.name.clone(),
                                 limit: None,
-                                reasoning: Some(true),  // 启用 opencode 思考强度切换 (ctrl+t)
+                                reasoning: Some(true),
                                 variants: Some(variants.clone()),
                                 options: None,
                                 reasoning_effort: model.reasoning_effort.clone(),
@@ -1003,7 +921,6 @@ pub fn import_backup(
                     }
                 }
             
-                // 转换 OAuth 配置
                 let oauth = mcp.oauth.as_ref().map(|o| crate::config::McpOAuthConfig {
                     client_id: o.client_id.clone(),
                     client_secret: o.client_secret.clone(),
@@ -1019,7 +936,7 @@ pub fn import_backup(
                         environment: mcp.environment.clone().unwrap_or_default(),
                         url: None,
                         headers: HashMap::new(),
-                        oauth: None, // 本地服务器不需要 OAuth
+                        oauth: None,
                         metadata: Default::default(),
                     }
                 } else {
@@ -1031,7 +948,7 @@ pub fn import_backup(
                         environment: HashMap::new(),
                         url: mcp.url.clone(),
                         headers: mcp.headers.clone().unwrap_or_default(),
-                        oauth, // 恢复 OAuth 配置
+                        oauth,
                         metadata: Default::default(),
                     }
                 };
@@ -1052,26 +969,21 @@ pub fn import_backup(
         
         for rule in &backup.rules {
             if let Some(base_path) = rule_paths.get(&rule.location) {
-                // 确保基础目录存在
                 if let Err(e) = fs::create_dir_all(base_path) {
                     result.errors.push(format!("创建目录失败: {}", e));
                     continue;
                 }
                 
                 let target_path = if rule.rule_type == "agents_md" {
-                    // AGENTS.md (OpenCode 和 Codex)
                     base_path.join("AGENTS.md")
                 } else if rule.rule_type == "gemini_md" {
-                    // GEMINI.md (Gemini CLI)
                     base_path.join("GEMINI.md")
                 } else {
-                    // rules 目录下的规则文件
                     let rules_dir = base_path.join("rules");
                     if let Err(e) = fs::create_dir_all(&rules_dir) {
                         result.errors.push(format!("Create dir failed: {}", e));
                         continue;
                     }
-                    // 使用保存的扩展名，保持 .md 或 .mdc 一致
                     let ext = if rule.file_ext.is_empty() { "md" } else { &rule.file_ext };
                     rules_dir.join(format!("{}.{}", rule.name, ext))
                 };
@@ -1091,7 +1003,6 @@ pub fn import_backup(
     
     if options.import_skills {
         for skills in &backup.skills {
-            // 支持 OpenCode、Claude、Codex、Gemini 的 skills 路径
             let base_path = match skills.location.as_str() {
                 "global_opencode" => dirs::home_dir().map(|d| d.join(".config").join("opencode").join("skills")),
                 "global_claude" => dirs::home_dir().map(|d| d.join(".claude").join("skills")),
@@ -1121,25 +1032,21 @@ pub fn import_backup(
         }
     }
     
-    // 导入 Codex CLI 配置
     if options.import_codex {
         if let Some(ref codex_config) = backup.codex_config {
             import_codex_config(codex_config, &options, &mut result);
         }
     }
     
-    // 导入 Gemini CLI 配置
     if options.import_gemini {
         if let Some(ref gemini_config) = backup.gemini_config {
             import_gemini_config(gemini_config, &options, &mut result);
         }
     }
     
-    // 导入使用统计数据
     if options.import_usage_stats {
         if let Some(records) = &backup.usage_stats {
             if let Ok(conn) = db.conn.lock() {
-                // 收集已有的 session_id+timestamp 用于去重
                 let mut existing_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
                 if let Ok(mut stmt) = conn.prepare("SELECT session_id, created_at FROM proxy_request_logs") {
                     if let Ok(rows) = stmt.query_map([], |row| {
@@ -1176,11 +1083,106 @@ pub fn import_backup(
         }
     }
 
+    if options.import_chat_conversations {
+        if let Some(conversations) = &backup.chat_conversations {
+            import_chat_conversations_to_store(conversations, &mut result);
+        }
+    }
+
     result.success = result.errors.is_empty();
     Ok(result)
 }
 
-/// 导入 Codex CLI 配置
+fn get_migration_store_path_internal() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".ai-switch").join("migrated_conversations.jsonl"))
+}
+
+fn read_migrated_conversations_for_backup() -> Option<Vec<ExportedChatConversation>> {
+    let store_path = get_migration_store_path_internal()?;
+    if !store_path.exists() { return None; }
+    let content = fs::read_to_string(&store_path).ok()?;
+    let mut conversations = Vec::new();
+    for line in content.lines() {
+        if line.trim().is_empty() { continue; }
+        if let Ok(conv) = serde_json::from_str::<ExportedChatConversation>(line) {
+            conversations.push(conv);
+        }
+    }
+    if conversations.is_empty() { None } else { Some(conversations) }
+}
+
+fn import_chat_conversations_to_store(
+    conversations: &[ExportedChatConversation],
+    result: &mut ImportResult,
+) {
+    let Some(store_path) = get_migration_store_path_internal() else {
+        result.errors.push("无法获取对话存储路径".to_string());
+        return;
+    };
+
+    let mut existing_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut existing_lines: Vec<String> = Vec::new();
+    if store_path.exists() {
+        if let Ok(content) = fs::read_to_string(&store_path) {
+            for line in content.lines() {
+                if line.trim().is_empty() { continue; }
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                    existing_keys.insert(chat_dedup_key(&json));
+                    existing_lines.push(line.to_string());
+                }
+            }
+        }
+    }
+
+    let mut new_lines: Vec<String> = Vec::new();
+    for conv in conversations {
+        if let Ok(json) = serde_json::to_value(conv) {
+            let key = chat_dedup_key(&json);
+            if existing_keys.contains(&key) {
+                result.chat_conversations_skipped += 1;
+            } else {
+                existing_keys.insert(key);
+                if let Ok(line) = serde_json::to_string(conv) {
+                    new_lines.push(line);
+                    result.chat_conversations_imported += 1;
+                }
+            }
+        }
+    }
+
+    if !new_lines.is_empty() {
+        existing_lines.extend(new_lines);
+        if let Some(parent) = store_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        if let Err(e) = fs::write(&store_path, existing_lines.join("\n")) {
+            result.errors.push(format!("写入对话记录失败: {}", e));
+        }
+    }
+}
+
+fn chat_dedup_key(json: &serde_json::Value) -> String {
+    let source = json.get("source").and_then(|v| v.as_str()).unwrap_or("");
+    let session_id = json.get("sessionId")
+        .or_else(|| json.get("session_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let first_content = json.get("messages")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|msg| msg.get("content"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let content_preview = &first_content[..first_content.len().min(100)];
+    format!("{}|{}|{:x}", source, session_id, simple_hash_backup(content_preview))
+}
+
+fn simple_hash_backup(s: &str) -> u64 {
+    let mut h: u64 = 5381;
+    for b in s.bytes() { h = h.wrapping_mul(33).wrapping_add(b as u64); }
+    h
+}
+
 fn import_codex_config(
     config: &ExportedCodexConfig,
     options: &ImportOptions,
@@ -1194,7 +1196,6 @@ fn import_codex_config(
         }
     };
     
-    // 导入 model_providers
     for provider in &config.model_providers {
         let existing = codex_manager.get_model_providers().ok();
         let exists = existing
@@ -1220,7 +1221,6 @@ fn import_codex_config(
         }
     }
     
-    // 导入 MCP servers
     for server in &config.mcp_servers {
         let existing = codex_manager.get_mcp_servers().ok();
         let exists = existing
@@ -1245,7 +1245,6 @@ fn import_codex_config(
     }
 }
 
-/// 导入 Gemini CLI 配置
 fn import_gemini_config(
     config: &ExportedGeminiConfig,
     options: &ImportOptions,
@@ -1259,14 +1258,12 @@ fn import_gemini_config(
         }
     };
     
-    // 导入环境配置
     let has_env = config.env.gemini_api_key.is_some() 
         || config.env.google_gemini_api_key.is_some() 
         || config.env.google_gemini_base_url.is_some()
         || config.env.gemini_model.is_some();
     
     if has_env {
-        // 检查是否已存在配置
         let existing_env = gemini_manager.read_env().ok();
         let env_exists = existing_env
             .as_ref()
@@ -1291,7 +1288,6 @@ fn import_gemini_config(
         }
     }
     
-    // 导入 MCP servers
     for server in &config.mcp_servers {
         let existing = gemini_manager.get_mcp_servers().ok();
         let exists = existing
@@ -1315,5 +1311,159 @@ fn import_gemini_config(
             Ok(_) => result.gemini_imported += 1,
             Err(e) => result.errors.push(format!("Gemini MCP '{}': {}", server.name, e)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn test_temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join("ai_switch_test").join(name);
+        let _ = fs::create_dir_all(&dir);
+        dir
+    }
+
+    fn make_test_conversation(source: &str, session_id: &str, content: &str) -> ExportedChatConversation {
+        ExportedChatConversation {
+            messages: vec![ExportedChatMessage {
+                role: "user".to_string(),
+                content: content.to_string(),
+                model: None,
+                timestamp: None,
+                tool_use: None,
+            }],
+            source: source.to_string(),
+            session_id: Some(session_id.to_string()),
+            name: Some(format!("Test {}", session_id)),
+            created_at: Some(1738000000000.0),
+        }
+    }
+
+    #[test]
+    fn test_chat_dedup_key_consistency() {
+        let conv = make_test_conversation("claude", "abc123", "Hello world");
+        let json = serde_json::to_value(&conv).unwrap();
+        let key1 = chat_dedup_key(&json);
+        let key2 = chat_dedup_key(&json);
+        assert_eq!(key1, key2, "相同数据应产生相同的 dedup key");
+        assert!(key1.starts_with("claude|abc123|"), "前缀应包含 source 和 sessionId");
+    }
+
+    #[test]
+    fn test_chat_dedup_key_different_for_different_data() {
+        let conv1 = make_test_conversation("claude", "abc", "Hello");
+        let conv2 = make_test_conversation("cursor", "abc", "Hello");
+        let conv3 = make_test_conversation("claude", "abc", "World");
+        let j1 = serde_json::to_value(&conv1).unwrap();
+        let j2 = serde_json::to_value(&conv2).unwrap();
+        let j3 = serde_json::to_value(&conv3).unwrap();
+        assert_ne!(chat_dedup_key(&j1), chat_dedup_key(&j2), "不同 source 应产生不同 key");
+        assert_ne!(chat_dedup_key(&j1), chat_dedup_key(&j3), "不同 content 应产生不同 key");
+    }
+
+    #[test]
+    fn test_import_chat_conversations_to_store_basic() {
+        let temp_dir = test_temp_dir("import_chat");
+        let store_path = temp_dir.join("migrated_conversations.jsonl");
+        let _ = fs::remove_file(&store_path);
+
+        let conversations = vec![
+            make_test_conversation("claude", "s1", "Hello"),
+            make_test_conversation("cursor", "s2", "World"),
+        ];
+
+        let mut result = ImportResult {
+            success: true,
+            providers_imported: 0, providers_skipped: 0,
+            mcp_imported: 0, mcp_skipped: 0,
+            rules_imported: 0, rules_skipped: 0,
+            skills_imported: 0, skills_skipped: 0,
+            codex_imported: 0, codex_skipped: 0,
+            gemini_imported: 0, gemini_skipped: 0,
+            usage_imported: 0, usage_skipped: 0,
+            chat_conversations_imported: 0, chat_conversations_skipped: 0,
+            errors: Vec::new(),
+        };
+
+        let mut existing_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut lines: Vec<String> = Vec::new();
+        for conv in &conversations {
+            if let Ok(json) = serde_json::to_value(conv) {
+                let key = chat_dedup_key(&json);
+                if !existing_keys.contains(&key) {
+                    existing_keys.insert(key);
+                    if let Ok(line) = serde_json::to_string(conv) {
+                        lines.push(line);
+                        result.chat_conversations_imported += 1;
+                    }
+                }
+            }
+        }
+        fs::write(&store_path, lines.join("\n")).unwrap();
+
+        assert_eq!(result.chat_conversations_imported, 2);
+        assert_eq!(result.chat_conversations_skipped, 0);
+
+        let content = fs::read_to_string(&store_path).unwrap();
+        let file_lines: Vec<&str> = content.lines().collect();
+        assert_eq!(file_lines.len(), 2);
+
+        let mut result2 = result.clone();
+        result2.chat_conversations_imported = 0;
+        result2.chat_conversations_skipped = 0;
+        let mut existing_keys2: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for line in content.lines() {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                existing_keys2.insert(chat_dedup_key(&json));
+            }
+        }
+        for conv in &conversations {
+            if let Ok(json) = serde_json::to_value(conv) {
+                let key = chat_dedup_key(&json);
+                if existing_keys2.contains(&key) {
+                    result2.chat_conversations_skipped += 1;
+                }
+            }
+        }
+        assert_eq!(result2.chat_conversations_skipped, 2, "重复导入应全部跳过");
+    }
+
+    #[test]
+    fn test_read_migrated_conversations_from_jsonl() {
+        let temp_dir = test_temp_dir("read_jsonl");
+        let store_path = temp_dir.join("test.jsonl");
+        let _ = fs::remove_file(&store_path);
+
+        let conv1 = make_test_conversation("claude", "s1", "Test content 1");
+        let conv2 = make_test_conversation("cursor", "s2", "Test content 2");
+        let mut file = fs::File::create(&store_path).unwrap();
+        writeln!(file, "{}", serde_json::to_string(&conv1).unwrap()).unwrap();
+        writeln!(file, "{}", serde_json::to_string(&conv2).unwrap()).unwrap();
+
+        let content = fs::read_to_string(&store_path).unwrap();
+        let mut conversations: Vec<ExportedChatConversation> = Vec::new();
+        for line in content.lines() {
+            if line.trim().is_empty() { continue; }
+            if let Ok(conv) = serde_json::from_str::<ExportedChatConversation>(line) {
+                conversations.push(conv);
+            }
+        }
+        assert_eq!(conversations.len(), 2);
+        assert_eq!(conversations[0].source, "claude");
+        assert_eq!(conversations[0].session_id.as_deref(), Some("s1"));
+        assert_eq!(conversations[1].source, "cursor");
+        assert_eq!(conversations[1].messages[0].content, "Test content 2");
+    }
+
+    #[test]
+    fn test_serialization_compatibility() {
+        let json_str = r#"{"messages":[{"role":"user","content":"hello"}],"source":"claude-code","sessionId":"abc","name":"Test","createdAt":1738000000}"#;
+        let conv: ExportedChatConversation = serde_json::from_str(json_str).unwrap();
+        assert_eq!(conv.source, "claude-code");
+        assert_eq!(conv.session_id.as_deref(), Some("abc"));
+        assert_eq!(conv.messages.len(), 1);
+        assert_eq!(conv.created_at, Some(1738000000.0));
     }
 }

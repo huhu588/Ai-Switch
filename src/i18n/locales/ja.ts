@@ -441,7 +441,7 @@ export default {
     deleteFromAll: '全てのツールから削除',
     deleteFromAllConfirm: '全てのツールから "{name}" を削除しますか？',
     totalSkills: '合計{count}件のSkills',
-    statsInstalled: 'インストール済み · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    statsInstalled: 'インストール済み · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor} · Windsurf: {windsurf} · Kiro: {kiro}',
     toggleFailed: '切り替え失敗: {error}',
     deleteSuccess: '削除しました',
     deleteFailed: '削除失敗: {error}',
@@ -913,7 +913,11 @@ export default {
       codex: 'Codex',
       windsurf: 'Windsurf',
       trae: 'Trae',
-      trae_cn: 'Trae CN'
+      trae_cn: 'Trae CN',
+      kiro: 'Kiro',
+      antigravity: 'Antigravity',
+      warp: 'Warp',
+      augment: 'Augment'
     }
   },
 

@@ -444,10 +444,7 @@ fn sync_providers_to_file(
         serde_json::json!({})
     };
 
-    // 确保基本结构存在
-    if existing_data.get("$schema").is_none() {
-        existing_data["$schema"] = serde_json::json!("https://opencode.ai/config.json");
-    }
+    // 确保基本结构存在（不添加 $schema，OpenCode 不识别此字段）
     if existing_data.get("theme").is_none() {
         existing_data["theme"] = serde_json::json!(SYNC_THEME);
     }

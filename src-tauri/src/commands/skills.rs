@@ -697,6 +697,10 @@ pub struct ManagedSkill {
     pub opencode_enabled: bool,
     /// 是否安装到 Cursor (~/.cursor/skills/)
     pub cursor_enabled: bool,
+    /// 是否安装到 Windsurf (.windsurf/skills/)
+    pub windsurf_enabled: bool,
+    /// 是否安装到 Kiro (~/.kiro/skills/)
+    pub kiro_enabled: bool,
     /// 源文件路径（用于复制）
     pub source_path: Option<String>,
     /// 是否来自本地（已安装）
@@ -766,6 +770,16 @@ fn get_tool_skills_paths() -> Vec<(String, PathBuf)> {
         }
     }
     
+    // Windsurf 项目级 skills
+    if let Ok(cwd) = std::env::current_dir() {
+        paths.push(("windsurf".to_string(), cwd.join(".windsurf").join("skills")));
+    }
+    
+    // Kiro 全局 skills
+    if let Some(home_dir) = dirs::home_dir() {
+        paths.push(("kiro".to_string(), home_dir.join(".kiro").join("skills")));
+    }
+    
     paths
 }
 
@@ -806,6 +820,8 @@ pub fn get_managed_skills() -> Result<Vec<ManagedSkill>, AppError> {
                             gemini_enabled: false,
                             opencode_enabled: false,
                             cursor_enabled: false,
+                            windsurf_enabled: false,
+                            kiro_enabled: false,
                             source_path: Some(skill_file.to_string_lossy().to_string()),
                             is_local: true,
                         });
@@ -822,6 +838,8 @@ pub fn get_managed_skills() -> Result<Vec<ManagedSkill>, AppError> {
                             "gemini" => skill.gemini_enabled = true,
                             "opencode" => skill.opencode_enabled = true,
                             "cursor" => skill.cursor_enabled = true,
+                            "windsurf" => skill.windsurf_enabled = true,
+                            "kiro" => skill.kiro_enabled = true,
                             _ => {}
                         }
                         
@@ -861,6 +879,14 @@ pub async fn toggle_skill_tool(skill_name: String, tool: String, enabled: bool) 
                 home_dir.join(".cursor").join("skills").join(&skill_name)
             }
         },
+        "windsurf" => {
+            if let Ok(cwd) = std::env::current_dir() {
+                cwd.join(".windsurf").join("skills").join(&skill_name)
+            } else {
+                return Err(AppError::Custom("无法获取当前目录".to_string()));
+            }
+        },
+        "kiro" => home_dir.join(".kiro").join("skills").join(&skill_name),
         _ => return Err(AppError::Custom(format!("未知的工具: {}", tool))),
     };
     
@@ -930,6 +956,8 @@ pub fn get_skills_stats() -> Result<SkillsStats, AppError> {
         gemini_count: 0,
         opencode_count: 0,
         cursor_count: 0,
+        windsurf_count: 0,
+        kiro_count: 0,
     };
     
     for (tool, base_path) in &tool_paths {
@@ -951,6 +979,8 @@ pub fn get_skills_stats() -> Result<SkillsStats, AppError> {
             "gemini" => stats.gemini_count = count,
             "opencode" => stats.opencode_count = count,
             "cursor" => stats.cursor_count = count,
+            "windsurf" => stats.windsurf_count = count,
+            "kiro" => stats.kiro_count = count,
             _ => {}
         }
     }
@@ -966,6 +996,8 @@ pub struct SkillsStats {
     pub gemini_count: usize,
     pub opencode_count: usize,
     pub cursor_count: usize,
+    pub windsurf_count: usize,
+    pub kiro_count: usize,
 }
 
 /// 扫描已安装的 Skills

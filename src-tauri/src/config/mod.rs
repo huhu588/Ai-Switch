@@ -10,6 +10,11 @@ pub mod claude_code_manager;
 pub mod codex_manager;
 pub mod gemini_manager;
 pub mod cursor_manager;
+pub mod windsurf_manager;
+pub mod augment_manager;
+pub mod warp_manager;
+pub mod kiro_manager;
+pub mod antigravity_manager;
 pub mod open_switch_manager;
 
 pub use thiserror::Error;

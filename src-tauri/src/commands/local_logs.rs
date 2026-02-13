@@ -52,6 +52,36 @@ pub struct ScanResult {
     pub cursor_entries: u32,
     /// Cursor 数据库路径
     pub cursor_path: Option<String>,
+    /// Windsurf 数据库文件数
+    pub windsurf_files: u32,
+    /// Windsurf 会话条目数（预估）
+    pub windsurf_entries: u32,
+    /// Windsurf 数据库路径
+    pub windsurf_path: Option<String>,
+    /// Kiro 数据库文件数
+    pub kiro_files: u32,
+    /// Kiro 会话条目数（预估）
+    pub kiro_entries: u32,
+    /// Kiro 数据库路径
+    pub kiro_path: Option<String>,
+    /// Antigravity 数据库文件数
+    pub antigravity_files: u32,
+    /// Antigravity 会话条目数（预估）
+    pub antigravity_entries: u32,
+    /// Antigravity 数据库路径
+    pub antigravity_path: Option<String>,
+    /// Warp 数据库文件数
+    pub warp_files: u32,
+    /// Warp 会话条目数（预估）
+    pub warp_entries: u32,
+    /// Warp 数据库路径
+    pub warp_path: Option<String>,
+    /// Augment 数据库文件数
+    pub augment_files: u32,
+    /// Augment 会话条目数（预估）
+    pub augment_entries: u32,
+    /// Augment 数据库路径
+    pub augment_path: Option<String>,
     /// 数据库中已有的本地导入记录数
     pub existing_records: u32,
 }
@@ -2415,6 +2445,295 @@ fn extract_cursor_timestamp(json: &serde_json::Value) -> i64 {
 }
 
 // ============================================================================
+// VSCode 系工具通用扫描（Windsurf / Kiro / Antigravity / Augment）
+// ============================================================================
+
+/// 获取 VSCode 系 app 的 state.vscdb 路径列表
+fn get_vscode_app_db_paths(app_names: &[&str]) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+
+    let mut base_dirs: Vec<PathBuf> = Vec::new();
+
+    #[cfg(windows)]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") { base_dirs.push(PathBuf::from(appdata)); }
+        if let Ok(localapp) = std::env::var("LOCALAPPDATA") { base_dirs.push(PathBuf::from(localapp)); }
+        if let Some(home) = dirs::home_dir() {
+            base_dirs.push(home.join("AppData").join("Roaming"));
+            base_dirs.push(home.join("AppData").join("Local"));
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = dirs::home_dir() {
+            base_dirs.push(home.join("Library").join("Application Support"));
+            base_dirs.push(home.join(".config"));
+        }
+    }
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    {
+        if let Some(home) = dirs::home_dir() {
+            base_dirs.push(home.join(".config"));
+            base_dirs.push(home.join(".local").join("share"));
+        }
+    }
+
+    for base in &base_dirs {
+        for name in app_names {
+            let user_dir = base.join(name).join("User");
+            if !user_dir.exists() { continue; }
+            // globalStorage/state.vscdb
+            let global_db = user_dir.join("globalStorage").join("state.vscdb");
+            if global_db.exists() {
+                let key = global_db.to_string_lossy().to_string();
+                if seen.insert(key) { paths.push(global_db); }
+            }
+            // workspaceStorage/*/state.vscdb
+            let workspace_dir = user_dir.join("workspaceStorage");
+            if workspace_dir.exists() {
+                if let Ok(entries) = fs::read_dir(&workspace_dir) {
+                    for entry in entries.flatten() {
+                        let db_path = entry.path().join("state.vscdb");
+                        if db_path.exists() {
+                            let key = db_path.to_string_lossy().to_string();
+                            if seen.insert(key) { paths.push(db_path); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    paths
+}
+
+/// 扫描 VSCode 系 app 的数据库文件
+fn scan_vscode_app_logs(app_names: &[&str]) -> (Vec<PathBuf>, u32) {
+    let db_paths = get_vscode_app_db_paths(app_names);
+    if db_paths.is_empty() {
+        return (vec![], 0);
+    }
+    let mut entry_count = 0u32;
+    // 只统计 globalStorage 中的会话数
+    if db_paths.len() > 8 {
+        if let Some(global) = db_paths.iter().find(|p| p.to_string_lossy().contains("globalStorage")) {
+            entry_count = count_cursor_sessions(global).unwrap_or(0);
+        }
+    } else {
+        for path in &db_paths {
+            entry_count = entry_count.saturating_add(count_cursor_sessions(path).unwrap_or(0));
+        }
+    }
+    (db_paths, entry_count)
+}
+
+/// 解析 VSCode 系 app 的数据库，将 source 替换为指定工具名
+fn parse_vscode_app_db(path: &PathBuf, source_name: &str) -> Vec<LocalLogEntry> {
+    // 复用 Cursor 的解析逻辑，然后替换 source
+    let entries = parse_cursor_db(path);
+    entries.into_iter().map(|mut e| {
+        // 替换 source 标识
+        e.source = source_name.to_string();
+        // 替换 session_id 前缀避免与 Cursor 冲突
+        e.session_id = e.session_id.replace("cursor-", &format!("{}-", source_name));
+        e
+    }).collect()
+}
+
+// ---- Windsurf ----
+fn scan_windsurf_logs() -> (Vec<PathBuf>, u32) {
+    scan_vscode_app_logs(&["Windsurf", "WindSurf"])
+}
+
+fn get_windsurf_log_path() -> Option<PathBuf> {
+    let paths = get_vscode_app_db_paths(&["Windsurf", "WindSurf"]);
+    paths.into_iter().find(|p| p.to_string_lossy().contains("globalStorage"))
+}
+
+// ---- Kiro ----
+fn scan_kiro_logs() -> (Vec<PathBuf>, u32) {
+    scan_vscode_app_logs(&["Kiro"])
+}
+
+fn get_kiro_log_path() -> Option<PathBuf> {
+    let paths = get_vscode_app_db_paths(&["Kiro"]);
+    paths.into_iter().find(|p| p.to_string_lossy().contains("globalStorage"))
+}
+
+// ---- Antigravity ----
+fn scan_antigravity_logs() -> (Vec<PathBuf>, u32) {
+    scan_vscode_app_logs(&["Antigravity"])
+}
+
+fn get_antigravity_log_path() -> Option<PathBuf> {
+    let paths = get_vscode_app_db_paths(&["Antigravity"]);
+    paths.into_iter().find(|p| p.to_string_lossy().contains("globalStorage"))
+}
+
+// ---- Augment（VS Code 扩展，复用 VS Code 数据库）----
+fn scan_augment_logs() -> (Vec<PathBuf>, u32) {
+    // Augment 是 VS Code 扩展，数据存储在 VS Code 的 state.vscdb 中
+    // 扫描 VS Code / Cursor 的 globalStorage 以查找 Augment 相关数据
+    scan_vscode_app_logs(&["Code", "Code - Insiders"])
+}
+
+fn get_augment_log_path() -> Option<PathBuf> {
+    let paths = get_vscode_app_db_paths(&["Code", "Code - Insiders"]);
+    paths.into_iter().find(|p| p.to_string_lossy().contains("globalStorage"))
+}
+
+// ============================================================================
+// Warp 日志解析
+// ============================================================================
+
+/// 获取 Warp 数据库路径
+fn get_warp_db_path() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let local_app_data = std::env::var("LOCALAPPDATA")
+            .unwrap_or_else(|_| home.join("AppData").join("Local").to_string_lossy().to_string());
+        let db_path = PathBuf::from(&local_app_data).join("Warp").join("Warp").join("data").join("warp.sqlite");
+        if db_path.exists() { return Some(db_path); }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let db_path = home
+            .join("Library")
+            .join("Group Containers")
+            .join("2BBY89MBSN.dev.warp")
+            .join("Library")
+            .join("Application Support")
+            .join("dev.warp.Warp-Stable")
+            .join("warp.sqlite");
+        if db_path.exists() { return Some(db_path); }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let db_path = home.join(".local").join("share").join("warp").join("warp.sqlite");
+        if db_path.exists() { return Some(db_path); }
+    }
+    None
+}
+
+/// 扫描 Warp 数据库
+fn scan_warp_logs() -> (Vec<PathBuf>, u32) {
+    let Some(db_path) = get_warp_db_path() else {
+        return (vec![], 0);
+    };
+    // 统计对话数
+    let entry_count = count_warp_conversations(&db_path).unwrap_or(0);
+    (vec![db_path], entry_count)
+}
+
+/// 统计 Warp 数据库中的对话数量
+fn count_warp_conversations(db_path: &PathBuf) -> Option<u32> {
+    use rusqlite::{Connection, OpenFlags};
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).ok()?;
+    // 检查表是否存在
+    let has_table = conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_conversations'")
+        .and_then(|mut stmt| stmt.query_row([], |_| Ok(())))
+        .is_ok();
+    if !has_table { return Some(0); }
+    conn.query_row(
+        "SELECT COUNT(*) FROM agent_conversations WHERE conversation_data IS NOT NULL",
+        [],
+        |row| row.get::<_, i64>(0),
+    ).ok().map(|c| c as u32)
+}
+
+/// 解析 Warp 数据库，提取用量记录
+fn parse_warp_db(db_path: &PathBuf) -> Vec<LocalLogEntry> {
+    use rusqlite::{Connection, OpenFlags};
+    let mut entries = Vec::new();
+
+    let Ok(conn) = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX) else {
+        return entries;
+    };
+
+    let has_table = conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_conversations'")
+        .and_then(|mut stmt| stmt.query_row([], |_| Ok(())))
+        .is_ok();
+    if !has_table { return entries; }
+
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT id, conversation_data FROM agent_conversations WHERE conversation_data IS NOT NULL"
+    ) else { return entries; };
+
+    let rows = match stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let data: String = row.get(1)?;
+        Ok((id, data))
+    }) {
+        Ok(r) => r,
+        Err(_) => return entries,
+    };
+
+    for row in rows.flatten() {
+        let (conv_id, data_str) = row;
+        let Ok(data) = serde_json::from_str::<serde_json::Value>(&data_str) else { continue };
+
+        let metadata = match data.get("conversation_usage_metadata") {
+            Some(m) => m,
+            None => continue,
+        };
+
+        // 解析 token_usage 数组
+        let token_usage = metadata.get("token_usage").and_then(|v| v.as_array());
+        if let Some(usages) = token_usage {
+            for usage in usages {
+                let model_id = usage.get("model_id").and_then(|v| v.as_str()).unwrap_or("warp-unknown");
+                let total_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                let byok_tokens = usage.get("byok_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                let all_tokens = total_tokens.saturating_add(byok_tokens);
+                if all_tokens == 0 { continue; }
+
+                // 估算输入/输出比例 (约 60% 输入, 40% 输出)
+                let input_tokens = (all_tokens * 60 / 100) as u32;
+                let output_tokens = (all_tokens - input_tokens as u64) as u32;
+
+                let session_id = format!("warp-{}-{}", conv_id, model_id);
+
+                entries.push(LocalLogEntry {
+                    source: "warp".to_string(),
+                    timestamp: chrono::Utc::now().timestamp(),
+                    model: model_id.to_string(),
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens: 0,
+                    cache_creation_tokens: 0,
+                    cost_usd: None,
+                    session_id,
+                    project_name: None,
+                });
+            }
+        } else {
+            // 无 token_usage 但有 credits_spent
+            let credits = metadata.get("credits_spent").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            if credits > 0.0 {
+                let session_id = format!("warp-{}", conv_id);
+                entries.push(LocalLogEntry {
+                    source: "warp".to_string(),
+                    timestamp: chrono::Utc::now().timestamp(),
+                    model: "warp-agent".to_string(),
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    cache_read_tokens: 0,
+                    cache_creation_tokens: 0,
+                    cost_usd: Some(credits),
+                    session_id,
+                    project_name: None,
+                });
+            }
+        }
+    }
+
+    entries
+}
+
+// ============================================================================
 // 数据库操作
 // ============================================================================
 
@@ -2549,6 +2868,11 @@ fn insert_log_entry(conn: &rusqlite::Connection, entry: &LocalLogEntry, cost: De
         "gemini" => "Gemini CLI (Local)",
         "opencode" => "Opencode (Local)",
         "cursor" => "Cursor (Local)",
+        "windsurf" => "Windsurf (Local)",
+        "kiro" => "Kiro (Local)",
+        "antigravity" => "Antigravity (Local)",
+        "warp" => "Warp (Local)",
+        "augment" => "Augment (Local)",
         _ => "Local Import",
     };
 
@@ -2597,6 +2921,11 @@ fn update_log_entry(conn: &rusqlite::Connection, entry: &LocalLogEntry, cost: De
         "gemini" => "Gemini CLI (Local)",
         "opencode" => "Opencode (Local)",
         "cursor" => "Cursor (Local)",
+        "windsurf" => "Windsurf (Local)",
+        "kiro" => "Kiro (Local)",
+        "antigravity" => "Antigravity (Local)",
+        "warp" => "Warp (Local)",
+        "augment" => "Augment (Local)",
         _ => "Local Import",
     };
 
@@ -3275,7 +3604,7 @@ pub async fn scan_local_logs(
 ) -> Result<ScanResult, String> {
     let conn = db.conn.lock().map_err(|e| format!("获取数据库锁失败: {e}"))?;
 
-    let total_steps = 5;
+    let total_steps = 10;
     let mut step = 0u32;
 
     step += 1;
@@ -3298,6 +3627,26 @@ pub async fn scan_local_logs(
     emit_local_log_progress(&window, "scan", "cursor", step, total_steps, "扫描 Cursor");
     let (cursor_files, cursor_entries) = scan_cursor_logs();
 
+    step += 1;
+    emit_local_log_progress(&window, "scan", "windsurf", step, total_steps, "扫描 Windsurf");
+    let (windsurf_files, windsurf_entries) = scan_windsurf_logs();
+
+    step += 1;
+    emit_local_log_progress(&window, "scan", "kiro", step, total_steps, "扫描 Kiro");
+    let (kiro_files, kiro_entries) = scan_kiro_logs();
+
+    step += 1;
+    emit_local_log_progress(&window, "scan", "antigravity", step, total_steps, "扫描 Antigravity");
+    let (antigravity_files, antigravity_entries) = scan_antigravity_logs();
+
+    step += 1;
+    emit_local_log_progress(&window, "scan", "warp", step, total_steps, "扫描 Warp");
+    let (warp_files, warp_entries) = scan_warp_logs();
+
+    step += 1;
+    emit_local_log_progress(&window, "scan", "augment", step, total_steps, "扫描 Augment");
+    let (augment_files, augment_entries) = scan_augment_logs();
+
     let existing_records = get_existing_local_records(&conn);
 
     emit_local_log_progress(&window, "scan", "done", total_steps, total_steps, "扫描完成");
@@ -3318,6 +3667,21 @@ pub async fn scan_local_logs(
         cursor_files: cursor_files.len() as u32,
         cursor_entries,
         cursor_path: get_cursor_db_path().map(|p| p.to_string_lossy().to_string()),
+        windsurf_files: windsurf_files.len() as u32,
+        windsurf_entries,
+        windsurf_path: get_windsurf_log_path().map(|p| p.to_string_lossy().to_string()),
+        kiro_files: kiro_files.len() as u32,
+        kiro_entries,
+        kiro_path: get_kiro_log_path().map(|p| p.to_string_lossy().to_string()),
+        antigravity_files: antigravity_files.len() as u32,
+        antigravity_entries,
+        antigravity_path: get_antigravity_log_path().map(|p| p.to_string_lossy().to_string()),
+        warp_files: warp_files.len() as u32,
+        warp_entries,
+        warp_path: get_warp_db_path().map(|p| p.to_string_lossy().to_string()),
+        augment_files: augment_files.len() as u32,
+        augment_entries,
+        augment_path: get_augment_log_path().map(|p| p.to_string_lossy().to_string()),
         existing_records,
     })
 }
@@ -3699,6 +4063,165 @@ pub async fn import_local_logs(
         let _ = conn.execute_batch("COMMIT");
     }
     
+    // 导入 Windsurf 日志
+    if sources.contains(&"windsurf".to_string()) {
+        source_index += 1;
+        let (files, _) = scan_windsurf_logs();
+        let total_files = files.len() as u32;
+        emit_local_log_progress(&window, "import", "windsurf", 0, total_files, &format!("导入 Windsurf ({}/{})", source_index, total_sources));
+        let mut existing_ids = load_existing_request_ids_by_app_type(&conn, "windsurf_local");
+        let _ = conn.execute_batch("BEGIN IMMEDIATE");
+        for (idx, file) in files.iter().enumerate() {
+            let entries = parse_vscode_app_db(file, "windsurf");
+            for entry in entries {
+                total += 1;
+                if seen_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                seen_ids.insert(entry.session_id.clone());
+                if existing_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                existing_ids.insert(entry.session_id.clone());
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = calculate_cost(&entry, pricing);
+                match insert_log_entry(&conn, &entry, cost) {
+                    Ok(_) => imported += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+            let file_index = idx as u32 + 1;
+            if total_files > 0 && (file_index == total_files || file_index % 5 == 0) {
+                emit_local_log_progress(&window, "import", "windsurf", file_index, total_files, &format!("导入 Windsurf ({}/{})", source_index, total_sources));
+            }
+        }
+        let _ = conn.execute_batch("COMMIT");
+    }
+
+    // 导入 Kiro 日志
+    if sources.contains(&"kiro".to_string()) {
+        source_index += 1;
+        let (files, _) = scan_kiro_logs();
+        let total_files = files.len() as u32;
+        emit_local_log_progress(&window, "import", "kiro", 0, total_files, &format!("导入 Kiro ({}/{})", source_index, total_sources));
+        let mut existing_ids = load_existing_request_ids_by_app_type(&conn, "kiro_local");
+        let _ = conn.execute_batch("BEGIN IMMEDIATE");
+        for (idx, file) in files.iter().enumerate() {
+            let entries = parse_vscode_app_db(file, "kiro");
+            for entry in entries {
+                total += 1;
+                if seen_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                seen_ids.insert(entry.session_id.clone());
+                if existing_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                existing_ids.insert(entry.session_id.clone());
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = calculate_cost(&entry, pricing);
+                match insert_log_entry(&conn, &entry, cost) {
+                    Ok(_) => imported += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+            let file_index = idx as u32 + 1;
+            if total_files > 0 && (file_index == total_files || file_index % 5 == 0) {
+                emit_local_log_progress(&window, "import", "kiro", file_index, total_files, &format!("导入 Kiro ({}/{})", source_index, total_sources));
+            }
+        }
+        let _ = conn.execute_batch("COMMIT");
+    }
+
+    // 导入 Antigravity 日志
+    if sources.contains(&"antigravity".to_string()) {
+        source_index += 1;
+        let (files, _) = scan_antigravity_logs();
+        let total_files = files.len() as u32;
+        emit_local_log_progress(&window, "import", "antigravity", 0, total_files, &format!("导入 Antigravity ({}/{})", source_index, total_sources));
+        let mut existing_ids = load_existing_request_ids_by_app_type(&conn, "antigravity_local");
+        let _ = conn.execute_batch("BEGIN IMMEDIATE");
+        for (idx, file) in files.iter().enumerate() {
+            let entries = parse_vscode_app_db(file, "antigravity");
+            for entry in entries {
+                total += 1;
+                if seen_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                seen_ids.insert(entry.session_id.clone());
+                if existing_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                existing_ids.insert(entry.session_id.clone());
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = calculate_cost(&entry, pricing);
+                match insert_log_entry(&conn, &entry, cost) {
+                    Ok(_) => imported += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+            let file_index = idx as u32 + 1;
+            if total_files > 0 && (file_index == total_files || file_index % 5 == 0) {
+                emit_local_log_progress(&window, "import", "antigravity", file_index, total_files, &format!("导入 Antigravity ({}/{})", source_index, total_sources));
+            }
+        }
+        let _ = conn.execute_batch("COMMIT");
+    }
+
+    // 导入 Warp 日志
+    if sources.contains(&"warp".to_string()) {
+        source_index += 1;
+        let (files, _) = scan_warp_logs();
+        let total_files = files.len() as u32;
+        emit_local_log_progress(&window, "import", "warp", 0, total_files, &format!("导入 Warp ({}/{})", source_index, total_sources));
+        let mut existing_ids = load_existing_request_ids_by_app_type(&conn, "warp_local");
+        let _ = conn.execute_batch("BEGIN IMMEDIATE");
+        for file in &files {
+            let entries = parse_warp_db(file);
+            for entry in entries {
+                total += 1;
+                if seen_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                seen_ids.insert(entry.session_id.clone());
+                if existing_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                existing_ids.insert(entry.session_id.clone());
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = entry.cost_usd
+                    .map(|c| Decimal::from_str(&c.to_string()).unwrap_or(Decimal::ZERO))
+                    .unwrap_or_else(|| calculate_cost(&entry, pricing));
+                match insert_log_entry(&conn, &entry, cost) {
+                    Ok(_) => imported += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+        }
+        let _ = conn.execute_batch("COMMIT");
+        emit_local_log_progress(&window, "import", "warp", total_files, total_files, &format!("导入 Warp ({}/{})", source_index, total_sources));
+    }
+
+    // 导入 Augment 日志
+    if sources.contains(&"augment".to_string()) {
+        source_index += 1;
+        let (files, _) = scan_augment_logs();
+        let total_files = files.len() as u32;
+        emit_local_log_progress(&window, "import", "augment", 0, total_files, &format!("导入 Augment ({}/{})", source_index, total_sources));
+        let mut existing_ids = load_existing_request_ids_by_app_type(&conn, "augment_local");
+        let _ = conn.execute_batch("BEGIN IMMEDIATE");
+        for (idx, file) in files.iter().enumerate() {
+            let entries = parse_vscode_app_db(file, "augment");
+            for entry in entries {
+                total += 1;
+                if seen_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                seen_ids.insert(entry.session_id.clone());
+                if existing_ids.contains(&entry.session_id) { skipped += 1; continue; }
+                existing_ids.insert(entry.session_id.clone());
+                let provider_id = format!("{}_local", entry.source);
+                let pricing = get_provider_model_pricing(&conn, &provider_id, &entry.model);
+                let cost = calculate_cost(&entry, pricing);
+                match insert_log_entry(&conn, &entry, cost) {
+                    Ok(_) => imported += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+            let file_index = idx as u32 + 1;
+            if total_files > 0 && (file_index == total_files || file_index % 5 == 0) {
+                emit_local_log_progress(&window, "import", "augment", file_index, total_files, &format!("导入 Augment ({}/{})", source_index, total_sources));
+            }
+        }
+        let _ = conn.execute_batch("COMMIT");
+    }
+
     emit_local_log_progress(&window, "import", "done", total_sources, total_sources, "导入完成");
 
     Ok(LocalLogImportResult {
@@ -3733,7 +4256,7 @@ pub async fn auto_import_local_logs(db: State<'_, Arc<Database>>) -> Result<u32,
     let mut seen_ids: HashSet<String> = HashSet::new();
     
     // 自动导入所有来源的日志
-    let sources = vec!["claude", "codex", "gemini", "opencode", "cursor"];
+    let sources = vec!["claude", "codex", "gemini", "opencode", "cursor", "windsurf", "kiro", "antigravity", "warp", "augment"];
     
     for source in sources {
         let (files, _) = match source {
@@ -3742,6 +4265,11 @@ pub async fn auto_import_local_logs(db: State<'_, Arc<Database>>) -> Result<u32,
             "gemini" => scan_gemini_logs(),
             "opencode" => scan_opencode_logs(),
             "cursor" => scan_cursor_logs(),
+            "windsurf" => scan_windsurf_logs(),
+            "kiro" => scan_kiro_logs(),
+            "antigravity" => scan_antigravity_logs(),
+            "warp" => scan_warp_logs(),
+            "augment" => scan_augment_logs(),
             _ => continue,
         };
         
@@ -3752,6 +4280,11 @@ pub async fn auto_import_local_logs(db: State<'_, Arc<Database>>) -> Result<u32,
                 "gemini" => parse_gemini_log_file(file),
                 "opencode" => parse_opencode_log_file(file),
                 "cursor" => parse_cursor_db(file),
+                "windsurf" => parse_vscode_app_db(file, "windsurf"),
+                "kiro" => parse_vscode_app_db(file, "kiro"),
+                "antigravity" => parse_vscode_app_db(file, "antigravity"),
+                "warp" => parse_warp_db(file),
+                "augment" => parse_vscode_app_db(file, "augment"),
                 _ => continue,
             };
             
@@ -3788,15 +4321,16 @@ pub async fn auto_import_local_logs(db: State<'_, Arc<Database>>) -> Result<u32,
                 "codex" => parse_codex_session_stats(file),
                 "gemini" => parse_gemini_session_stats(file),
                 "opencode" => parse_opencode_session_stats(file),
-                "cursor" => parse_cursor_session_stats(file),
+                "cursor" | "windsurf" | "kiro" | "antigravity" | "augment" => parse_cursor_session_stats(file),
+                // Warp 暂无会话统计解析
                 _ => continue,
             };
             
             // 只有有数据时才保存
             if stats.conversation_count > 0 || stats.tool_calls.values().sum::<u32>() > 0 {
-                let session_id = if source == "cursor" {
-                    // Cursor 使用时间戳作为会话 ID
-                    format!("cursor-{}", chrono::Utc::now().timestamp())
+                let session_id = if matches!(source, "cursor" | "windsurf" | "kiro" | "antigravity" | "augment") {
+                    // VSCode 系工具使用时间戳作为会话 ID
+                    format!("{}-{}", source, chrono::Utc::now().timestamp())
                 } else {
                     file
                         .file_stem()

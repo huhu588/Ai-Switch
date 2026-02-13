@@ -445,7 +445,7 @@ export default {
     deleteFromAll: '从所有工具中删除',
     deleteFromAllConfirm: '确定要从所有工具中删除 "{name}" 吗？',
     totalSkills: '共 {count} 个 Skills',
-    statsInstalled: '已安装 · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    statsInstalled: '已安装 · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor} · Windsurf: {windsurf} · Kiro: {kiro}',
     toggleFailed: '切换失败: {error}',
     deleteSuccess: '删除成功',
     deleteFailed: '删除失败: {error}',
@@ -919,7 +919,11 @@ export default {
       codex: 'Codex',
       windsurf: 'Windsurf',
       trae: 'Trae',
-      trae_cn: 'Trae CN'
+      trae_cn: 'Trae CN',
+      kiro: 'Kiro',
+      antigravity: '反重力',
+      warp: 'Warp',
+      augment: 'Augment'
     }
   },
 

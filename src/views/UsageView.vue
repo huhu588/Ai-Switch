@@ -88,6 +88,21 @@ interface ScanResult {
   cursorFiles: number
   cursorEntries: number
   cursorPath: string | null
+  windsurfFiles: number
+  windsurfEntries: number
+  windsurfPath: string | null
+  kiroFiles: number
+  kiroEntries: number
+  kiroPath: string | null
+  antigravityFiles: number
+  antigravityEntries: number
+  antigravityPath: string | null
+  warpFiles: number
+  warpEntries: number
+  warpPath: string | null
+  augmentFiles: number
+  augmentEntries: number
+  augmentPath: string | null
   existingRecords: number
 }
 
@@ -188,6 +203,11 @@ const importCodex = ref(true)
 const importGemini = ref(true)
 const importOpencode = ref(true)
 const importCursor = ref(true)
+const importWindsurf = ref(true)
+const importKiro = ref(true)
+const importAntigravity = ref(true)
+const importWarp = ref(true)
+const importAugment = ref(true)
 
 // Cursor 对话统计
 const cursorConversationStats = ref<CursorConversationStats | null>(null)
@@ -208,7 +228,7 @@ const progressText = computed(() => {
 })
 
 // 服务商筛选
-const selectedProvider = ref<'all' | 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor'>('all')
+const selectedProvider = ref<'all' | 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor' | 'windsurf' | 'kiro' | 'antigravity' | 'warp' | 'augment'>('all')
 
 // Token tooltip 状态
 const showTokenTooltip = ref(false)
@@ -411,6 +431,11 @@ const filteredProviderStats = computed(() => {
     'gemini': ['gemini_local', 'Gemini CLI (Local)'],
     'opencode': ['opencode_local', 'Opencode (Local)'],
     'cursor': ['cursor_local', 'Cursor (Local)'],
+    'windsurf': ['windsurf_local', 'Windsurf (Local)'],
+    'kiro': ['kiro_local', 'Kiro (Local)'],
+    'antigravity': ['antigravity_local', 'Antigravity (Local)'],
+    'warp': ['warp_local', 'Warp (Local)'],
+    'augment': ['augment_local', 'Augment (Local)'],
   }
   const targetIds = providerMap[selectedProvider.value] || []
   return providerStats.value.filter(s => 
@@ -526,6 +551,11 @@ function getTrendProviderId(): string | null {
     'gemini': 'gemini_local',
     'opencode': 'opencode_local',
     'cursor': 'cursor_local',
+    'windsurf': 'windsurf_local',
+    'kiro': 'kiro_local',
+    'antigravity': 'antigravity_local',
+    'warp': 'warp_local',
+    'augment': 'augment_local',
   }
   return map[selectedProvider.value] || null
 }
@@ -760,6 +790,11 @@ async function importLocalLogs() {
   if (importGemini.value && scanResult.value?.geminiFiles) sources.push('gemini')
   if (importOpencode.value && scanResult.value?.opencodeFiles) sources.push('opencode')
   if (importCursor.value && scanResult.value?.cursorFiles) sources.push('cursor')
+  if (importWindsurf.value && scanResult.value?.windsurfFiles) sources.push('windsurf')
+  if (importKiro.value && scanResult.value?.kiroFiles) sources.push('kiro')
+  if (importAntigravity.value && scanResult.value?.antigravityFiles) sources.push('antigravity')
+  if (importWarp.value && scanResult.value?.warpFiles) sources.push('warp')
+  if (importAugment.value && scanResult.value?.augmentFiles) sources.push('augment')
   
   if (sources.length === 0) return
   
@@ -1361,6 +1396,11 @@ onUnmounted(() => {
               { id: 'gemini', label: 'Gemini' },
               { id: 'opencode', label: 'Opencode' },
               { id: 'cursor', label: 'Cursor' },
+              { id: 'windsurf', label: 'Windsurf' },
+              { id: 'kiro', label: 'Kiro' },
+              { id: 'antigravity', label: '反重力' },
+              { id: 'warp', label: 'Warp' },
+              { id: 'augment', label: 'Augment' },
             ]"
             :key="provider.id"
             @click="selectedProvider = provider.id as any"
@@ -1946,13 +1986,93 @@ onUnmounted(() => {
             </label>
           </div>
 
+          <!-- Windsurf -->
+          <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" v-model="importWindsurf" :disabled="!scanResult.windsurfFiles || importing" class="mt-1 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">Windsurf</span>
+                  <span v-if="scanResult.windsurfFiles" class="text-xs px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900 text-cyan-600 dark:text-cyan-300 rounded">{{ scanResult.windsurfFiles }} {{ t('usage.files') }}</span>
+                  <span v-else class="text-xs text-gray-400">{{ t('usage.notFound') }}</span>
+                </div>
+                <p v-if="scanResult.windsurfPath" class="text-xs text-gray-500 mt-1 break-all">{{ scanResult.windsurfPath }}</p>
+                <p v-if="scanResult.windsurfEntries" class="text-xs text-gray-500">~{{ scanResult.windsurfEntries }} {{ t('usage.entries') }}</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Kiro -->
+          <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" v-model="importKiro" :disabled="!scanResult.kiroFiles || importing" class="mt-1 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">Kiro</span>
+                  <span v-if="scanResult.kiroFiles" class="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-600 dark:text-amber-300 rounded">{{ scanResult.kiroFiles }} {{ t('usage.files') }}</span>
+                  <span v-else class="text-xs text-gray-400">{{ t('usage.notFound') }}</span>
+                </div>
+                <p v-if="scanResult.kiroPath" class="text-xs text-gray-500 mt-1 break-all">{{ scanResult.kiroPath }}</p>
+                <p v-if="scanResult.kiroEntries" class="text-xs text-gray-500">~{{ scanResult.kiroEntries }} {{ t('usage.entries') }}</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Antigravity -->
+          <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" v-model="importAntigravity" :disabled="!scanResult.antigravityFiles || importing" class="mt-1 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">反重力 (Antigravity)</span>
+                  <span v-if="scanResult.antigravityFiles" class="text-xs px-2 py-0.5 bg-rose-100 dark:bg-rose-900 text-rose-600 dark:text-rose-300 rounded">{{ scanResult.antigravityFiles }} {{ t('usage.files') }}</span>
+                  <span v-else class="text-xs text-gray-400">{{ t('usage.notFound') }}</span>
+                </div>
+                <p v-if="scanResult.antigravityPath" class="text-xs text-gray-500 mt-1 break-all">{{ scanResult.antigravityPath }}</p>
+                <p v-if="scanResult.antigravityEntries" class="text-xs text-gray-500">~{{ scanResult.antigravityEntries }} {{ t('usage.entries') }}</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Warp -->
+          <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" v-model="importWarp" :disabled="!scanResult.warpFiles || importing" class="mt-1 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">Warp</span>
+                  <span v-if="scanResult.warpFiles" class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded">{{ scanResult.warpFiles }} {{ t('usage.files') }}</span>
+                  <span v-else class="text-xs text-gray-400">{{ t('usage.notFound') }}</span>
+                </div>
+                <p v-if="scanResult.warpPath" class="text-xs text-gray-500 mt-1 break-all">{{ scanResult.warpPath }}</p>
+                <p v-if="scanResult.warpEntries" class="text-xs text-gray-500">~{{ scanResult.warpEntries }} {{ t('usage.entries') }}</p>
+              </div>
+            </label>
+          </div>
+
+          <!-- Augment -->
+          <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" v-model="importAugment" :disabled="!scanResult.augmentFiles || importing" class="mt-1 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" />
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">Augment</span>
+                  <span v-if="scanResult.augmentFiles" class="text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300 rounded">{{ scanResult.augmentFiles }} {{ t('usage.files') }}</span>
+                  <span v-else class="text-xs text-gray-400">{{ t('usage.notFound') }}</span>
+                </div>
+                <p v-if="scanResult.augmentPath" class="text-xs text-gray-500 mt-1 break-all">{{ scanResult.augmentPath }}</p>
+                <p v-if="scanResult.augmentEntries" class="text-xs text-gray-500">~{{ scanResult.augmentEntries }} {{ t('usage.entries') }}</p>
+              </div>
+            </label>
+          </div>
+
           <!-- 已导入记录提示 -->
           <div v-if="scanResult.existingRecords > 0" class="text-xs text-gray-500 px-1">
             {{ t('usage.existingRecords') }}: {{ scanResult.existingRecords }}
           </div>
 
           <!-- 无可导入数据 -->
-          <div v-if="!scanResult.claudeFiles && !scanResult.codexFiles && !scanResult.geminiFiles && !scanResult.opencodeFiles && !scanResult.cursorFiles" class="text-center py-4 text-gray-400">
+          <div v-if="!scanResult.claudeFiles && !scanResult.codexFiles && !scanResult.geminiFiles && !scanResult.opencodeFiles && !scanResult.cursorFiles && !scanResult.windsurfFiles && !scanResult.kiroFiles && !scanResult.antigravityFiles && !scanResult.warpFiles && !scanResult.augmentFiles" class="text-center py-4 text-gray-400">
             {{ t('usage.noLogsFound') }}
           </div>
 
@@ -1976,7 +2096,7 @@ onUnmounted(() => {
             </button>
             <button
               @click="importLocalLogs"
-              :disabled="importing || (!importClaude && !importCodex && !importGemini && !importOpencode && !importCursor) || (!scanResult.claudeFiles && !scanResult.codexFiles && !scanResult.geminiFiles && !scanResult.opencodeFiles && !scanResult.cursorFiles)"
+              :disabled="importing || (!importClaude && !importCodex && !importGemini && !importOpencode && !importCursor && !importWindsurf && !importKiro && !importAntigravity && !importWarp && !importAugment) || (!scanResult.claudeFiles && !scanResult.codexFiles && !scanResult.geminiFiles && !scanResult.opencodeFiles && !scanResult.cursorFiles && !scanResult.windsurfFiles && !scanResult.kiroFiles && !scanResult.antigravityFiles && !scanResult.warpFiles && !scanResult.augmentFiles)"
               class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <div v-if="importing" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>

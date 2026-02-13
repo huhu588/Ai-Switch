@@ -80,6 +80,7 @@ GitHub Actions 中使用的版本：
 - [深链接配置](docs/DEEP_LINK.md)
 - [自动推断 Provider](docs/AUTO_IMPORT_PROVIDER.md)
 - [编程环境管理](docs/DEV_ENV_MANAGEMENT.md)
+- [Warp API 参考](docs/WARP_API_REFERENCE.md)
 - [Bug 跟踪](docs/BUGS.md)
 
 ## License

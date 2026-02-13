@@ -442,7 +442,7 @@ export default {
     deleteFromAll: 'Delete from all tools',
     deleteFromAllConfirm: 'Are you sure you want to delete "{name}" from all tools?',
     totalSkills: '{count} Skills total',
-    statsInstalled: 'Installed · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor}',
+    statsInstalled: 'Installed · Claude: {claude} · Codex: {codex} · Gemini: {gemini} · OpenCode: {opencode} · Cursor: {cursor} · Windsurf: {windsurf} · Kiro: {kiro}',
     toggleFailed: 'Toggle failed: {error}',
     deleteSuccess: 'Deleted successfully',
     deleteFailed: 'Delete failed: {error}',
@@ -914,7 +914,11 @@ export default {
       codex: 'Codex',
       windsurf: 'Windsurf',
       trae: 'Trae',
-      trae_cn: 'Trae CN'
+      trae_cn: 'Trae CN',
+      kiro: 'Kiro',
+      antigravity: 'Antigravity',
+      warp: 'Warp',
+      augment: 'Augment'
     }
   },
 

@@ -105,8 +105,7 @@ pub struct OpenCodePermission {
 /// OpenCode 配置文件结构 (匹配新版 opencode 格式)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenCodeConfig {
-    #[serde(rename = "$schema", default = "default_schema", skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
+    // 移除 $schema 字段，OpenCode 不识别此字段
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -117,10 +116,6 @@ pub struct OpenCodeConfig {
     pub permission: Option<OpenCodePermission>,
     #[serde(default)]
     pub provider: HashMap<String, OpenCodeProvider>,
-}
-
-fn default_schema() -> Option<String> {
-    Some("https://opencode.ai/config.json".to_string())
 }
 
 /// OpenCode Provider 配置 (匹配真实 opencode.json 格式)
@@ -440,7 +435,6 @@ impl OpenCodeConfig {
     /// 创建新的 OpenCode 配置
     pub fn new() -> Self {
         Self {
-            schema: default_schema(),
             theme: Some("opencode".to_string()),
             autoupdate: Some(true),
             tools: None,

@@ -8,10 +8,6 @@ import SvgIcon from '@/components/SvgIcon.vue'
 
 const { t } = useI18n()
 
-// ============================================================================
-// 备份相关类型
-// ============================================================================
-
 interface ExportedModel { id: string; name: string; reasoning_effort?: string }
 interface ExportedProvider { name: string; base_url: string; api_key: string; npm?: string; description?: string; model_type?: string; enabled: boolean; models: ExportedModel[] }
 interface ExportedOAuthConfig { client_id?: string; client_secret?: string; scope?: string }
@@ -25,15 +21,13 @@ interface ExportedGeminiEnv { gemini_api_key?: string; google_gemini_api_key?: s
 interface ExportedGeminiMcpServer { name: string; command?: string; args?: string[]; env?: Record<string, string>; url?: string }
 interface ExportedGeminiConfig { env: ExportedGeminiEnv; mcp_servers: ExportedGeminiMcpServer[] }
 interface ExportedUsageRecord { session_id: string; timestamp: number; model: string; source: string; input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_creation_tokens: number; cost?: number }
-interface BackupData { version: string; created_at: string; app_name: string; providers: ExportedProvider[]; mcp_servers: ExportedMcpServer[]; rules: ExportedRule[]; skills: ExportedSkills[]; codex_config?: ExportedCodexConfig; gemini_config?: ExportedGeminiConfig; usage_stats?: ExportedUsageRecord[]; dev_envs?: { id: string; name: string; version?: string }[] }
+interface ExportedChatMessage { role: string; content: string; model?: string; timestamp?: string; toolUse?: unknown }
+interface ExportedChatConversation { messages: ExportedChatMessage[]; source: string; sessionId?: string; name?: string; createdAt?: number }
+interface BackupData { version: string; created_at: string; app_name: string; providers: ExportedProvider[]; mcp_servers: ExportedMcpServer[]; rules: ExportedRule[]; skills: ExportedSkills[]; codex_config?: ExportedCodexConfig; gemini_config?: ExportedGeminiConfig; usage_stats?: ExportedUsageRecord[]; chat_conversations?: ExportedChatConversation[]; dev_envs?: { id: string; name: string; version?: string }[] }
 interface ExportedDevEnv { id: string; name: string; version?: string }
 interface DevEnvInfo { id: string; name: string; installed: boolean; current_version: string | null }
 interface ExportStats { providers: number; models: number; mcp_servers: number; rules: number; skills: number; codex_providers: number; codex_mcp_servers: number; gemini_configured: boolean; gemini_mcp_servers: number; usage_records: number; chat_conversations: number }
-interface ImportResult { success: boolean; providers_imported: number; providers_skipped: number; mcp_imported: number; mcp_skipped: number; rules_imported: number; rules_skipped: number; skills_imported: number; skills_skipped: number; codex_imported: number; codex_skipped: number; gemini_imported: number; gemini_skipped: number; usage_imported: number; usage_skipped: number; errors: string[] }
-
-// ============================================================================
-// 对话迁移相关类型
-// ============================================================================
+interface ImportResult { success: boolean; providers_imported: number; providers_skipped: number; mcp_imported: number; mcp_skipped: number; rules_imported: number; rules_skipped: number; skills_imported: number; skills_skipped: number; codex_imported: number; codex_skipped: number; gemini_imported: number; gemini_skipped: number; usage_imported: number; usage_skipped: number; chat_conversations_imported: number; chat_conversations_skipped: number; errors: string[] }
 
 interface ChatSourceInfo { name: string; key: string; path: string | null; conversationCount: number; available: boolean }
 interface ChatScanResult { sources: ChatSourceInfo[] }
@@ -42,10 +36,6 @@ interface ExtractedConversation { messages: ExtractedMessage[]; source: string; 
 interface ExtractionResult { source: string; conversations: ExtractedConversation[]; total: number }
 interface ChatExportResult { exported: number; filePath: string }
 interface MigrationImportResult { imported: number; skipped: number; total: number }
-
-// ============================================================================
-// 备份状态
-// ============================================================================
 
 const isExporting = ref(false)
 const isImportingBackup = ref(false)
@@ -57,7 +47,6 @@ const exportMessageType = ref<'success' | 'error'>('success')
 const importMessage = ref('')
 const importMessageType = ref<'success' | 'error'>('success')
 
-// 导出选择面板状态
 const showExportPanel = ref(false)
 const isLoadingExportData = ref(false)
 const fullBackupData = ref<BackupData | null>(null)
@@ -71,30 +60,33 @@ const includeGeminiEnv = ref(true)
 const selectedGeminiMcps = ref<string[]>([])
 const selectedUsageSources = ref<string[]>([])
 const selectedChatSources = ref<string[]>([])
-// 开发环境（从后端检测得到）
 const detectedEnvs = ref<DevEnvInfo[]>([])
-const selectedDevEnvs = ref<Record<string, string>>({}) // id -> version
+const selectedDevEnvs = ref<Record<string, string>>({})
 
-// 区块折叠状态
 const sectionExpanded = ref<Record<string, boolean>>({
   providers: true, claude: true, codex: true, gemini: true,
   mcp: true, rules: true, skills: true, usage: false, chatRecords: false,
 })
 function toggleSection(key: string) { sectionExpanded.value[key] = !sectionExpanded.value[key] }
 
-// 使用统计可选来源
 const usageSourceOptions = [
   { key: 'claude', label: 'Claude', color: 'amber' },
   { key: 'codex', label: 'Codex', color: 'green' },
   { key: 'gemini', label: 'Gemini', color: 'pink' },
   { key: 'opencode', label: 'Opencode', color: 'blue' },
   { key: 'cursor', label: 'Cursor', color: 'cyan' },
+  { key: 'windsurf', label: 'Windsurf', color: 'violet' },
+  { key: 'kiro', label: 'Kiro', color: 'orange' },
+  { key: 'antigravity', label: '反重力', color: 'rose' },
+  { key: 'warp', label: 'Warp', color: 'indigo' },
+  { key: 'augment', label: 'Augment', color: 'emerald' },
 ]
 
 const importOptions = ref({
   import_providers: true, import_mcp: true, import_rules: true,
   import_skills: true, import_codex: true, import_gemini: true,
   overwrite_existing: false, import_usage_stats: true,
+  import_chat_conversations: true,
 })
 
 const previewStats = computed(() => {
@@ -112,12 +104,9 @@ const previewStats = computed(() => {
     gemini_configured: !!(geminiConfig?.env?.gemini_api_key || geminiConfig?.env?.google_gemini_api_key),
     gemini_mcp_servers: geminiConfig?.mcp_servers?.length || 0,
     usage_records: previewData.value.usage_stats?.length || 0,
+    chat_conversations: previewData.value.chat_conversations?.length || 0,
   }
 })
-
-// ============================================================================
-// 对话迁移状态
-// ============================================================================
 
 const isScanning = ref(false)
 const scanResult = ref<ChatScanResult | null>(null)
@@ -137,6 +126,10 @@ const toolMeta: Record<string, { icon: string; color: string }> = {
   windsurf: { icon: 'activity', color: '#8B5CF6' },
   trae: { icon: 'server', color: '#EC4899' },
   trae_cn: { icon: 'server', color: '#F43F5E' },
+  kiro: { icon: 'code', color: '#F59E0B' },
+  antigravity: { icon: 'refresh', color: '#F43F5E' },
+  warp: { icon: 'terminal', color: '#6366F1' },
+  augment: { icon: 'layers', color: '#059669' },
 }
 
 const allConversations = computed(() => {
@@ -150,11 +143,6 @@ const hasExtractedData = computed(() => totalConversations.value > 0)
 const availableSources = computed(() => scanResult.value?.sources.filter(s => s.available) ?? [])
 const extractedSourceList = computed(() => [...extractedData.value.entries()])
 
-// ============================================================================
-// 备份方法
-// ============================================================================
-
-// 获取 provider 应用到的工具列表
 function getProviderTools(modelType?: string): string[] {
   switch (modelType || 'claude') {
     case 'claude': return ['Claude Code', 'OpenCode']
@@ -164,14 +152,12 @@ function getProviderTools(modelType?: string): string[] {
   }
 }
 
-// 通用列表项切换
 function toggleItem(list: string[], key: string) {
   const idx = list.indexOf(key)
   if (idx >= 0) list.splice(idx, 1)
   else list.push(key)
 }
 
-// 服务商分组 computed
 const claudeProviders = computed(() => fullBackupData.value?.providers.filter(p => (p.model_type || 'claude') === 'claude') || [])
 const codexOcProviders = computed(() => fullBackupData.value?.providers.filter(p => p.model_type === 'codex') || [])
 const geminiOcProviders = computed(() => fullBackupData.value?.providers.filter(p => p.model_type === 'gemini') || [])
@@ -181,19 +167,16 @@ const hasGeminiEnv = computed(() => {
   return !!(env?.gemini_api_key || env?.google_gemini_api_key)
 })
 
-// 统一 MCP 列表
 const codexCliMcps = computed(() => fullBackupData.value?.codex_config?.mcp_servers || [])
 const geminiCliMcps = computed(() => fullBackupData.value?.gemini_config?.mcp_servers || [])
 const totalMcpCount = computed(() => (fullBackupData.value?.mcp_servers.length || 0) + codexCliMcps.value.length + geminiCliMcps.value.length)
 const selectedMcpTotalCount = computed(() => selectedMcps.value.length + selectedCodexMcps.value.length + selectedGeminiMcps.value.length)
 
-// Claude 分组全选
 const allClaudeSelected = computed(() => claudeProviders.value.length > 0 && claudeProviders.value.every(p => selectedProviders.value.includes(p.name)))
 function toggleAllClaude() {
   if (allClaudeSelected.value) { for (const p of claudeProviders.value) { const i = selectedProviders.value.indexOf(p.name); if (i >= 0) selectedProviders.value.splice(i, 1) } }
   else { for (const p of claudeProviders.value) { if (!selectedProviders.value.includes(p.name)) selectedProviders.value.push(p.name) } }
 }
-// Codex 分组全选
 const allCodexSelected = computed(() => {
   const ocOk = codexOcProviders.value.length === 0 || codexOcProviders.value.every(p => selectedProviders.value.includes(p.name))
   const cliOk = codexCliProviders.value.length === 0 || codexCliProviders.value.every(p => selectedCodexProviders.value.includes(p.name))
@@ -208,7 +191,6 @@ function toggleAllCodex() {
     selectedCodexProviders.value = codexCliProviders.value.map(p => p.name)
   }
 }
-// Gemini 分组全选
 const allGeminiSelected = computed(() => {
   const ocOk = geminiOcProviders.value.length === 0 || geminiOcProviders.value.every(p => selectedProviders.value.includes(p.name))
   const envOk = !hasGeminiEnv.value || includeGeminiEnv.value
@@ -223,7 +205,6 @@ function toggleAllGemini() {
     includeGeminiEnv.value = hasGeminiEnv.value
   }
 }
-// 服务商总计
 const allProvidersGroupSelected = computed(() => allClaudeSelected.value && allCodexSelected.value && allGeminiSelected.value)
 const selectedProvidersGroupCount = computed(() => {
   let c = selectedProviders.value.length + selectedCodexProviders.value.length
@@ -235,17 +216,14 @@ const totalProvidersGroupCount = computed(() => {
 })
 function toggleAllProvidersGroup() {
   if (allProvidersGroupSelected.value) {
-    // 取消全选
     selectedProviders.value = []; selectedCodexProviders.value = []; includeGeminiEnv.value = false
   } else {
-    // 强制全选所有服务商（不使用 toggle 函数，避免已选中的被反选）
     selectedProviders.value = fullBackupData.value?.providers.map(p => p.name) || []
     selectedCodexProviders.value = codexCliProviders.value.map(p => p.name)
     includeGeminiEnv.value = hasGeminiEnv.value
   }
 }
 
-// MCP 统一全选
 const allMcpsSelected = computed(() => {
   const ocOk = (fullBackupData.value?.mcp_servers.length || 0) === 0 || fullBackupData.value!.mcp_servers.every(m => selectedMcps.value.includes(m.name))
   const cxOk = codexCliMcps.value.length === 0 || codexCliMcps.value.every(m => selectedCodexMcps.value.includes(m.name))
@@ -261,19 +239,15 @@ function toggleAllMcps() {
   }
 }
 
-// 规则全选
 const allRulesSelected = computed(() => fullBackupData.value ? fullBackupData.value.rules.length > 0 && fullBackupData.value.rules.every(r => selectedRules.value.includes(`${r.name}|${r.location}`)) : false)
 function toggleAllRules() { selectedRules.value = allRulesSelected.value ? [] : (fullBackupData.value?.rules.map(r => `${r.name}|${r.location}`) || []) }
 
-// Skills 全选
 const allSkillsSelected = computed(() => fullBackupData.value ? fullBackupData.value.skills.length > 0 && fullBackupData.value.skills.every(s => selectedSkills.value.includes(`${s.name}|${s.location}`)) : false)
 function toggleAllSkills() { selectedSkills.value = allSkillsSelected.value ? [] : (fullBackupData.value?.skills.map(s => `${s.name}|${s.location}`) || []) }
 
-// 使用统计全选
 const allUsageSourcesSelected = computed(() => selectedUsageSources.value.length === usageSourceOptions.length)
 function toggleAllUsageSources() { selectedUsageSources.value = allUsageSourcesSelected.value ? [] : usageSourceOptions.map(s => s.key) }
 
-// 开发环境全选/取消
 function toggleAllDevEnvs() {
   if (Object.keys(selectedDevEnvs.value).length === detectedEnvs.value.length) {
     selectedDevEnvs.value = {}
@@ -285,11 +259,9 @@ function toggleAllDevEnvs() {
   }
 }
 
-// 对话源全选
 const allChatSourcesSelected = computed(() => extractedData.value.size > 0 && [...extractedData.value.keys()].every(k => selectedChatSources.value.includes(k)))
 function toggleAllChatSources() { selectedChatSources.value = allChatSourcesSelected.value ? [] : [...extractedData.value.keys()] }
 
-// 总选中数
 const totalSelectedCount = computed(() =>
   selectedProviders.value.length + selectedCodexProviders.value.length + (includeGeminiEnv.value && hasGeminiEnv.value ? 1 : 0) +
   selectedMcps.value.length + selectedCodexMcps.value.length + selectedGeminiMcps.value.length +
@@ -297,12 +269,10 @@ const totalSelectedCount = computed(() =>
   selectedUsageSources.value.length + selectedChatSources.value.length
 )
 
-// 打开导出选择面板
 async function openExportPanel() {
   isLoadingExportData.value = true; showExportPanel.value = true; exportMessage.value = ''
   try {
     fullBackupData.value = await invoke<BackupData>('create_backup')
-    // 检测本机开发环境（仅备份版本号）
     const envs = await invoke<DevEnvInfo[]>('detect_all_dev_envs')
     detectedEnvs.value = envs.filter(e => e.installed)
     selectedDevEnvs.value = {}
@@ -323,7 +293,6 @@ async function openExportPanel() {
 
 function cancelExport() { showExportPanel.value = false; fullBackupData.value = null; exportMessage.value = '' }
 
-// 确认导出
 async function confirmFilteredExport() {
   try {
     isExporting.value = true; exportMessage.value = ''
@@ -372,6 +341,7 @@ async function handleBackupImport() {
       ? t('backup.importSuccess', { providers: result.providers_imported, mcp: result.mcp_imported, rules: result.rules_imported, skills: result.skills_imported, codex: result.codex_imported, gemini: result.gemini_imported })
       : t('backup.importPartial', { providers: result.providers_imported, mcp: result.mcp_imported, rules: result.rules_imported, skills: result.skills_imported, codex: result.codex_imported, gemini: result.gemini_imported, errors: result.errors.length })
     if (result.usage_imported > 0 || result.usage_skipped > 0) { msg += ` | ${t('backup.includeUsageStats')}: +${result.usage_imported}, -${result.usage_skipped}` }
+    if (result.chat_conversations_imported > 0 || result.chat_conversations_skipped > 0) { msg += ` | ${t('backup.chatRecords')}: +${result.chat_conversations_imported}, -${result.chat_conversations_skipped}` }
     importMessage.value = msg; importMessageType.value = 'success'
     showBackupPreview.value = false; previewData.value = null; selectedFilePath.value = ''
   } catch (e) { importMessage.value = t('backup.importFailed') + ': ' + String(e); importMessageType.value = 'error' }
@@ -384,10 +354,6 @@ function handleCancelImport() {
 
 function formatDate(dateStr: string): string { try { return new Date(dateStr).toLocaleString() } catch { return dateStr } }
 function maskApiKey(key: string): string { return key.length <= 8 ? '***' : key.slice(0, 4) + '****' + key.slice(-4) }
-
-// ============================================================================
-// 对话迁移方法
-// ============================================================================
 
 async function handleScan() {
   try {
@@ -461,9 +427,6 @@ function formatTimestamp(ts?: string | number | null): string {
   <div class="h-full overflow-auto pb-6">
     <div class="max-w-3xl mx-auto space-y-6">
 
-    <!-- ================================================================ -->
-    <!-- 导出备份 -->
-    <!-- ================================================================ -->
     <div class="rounded-xl bg-surface/30 border border-border p-6">
       <div class="flex items-center gap-3 mb-4">
         <SvgIcon name="save" :size="28" class="text-accent" />
@@ -471,7 +434,6 @@ function formatTimestamp(ts?: string | number | null): string {
       </div>
       <p class="text-sm text-muted-foreground mb-4">{{ t('backup.exportDesc') }}</p>
 
-      <!-- 未展开：导出按钮 -->
       <div v-if="!showExportPanel" class="flex items-center gap-4">
         <button @click="openExportPanel" :disabled="isExporting"
           class="px-4 py-2 bg-accent text-accent-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2">
@@ -481,18 +443,14 @@ function formatTimestamp(ts?: string | number | null): string {
         <span v-if="exportMessage" class="text-sm" :class="exportMessageType === 'error' ? 'text-red-500' : 'text-green-500'">{{ exportMessage }}</span>
       </div>
 
-      <!-- 展开：详细选择面板 -->
       <div v-if="showExportPanel" class="space-y-3">
-        <!-- 加载中 -->
         <div v-if="isLoadingExportData" class="flex items-center justify-center py-8 gap-2 text-muted-foreground">
           <SvgIcon name="loading" :size="20" class="animate-spin" />
           <span class="text-sm">{{ t('backup.loadingData') }}</span>
         </div>
 
         <template v-else-if="fullBackupData">
-          <!-- ========== 服务商（按工具分组） ========== -->
           <div class="bg-surface rounded-lg overflow-hidden">
-            <!-- 服务商总标题 -->
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('providers')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
                 <input type="checkbox" :checked="allProvidersGroupSelected" @change="toggleAllProvidersGroup" class="w-3.5 h-3.5 rounded border-border accent-accent" />
@@ -504,7 +462,6 @@ function formatTimestamp(ts?: string | number | null): string {
               </div>
             </div>
             <div v-if="sectionExpanded.providers" class="border-t border-border/30">
-              <!-- Claude Code 子分组 -->
               <div v-if="claudeProviders.length > 0">
                 <div class="flex items-center justify-between px-4 py-2 cursor-pointer select-none bg-amber-500/5" @click="toggleSection('claude')">
                   <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -535,7 +492,6 @@ function formatTimestamp(ts?: string | number | null): string {
                   </div>
                 </div>
               </div>
-              <!-- Codex 子分组 -->
               <div v-if="codexOcProviders.length > 0 || codexCliProviders.length > 0">
                 <div class="flex items-center justify-between px-4 py-2 cursor-pointer select-none bg-green-500/5 border-t border-border/20" @click="toggleSection('codex')">
                   <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -548,7 +504,6 @@ function formatTimestamp(ts?: string | number | null): string {
                   </div>
                 </div>
                 <div v-if="sectionExpanded.codex" class="px-4 pb-2 space-y-1">
-                  <!-- OpenCode Codex providers -->
                   <div v-for="provider in codexOcProviders" :key="provider.name" class="flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-background/50 transition-colors">
                     <input type="checkbox" :checked="selectedProviders.includes(provider.name)" @change="toggleItem(selectedProviders, provider.name)" class="w-3.5 h-3.5 rounded border-border accent-accent shrink-0" />
                     <div class="flex-1 min-w-0">
@@ -563,7 +518,6 @@ function formatTimestamp(ts?: string | number | null): string {
                       </div>
                     </div>
                   </div>
-                  <!-- Codex CLI providers -->
                   <div v-for="cp in codexCliProviders" :key="'codex-cli-' + cp.name" class="flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-background/50 transition-colors">
                     <input type="checkbox" :checked="selectedCodexProviders.includes(cp.name)" @change="toggleItem(selectedCodexProviders, cp.name)" class="w-3.5 h-3.5 rounded border-border accent-green-500 shrink-0" />
                     <div class="flex-1 min-w-0">
@@ -576,7 +530,6 @@ function formatTimestamp(ts?: string | number | null): string {
                   </div>
                 </div>
               </div>
-              <!-- Gemini 子分组 -->
               <div v-if="geminiOcProviders.length > 0 || hasGeminiEnv">
                 <div class="flex items-center justify-between px-4 py-2 cursor-pointer select-none bg-pink-500/5 border-t border-border/20" @click="toggleSection('gemini')">
                   <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -589,7 +542,6 @@ function formatTimestamp(ts?: string | number | null): string {
                   </div>
                 </div>
                 <div v-if="sectionExpanded.gemini" class="px-4 pb-2 space-y-1">
-                  <!-- OpenCode Gemini providers -->
                   <div v-for="provider in geminiOcProviders" :key="provider.name" class="flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-background/50 transition-colors">
                     <input type="checkbox" :checked="selectedProviders.includes(provider.name)" @change="toggleItem(selectedProviders, provider.name)" class="w-3.5 h-3.5 rounded border-border accent-accent shrink-0" />
                     <div class="flex-1 min-w-0">
@@ -604,7 +556,6 @@ function formatTimestamp(ts?: string | number | null): string {
                       </div>
                     </div>
                   </div>
-                  <!-- Gemini CLI env 配置 -->
                   <label v-if="hasGeminiEnv" class="flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-background/50 cursor-pointer transition-colors">
                     <input type="checkbox" v-model="includeGeminiEnv" class="w-3.5 h-3.5 rounded border-border accent-pink-500 shrink-0" />
                     <span class="text-sm text-pink-500">Gemini CLI</span>
@@ -615,7 +566,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== MCP 服务器（统一三来源） ========== -->
           <div v-if="totalMcpCount > 0" class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('mcp')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -628,20 +578,17 @@ function formatTimestamp(ts?: string | number | null): string {
               </div>
             </div>
             <div v-if="sectionExpanded.mcp" class="px-4 pb-2 space-y-1 max-h-[240px] overflow-y-auto border-t border-border/30">
-              <!-- OpenCode MCP -->
               <label v-for="mcp in fullBackupData.mcp_servers" :key="mcp.name" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-background/50 cursor-pointer transition-colors">
                 <input type="checkbox" :checked="selectedMcps.includes(mcp.name)" @change="toggleItem(selectedMcps, mcp.name)" class="w-3.5 h-3.5 rounded border-border accent-accent shrink-0" />
                 <span class="text-sm truncate">{{ mcp.name }}</span>
                 <span class="text-[10px] text-muted-foreground shrink-0">{{ mcp.server_type }}</span>
                 <span class="text-[9px] px-1.5 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/20 shrink-0">OpenCode</span>
               </label>
-              <!-- Codex CLI MCP -->
               <label v-for="mcp in codexCliMcps" :key="'cx-' + mcp.name" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-background/50 cursor-pointer transition-colors">
                 <input type="checkbox" :checked="selectedCodexMcps.includes(mcp.name)" @change="toggleItem(selectedCodexMcps, mcp.name)" class="w-3.5 h-3.5 rounded border-border accent-green-500 shrink-0" />
                 <span class="text-sm truncate">{{ mcp.name }}</span>
                 <span class="text-[9px] px-1.5 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/20 shrink-0">Codex</span>
               </label>
-              <!-- Gemini CLI MCP -->
               <label v-for="mcp in geminiCliMcps" :key="'gm-' + mcp.name" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-background/50 cursor-pointer transition-colors">
                 <input type="checkbox" :checked="selectedGeminiMcps.includes(mcp.name)" @change="toggleItem(selectedGeminiMcps, mcp.name)" class="w-3.5 h-3.5 rounded border-border accent-pink-500 shrink-0" />
                 <span class="text-sm truncate">{{ mcp.name }}</span>
@@ -650,7 +597,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== 规则 ========== -->
           <div v-if="fullBackupData.rules.length > 0" class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('rules')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -671,7 +617,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== Skills ========== -->
           <div v-if="fullBackupData.skills.length > 0" class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('skills')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -692,7 +637,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== 开发环境（仅版本号） ========== -->
           <div v-if="detectedEnvs.length > 0" class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('devenvs')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -716,7 +660,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== 使用统计（按来源可选） ========== -->
           <div class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('usage')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -736,7 +679,6 @@ function formatTimestamp(ts?: string | number | null): string {
             </div>
           </div>
 
-          <!-- ========== 对话记录（集成对话迁移功能） ========== -->
           <div class="bg-surface rounded-lg overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none" @click="toggleSection('chatRecords')">
               <label class="flex items-center gap-2 cursor-pointer" @click.stop>
@@ -749,7 +691,6 @@ function formatTimestamp(ts?: string | number | null): string {
               </div>
             </div>
             <div v-if="sectionExpanded.chatRecords" class="border-t border-border/30">
-              <!-- 操作栏：扫描/提取/导入 -->
               <div class="px-4 pt-2 pb-1 flex items-center gap-2 flex-wrap">
                 <button @click="handleScan" :disabled="isScanning" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
                   <SvgIcon v-if="isScanning" name="loading" :size="14" class="animate-spin" /><SvgIcon v-else name="search" :size="14" />
@@ -764,11 +705,9 @@ function formatTimestamp(ts?: string | number | null): string {
                   {{ t('chatMigration.importFile') }}
                 </button>
               </div>
-              <!-- 状态消息 -->
               <div v-if="chatStatusMessage" class="mx-4 mb-2 px-3 py-2 rounded-lg text-sm" :class="{ 'bg-green-500/10 text-green-400 border border-green-500/20': chatStatusType === 'success', 'bg-red-500/10 text-red-400 border border-red-500/20': chatStatusType === 'error', 'bg-blue-500/10 text-blue-400 border border-blue-500/20': chatStatusType === 'info' }">
                 {{ chatStatusMessage }}
               </div>
-              <!-- 扫描结果：工具卡片 -->
               <div v-if="scanResult" class="px-4 pb-2">
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
                   <div v-for="source in scanResult.sources" :key="source.key" class="rounded-lg border border-border p-2.5 transition-all duration-200" :class="source.available ? 'bg-surface/30 hover:border-accent/40' : 'bg-surface/10 opacity-60'">
@@ -795,7 +734,6 @@ function formatTimestamp(ts?: string | number | null): string {
               <div v-else class="px-4 pb-2">
                 <p class="text-xs text-muted-foreground/60 text-center py-3">{{ t('chatMigration.scanFirst') }}</p>
               </div>
-              <!-- 已提取对话源选择 -->
               <div v-if="extractedSourceList.length > 0" class="px-4 pb-2 space-y-1 border-t border-border/20">
                 <div class="flex items-center justify-between py-1.5">
                   <span class="text-[10px] text-muted-foreground">{{ t('backup.chatRecords') }} ({{ totalConversations }} {{ t('chatMigration.conversations') }}, {{ totalMessages }} {{ t('chatMigration.messages') }})</span>
@@ -820,7 +758,6 @@ function formatTimestamp(ts?: string | number | null): string {
           </div>
         </template>
 
-        <!-- 底部操作 -->
         <div class="flex items-center gap-3 pt-3">
           <button @click="confirmFilteredExport" :disabled="isExporting || totalSelectedCount === 0"
             class="px-4 py-2 bg-accent text-accent-foreground rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2">
@@ -835,9 +772,6 @@ function formatTimestamp(ts?: string | number | null): string {
       </div>
     </div>
 
-    <!-- ================================================================ -->
-    <!-- 导入配置 -->
-    <!-- ================================================================ -->
     <div class="rounded-xl bg-surface/30 border border-border p-6">
       <div class="flex items-center gap-3 mb-4">
         <SvgIcon name="upload" :size="28" class="text-accent" />
@@ -845,7 +779,6 @@ function formatTimestamp(ts?: string | number | null): string {
       </div>
       <p class="text-sm text-muted-foreground mb-4">{{ t('backup.importDesc') }}</p>
 
-      <!-- 选择文件 -->
       <div v-if="!showBackupPreview" class="flex items-center gap-4">
         <button @click="handleSelectFile"
           class="px-4 py-2 bg-surface border border-border rounded-lg font-medium hover:bg-surface/80 transition-all flex items-center gap-2">
@@ -854,7 +787,6 @@ function formatTimestamp(ts?: string | number | null): string {
         <span v-if="importMessage && !showBackupPreview" class="text-sm" :class="importMessageType === 'error' ? 'text-red-500' : 'text-green-500'">{{ importMessage }}</span>
       </div>
 
-      <!-- 预览 -->
       <div v-if="showBackupPreview && previewData" class="space-y-4">
         <div class="bg-surface rounded-lg p-4 space-y-2">
           <div class="flex justify-between items-center"><span class="text-sm text-muted-foreground">{{ t('backup.backupVersion') }}</span><span class="text-sm font-mono">{{ previewData.version }}</span></div>
@@ -869,6 +801,9 @@ function formatTimestamp(ts?: string | number | null): string {
             <div class="bg-surface rounded-lg p-3 text-center"><div class="text-2xl font-bold text-orange-500">{{ previewStats.rules }}</div><div class="text-xs text-muted-foreground">{{ t('backup.rules') }}</div></div>
             <div class="bg-surface rounded-lg p-3 text-center"><div class="text-2xl font-bold text-green-500">{{ previewStats.skills }}</div><div class="text-xs text-muted-foreground">Skills</div></div>
           </div>
+          <div v-if="previewStats.chat_conversations > 0" class="grid grid-cols-1 gap-3">
+            <div class="bg-surface rounded-lg p-3 text-center"><div class="text-2xl font-bold text-teal-500">{{ previewStats.chat_conversations }}</div><div class="text-xs text-muted-foreground">{{ t('backup.chatRecords') }}</div></div>
+          </div>
           <div v-if="previewStats.codex_providers > 0 || previewStats.codex_mcp_servers > 0 || previewStats.gemini_configured || previewStats.gemini_mcp_servers > 0" class="grid grid-cols-4 gap-3">
             <div class="bg-surface rounded-lg p-3 text-center"><div class="text-2xl font-bold text-cyan-500">{{ previewStats.codex_providers }}</div><div class="text-xs text-muted-foreground">Codex {{ t('backup.providers') }}</div></div>
             <div class="bg-surface rounded-lg p-3 text-center"><div class="text-2xl font-bold text-cyan-400">{{ previewStats.codex_mcp_servers }}</div><div class="text-xs text-muted-foreground">Codex MCP</div></div>
@@ -877,7 +812,6 @@ function formatTimestamp(ts?: string | number | null): string {
           </div>
         </div>
 
-        <!-- 导入选项 -->
         <div class="bg-surface rounded-lg p-4 space-y-3">
           <h3 class="font-medium text-sm mb-3">{{ t('backup.importOptions') }}</h3>
           <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.import_providers" class="w-4 h-4 rounded border-border accent-accent" /><span class="text-sm">{{ t('backup.importProviders') }}</span><span class="text-xs text-muted-foreground">({{ previewStats?.providers || 0 }} {{ t('backup.items') }})</span></label>
@@ -887,13 +821,13 @@ function formatTimestamp(ts?: string | number | null): string {
           <label v-if="previewStats && (previewStats.codex_providers > 0 || previewStats.codex_mcp_servers > 0)" class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.import_codex" class="w-4 h-4 rounded border-border accent-cyan-500" /><span class="text-sm text-cyan-500">{{ t('backup.importCodex') }}</span><span class="text-xs text-muted-foreground">({{ (previewStats?.codex_providers || 0) + (previewStats?.codex_mcp_servers || 0) }} {{ t('backup.items') }})</span></label>
           <label v-if="previewStats && (previewStats.gemini_configured || previewStats.gemini_mcp_servers > 0)" class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.import_gemini" class="w-4 h-4 rounded border-border accent-pink-500" /><span class="text-sm text-pink-500">{{ t('backup.importGemini') }}</span><span class="text-xs text-muted-foreground">({{ (previewStats?.gemini_configured ? 1 : 0) + (previewStats?.gemini_mcp_servers || 0) }} {{ t('backup.items') }})</span></label>
           <label v-if="previewStats && previewStats.usage_records > 0" class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.import_usage_stats" class="w-4 h-4 rounded border-border accent-amber-500" /><span class="text-sm text-amber-500">{{ t('backup.importUsageStats') }}</span><span class="text-xs text-muted-foreground">({{ previewStats.usage_records }} {{ t('backup.usageRecords') }})</span></label>
+          <label v-if="previewStats && previewStats.chat_conversations > 0" class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.import_chat_conversations" class="w-4 h-4 rounded border-border accent-teal-500" /><span class="text-sm text-teal-500">{{ t('backup.chatRecords') }}</span><span class="text-xs text-muted-foreground">({{ previewStats.chat_conversations }} {{ t('chatMigration.conversations') }})</span></label>
           <div class="border-t border-border pt-3 mt-3">
             <label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="importOptions.overwrite_existing" class="w-4 h-4 rounded border-border accent-orange-500" /><span class="text-sm text-orange-500">{{ t('backup.overwriteExisting') }}</span></label>
             <p class="text-xs text-muted-foreground mt-1 ml-7">{{ t('backup.overwriteHint') }}</p>
           </div>
         </div>
 
-        <!-- Provider 预览 -->
         <div v-if="previewData.providers.length > 0" class="bg-surface rounded-lg p-4">
           <h3 class="font-medium text-sm mb-3">{{ t('backup.providerPreview') }}</h3>
           <div class="space-y-2 max-h-40 overflow-y-auto">
@@ -915,9 +849,6 @@ function formatTimestamp(ts?: string | number | null): string {
       </div>
     </div>
 
-    <!-- ================================================================ -->
-    <!-- 说明信息 -->
-    <!-- ================================================================ -->
     <div class="rounded-xl bg-surface/30 border border-border p-6">
       <div class="flex items-start gap-3">
         <SvgIcon name="info" :size="20" class="text-accent flex-shrink-0 mt-0.5" />
@@ -942,9 +873,6 @@ function formatTimestamp(ts?: string | number | null): string {
     </div>
   </div>
 
-  <!-- ================================================================ -->
-  <!-- 对话预览弹窗 -->
-  <!-- ================================================================ -->
   <Teleport to="body">
     <div v-if="showChatPreview && previewConversation" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="closeChatPreview">
       <div class="w-[700px] max-h-[80vh] bg-surface border border-border rounded-2xl shadow-xl flex flex-col overflow-hidden">

@@ -283,7 +283,6 @@ impl McpConfigManager {
             serde_json::from_str(&content).map_err(|e| format!("解析 opencode.json 失败: {}", e))?
         } else {
             serde_json::json!({
-                "$schema": "https://opencode.ai/config.json",
                 "theme": "tokyonight",
                 "autoupdate": false,
                 "provider": {},
@@ -366,7 +365,6 @@ impl McpConfigManager {
                 .map_err(|e| format!("解析项目 opencode.json 失败: {}", e))?
         } else {
             serde_json::json!({
-                "$schema": "https://opencode.ai/config.json",
                 "mcp": {}
             })
         };

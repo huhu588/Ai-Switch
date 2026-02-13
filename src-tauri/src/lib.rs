@@ -497,6 +497,36 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::import_migration_file,
             commands::get_migrated_conversations,
             commands::clear_migrated_conversations,
+            // Windsurf commands
+            commands::get_windsurf_status,
+            commands::get_windsurf_mcp_servers,
+            commands::add_windsurf_mcp_server,
+            commands::remove_windsurf_mcp_server,
+            commands::sync_mcp_to_windsurf,
+            commands::import_mcp_from_windsurf,
+            // Augment Code commands
+            commands::get_augment_status,
+            commands::ensure_augment_rules_dir,
+            // Warp commands
+            commands::get_warp_status,
+            commands::get_warp_usage_from_local_db,
+            commands::ensure_warp_rules_dir,
+            // Kiro commands
+            commands::get_kiro_status,
+            commands::get_kiro_mcp_servers,
+            commands::add_kiro_mcp_server,
+            commands::remove_kiro_mcp_server,
+            commands::sync_mcp_to_kiro,
+            commands::import_mcp_from_kiro,
+            commands::ensure_kiro_rules_dir,
+            // Antigravity commands
+            commands::get_antigravity_status,
+            commands::get_antigravity_mcp_servers,
+            commands::add_antigravity_mcp_server,
+            commands::remove_antigravity_mcp_server,
+            commands::sync_mcp_to_antigravity,
+            commands::import_mcp_from_antigravity,
+            commands::ensure_antigravity_rules_dir,
         ])
         .run(tauri::generate_context!())?;
 

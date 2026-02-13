@@ -59,6 +59,8 @@ interface ManagedSkill {
   gemini_enabled: boolean
   opencode_enabled: boolean
   cursor_enabled: boolean
+  windsurf_enabled: boolean
+  kiro_enabled: boolean
   source_path: string | null
   is_local: boolean
 }
@@ -70,6 +72,8 @@ interface SkillsStats {
   gemini_count: number
   opencode_count: number
   cursor_count: number
+  windsurf_count: number
+  kiro_count: number
 }
 
 // 状态
@@ -112,7 +116,7 @@ const selectedDiscovered = ref<Set<string>>(new Set())
 // Skills 管理
 const showManageModal = ref(false)
 const managedSkills = ref<ManagedSkill[]>([])
-const skillsStats = ref<SkillsStats>({ claude_count: 0, codex_count: 0, gemini_count: 0, opencode_count: 0, cursor_count: 0 })
+const skillsStats = ref<SkillsStats>({ claude_count: 0, codex_count: 0, gemini_count: 0, opencode_count: 0, cursor_count: 0, windsurf_count: 0, kiro_count: 0 })
 const togglingTool = ref<string | null>(null) // 正在切换的 skill-tool 组合
 const manageSearchQuery = ref('')
 
@@ -211,7 +215,7 @@ const filteredManagedSkills = computed(() => {
 })
 
 // 切换 skill 的工具启用状态
-async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor') {
+async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor' | 'windsurf' | 'kiro') {
   const key = `${skill.name}-${tool}`
   if (togglingTool.value) return
   
@@ -221,6 +225,8 @@ async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | '
                          tool === 'codex' ? skill.codex_enabled :
                          tool === 'gemini' ? skill.gemini_enabled :
                          tool === 'cursor' ? skill.cursor_enabled :
+                         tool === 'windsurf' ? skill.windsurf_enabled :
+                         tool === 'kiro' ? skill.kiro_enabled :
                          skill.opencode_enabled
   
   try {
@@ -235,6 +241,8 @@ async function toggleSkillTool(skill: ManagedSkill, tool: 'claude' | 'codex' | '
     else if (tool === 'codex') skill.codex_enabled = !currentEnabled
     else if (tool === 'gemini') skill.gemini_enabled = !currentEnabled
     else if (tool === 'cursor') skill.cursor_enabled = !currentEnabled
+    else if (tool === 'windsurf') skill.windsurf_enabled = !currentEnabled
+    else if (tool === 'kiro') skill.kiro_enabled = !currentEnabled
     else skill.opencode_enabled = !currentEnabled
     
     // 更新统计
@@ -262,12 +270,14 @@ async function confirmDeleteSkillFromAll() {
   
   try {
     // 依次从各个工具中删除
-    const tools = ['claude', 'codex', 'gemini', 'opencode', 'cursor'] as const
+    const tools = ['claude', 'codex', 'gemini', 'opencode', 'cursor', 'windsurf', 'kiro'] as const
     for (const tool of tools) {
       const enabled = tool === 'claude' ? skill.claude_enabled :
                       tool === 'codex' ? skill.codex_enabled :
                       tool === 'gemini' ? skill.gemini_enabled :
                       tool === 'cursor' ? skill.cursor_enabled :
+                      tool === 'windsurf' ? skill.windsurf_enabled :
+                      tool === 'kiro' ? skill.kiro_enabled :
                       skill.opencode_enabled
       
       if (enabled) {
@@ -1230,7 +1240,7 @@ onMounted(() => {
           
           <!-- 统计信息 -->
           <div class="px-6 py-3 border-b border-border bg-surface/30 text-sm text-muted-foreground">
-            {{ t('skills.statsInstalled', { claude: skillsStats.claude_count, codex: skillsStats.codex_count, gemini: skillsStats.gemini_count, opencode: skillsStats.opencode_count, cursor: skillsStats.cursor_count }) }}
+            {{ t('skills.statsInstalled', { claude: skillsStats.claude_count, codex: skillsStats.codex_count, gemini: skillsStats.gemini_count, opencode: skillsStats.opencode_count, cursor: skillsStats.cursor_count, windsurf: skillsStats.windsurf_count, kiro: skillsStats.kiro_count }) }}
           </div>
           
           <!-- 搜索框 -->
@@ -1340,6 +1350,38 @@ onMounted(() => {
                       <span
                         class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
                         :class="skill.cursor_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Windsurf 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">Windsurf</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'windsurf')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.windsurf_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.windsurf_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Kiro 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[120px]">
+                    <span class="text-sm text-muted-foreground">Kiro</span>
+                    <button
+                      @click="toggleSkillTool(skill, 'kiro')"
+                      :disabled="togglingTool !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="skill.kiro_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="skill.kiro_enabled ? 'translate-x-5' : 'translate-x-0'"
                       ></span>
                     </button>
                   </div>

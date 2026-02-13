@@ -99,6 +99,9 @@ interface ManagedMcp {
   codex_enabled: boolean
   gemini_enabled: boolean
   cursor_enabled: boolean
+  windsurf_enabled: boolean
+  kiro_enabled: boolean
+  antigravity_enabled: boolean
 }
 
 // MCP 统计信息
@@ -108,6 +111,9 @@ interface McpStats {
   codex_count: number
   gemini_count: number
   cursor_count: number
+  windsurf_count: number
+  kiro_count: number
+  antigravity_count: number
 }
 
 const servers = ref<McpServer[]>([])
@@ -123,7 +129,7 @@ const activeTab = ref<'mcp' | 'rules'>('mcp')
 // MCP 管理弹窗
 const showMcpManageModal = ref(false)
 const managedMcps = ref<ManagedMcp[]>([])
-const mcpStats = ref<McpStats>({ opencode_count: 0, claude_count: 0, codex_count: 0, gemini_count: 0, cursor_count: 0 })
+const mcpStats = ref<McpStats>({ opencode_count: 0, claude_count: 0, codex_count: 0, gemini_count: 0, cursor_count: 0, windsurf_count: 0, kiro_count: 0, antigravity_count: 0 })
 const togglingMcp = ref<string | null>(null)
 const mcpManageSearchQuery = ref('')
 
@@ -138,6 +144,11 @@ interface ManagedRule {
   codex_enabled: boolean
   gemini_enabled: boolean
   cursor_enabled: boolean
+  windsurf_enabled: boolean
+  augment_enabled: boolean
+  warp_enabled: boolean
+  kiro_enabled: boolean
+  antigravity_enabled: boolean
   source_path: string | null
 }
 
@@ -148,12 +159,17 @@ interface RuleStats {
   codex_count: number
   gemini_count: number
   cursor_count: number
+  windsurf_count: number
+  augment_count: number
+  warp_count: number
+  kiro_count: number
+  antigravity_count: number
 }
 
 // 规则管理弹窗
 const showRuleManageModal = ref(false)
 const managedRules = ref<ManagedRule[]>([])
-const ruleStats = ref<RuleStats>({ opencode_count: 0, claude_count: 0, codex_count: 0, gemini_count: 0, cursor_count: 0 })
+const ruleStats = ref<RuleStats>({ opencode_count: 0, claude_count: 0, codex_count: 0, gemini_count: 0, cursor_count: 0, windsurf_count: 0, augment_count: 0, warp_count: 0, kiro_count: 0, antigravity_count: 0 })
 const togglingRule = ref<string | null>(null)
 const ruleManageSearchQuery = ref('')
 
@@ -476,7 +492,7 @@ const filteredManagedMcps = computed(() => {
 })
 
 // 切换 MCP 的应用启用状态
-async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor') {
+async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor' | 'windsurf' | 'kiro' | 'antigravity') {
   const key = `${mcp.name}-${app}`
   if (togglingMcp.value) return
   
@@ -486,7 +502,10 @@ async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex
                          app === 'claude' ? mcp.claude_enabled :
                          app === 'codex' ? mcp.codex_enabled :
                          app === 'gemini' ? mcp.gemini_enabled :
-                         mcp.cursor_enabled
+                         app === 'cursor' ? mcp.cursor_enabled :
+                         app === 'windsurf' ? mcp.windsurf_enabled :
+                         app === 'kiro' ? mcp.kiro_enabled :
+                         mcp.antigravity_enabled
   
   try {
     await invoke('toggle_mcp_app', {
@@ -501,6 +520,9 @@ async function toggleMcpApp(mcp: ManagedMcp, app: 'opencode' | 'claude' | 'codex
     else if (app === 'codex') mcp.codex_enabled = !currentEnabled
     else if (app === 'gemini') mcp.gemini_enabled = !currentEnabled
     else if (app === 'cursor') mcp.cursor_enabled = !currentEnabled
+    else if (app === 'windsurf') mcp.windsurf_enabled = !currentEnabled
+    else if (app === 'kiro') mcp.kiro_enabled = !currentEnabled
+    else if (app === 'antigravity') mcp.antigravity_enabled = !currentEnabled
     
     // 刷新统计
     mcpStats.value = await invoke<McpStats>('get_mcp_stats')
@@ -567,7 +589,7 @@ const filteredManagedRules = computed(() => {
 })
 
 // 切换规则的应用启用状态
-async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor') {
+async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor' | 'windsurf' | 'augment' | 'warp' | 'kiro' | 'antigravity') {
   const key = `${rule.name}-${app}`
   if (togglingRule.value) return
   
@@ -577,7 +599,12 @@ async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'co
                          app === 'claude' ? rule.claude_enabled :
                          app === 'codex' ? rule.codex_enabled :
                          app === 'gemini' ? rule.gemini_enabled :
-                         rule.cursor_enabled
+                         app === 'cursor' ? rule.cursor_enabled :
+                         app === 'windsurf' ? rule.windsurf_enabled :
+                         app === 'augment' ? rule.augment_enabled :
+                         app === 'warp' ? rule.warp_enabled :
+                         app === 'kiro' ? rule.kiro_enabled :
+                         rule.antigravity_enabled
   
   try {
     await invoke('toggle_rule_app', {
@@ -593,6 +620,11 @@ async function toggleRuleApp(rule: ManagedRule, app: 'opencode' | 'claude' | 'co
     else if (app === 'codex') rule.codex_enabled = !currentEnabled
     else if (app === 'gemini') rule.gemini_enabled = !currentEnabled
     else if (app === 'cursor') rule.cursor_enabled = !currentEnabled
+    else if (app === 'windsurf') rule.windsurf_enabled = !currentEnabled
+    else if (app === 'augment') rule.augment_enabled = !currentEnabled
+    else if (app === 'warp') rule.warp_enabled = !currentEnabled
+    else if (app === 'kiro') rule.kiro_enabled = !currentEnabled
+    else if (app === 'antigravity') rule.antigravity_enabled = !currentEnabled
     
     // 刷新统计
     ruleStats.value = await invoke<RuleStats>('get_rule_stats')
@@ -2276,7 +2308,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
           
           <!-- 统计信息 -->
           <div class="px-6 py-3 border-b border-border bg-surface/30 text-sm text-muted-foreground flex-shrink-0">
-            {{ t('mcp.installed') }} · OpenCode: {{ mcpStats.opencode_count }} · Claude: {{ mcpStats.claude_count }} · Codex: {{ mcpStats.codex_count }} · Gemini: {{ mcpStats.gemini_count }} · Cursor: {{ mcpStats.cursor_count }}
+            {{ t('mcp.installed') }} · OpenCode: {{ mcpStats.opencode_count }} · Claude: {{ mcpStats.claude_count }} · Codex: {{ mcpStats.codex_count }} · Gemini: {{ mcpStats.gemini_count }} · Cursor: {{ mcpStats.cursor_count }} · Windsurf: {{ mcpStats.windsurf_count }} · Kiro: {{ mcpStats.kiro_count }} · Antigravity: {{ mcpStats.antigravity_count }}
           </div>
           
           <!-- 搜索框 -->
@@ -2394,6 +2426,54 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                       ></span>
                     </button>
                   </div>
+                  
+                  <!-- Windsurf 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Windsurf</span>
+                    <button
+                      @click="toggleMcpApp(mcp, 'windsurf')"
+                      :disabled="togglingMcp !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="mcp.windsurf_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="mcp.windsurf_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Kiro 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Kiro</span>
+                    <button
+                      @click="toggleMcpApp(mcp, 'kiro')"
+                      :disabled="togglingMcp !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="mcp.kiro_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="mcp.kiro_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Antigravity 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Antigravity</span>
+                    <button
+                      @click="toggleMcpApp(mcp, 'antigravity')"
+                      :disabled="togglingMcp !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="mcp.antigravity_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="mcp.antigravity_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
                 </div>
                 
                 <!-- 删除按钮 -->
@@ -2457,7 +2537,7 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
           
           <!-- 统计信息 -->
           <div class="px-6 py-3 border-b border-border bg-surface/30 text-sm text-muted-foreground flex-shrink-0">
-            {{ t('rule.installed') }} · OpenCode: {{ ruleStats.opencode_count }} · Claude: {{ ruleStats.claude_count }} · Codex: {{ ruleStats.codex_count }} · Gemini: {{ ruleStats.gemini_count }} · Cursor: {{ ruleStats.cursor_count }}
+            {{ t('rule.installed') }} · OpenCode: {{ ruleStats.opencode_count }} · Claude: {{ ruleStats.claude_count }} · Codex: {{ ruleStats.codex_count }} · Gemini: {{ ruleStats.gemini_count }} · Cursor: {{ ruleStats.cursor_count }} · Windsurf: {{ ruleStats.windsurf_count }} · Augment: {{ ruleStats.augment_count }} · Warp: {{ ruleStats.warp_count }} · Kiro: {{ ruleStats.kiro_count }} · Antigravity: {{ ruleStats.antigravity_count }}
           </div>
           
           <!-- 搜索框 -->
@@ -2569,6 +2649,86 @@ const currentServer = () => servers.value.find(s => s.name === selectedServer.va
                       <span
                         class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
                         :class="rule.cursor_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Windsurf 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Windsurf</span>
+                    <button
+                      @click="toggleRuleApp(rule, 'windsurf')"
+                      :disabled="togglingRule !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="rule.windsurf_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="rule.windsurf_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Augment 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Augment</span>
+                    <button
+                      @click="toggleRuleApp(rule, 'augment')"
+                      :disabled="togglingRule !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="rule.augment_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="rule.augment_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Warp 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Warp</span>
+                    <button
+                      @click="toggleRuleApp(rule, 'warp')"
+                      :disabled="togglingRule !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="rule.warp_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="rule.warp_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Kiro 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Kiro</span>
+                    <button
+                      @click="toggleRuleApp(rule, 'kiro')"
+                      :disabled="togglingRule !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="rule.kiro_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="rule.kiro_enabled ? 'translate-x-5' : 'translate-x-0'"
+                      ></span>
+                    </button>
+                  </div>
+                  
+                  <!-- Antigravity 开关 -->
+                  <div class="flex items-center justify-between gap-3 min-w-[130px]">
+                    <span class="text-sm text-muted-foreground">Antigravity</span>
+                    <button
+                      @click="toggleRuleApp(rule, 'antigravity')"
+                      :disabled="togglingRule !== null"
+                      class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                      :class="rule.antigravity_enabled ? 'bg-emerald-500' : 'bg-gray-600'"
+                    >
+                      <span
+                        class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                        :class="rule.antigravity_enabled ? 'translate-x-5' : 'translate-x-0'"
                       ></span>
                     </button>
                   </div>

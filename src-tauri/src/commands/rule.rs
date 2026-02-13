@@ -741,6 +741,11 @@ pub struct ManagedRule {
     pub codex_enabled: bool,
     pub gemini_enabled: bool,
     pub cursor_enabled: bool,
+    pub windsurf_enabled: bool,
+    pub augment_enabled: bool,
+    pub warp_enabled: bool,
+    pub kiro_enabled: bool,
+    pub antigravity_enabled: bool,
     // 源路径（用于读取内容）
     pub source_path: Option<String>,
 }
@@ -753,6 +758,11 @@ pub struct RuleStats {
     pub codex_count: usize,
     pub gemini_count: usize,
     pub cursor_count: usize,
+    pub windsurf_count: usize,
+    pub augment_count: usize,
+    pub warp_count: usize,
+    pub kiro_count: usize,
+    pub antigravity_count: usize,
 }
 
 /// 获取各应用的规则目录
@@ -770,6 +780,33 @@ fn get_app_rules_paths() -> HashMap<String, PathBuf> {
         paths.insert("gemini".to_string(), home.join(".gemini").join("rules"));
         // Cursor
         paths.insert("cursor".to_string(), home.join(".cursor").join("rules"));
+        // Warp
+        #[cfg(target_os = "windows")]
+        {
+            let app_data = std::env::var("APPDATA")
+                .unwrap_or_else(|_| home.join("AppData").join("Roaming").to_string_lossy().to_string());
+            paths.insert("warp".to_string(), std::path::PathBuf::from(app_data).join("Warp").join("Warp").join("data").join("rules"));
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            paths.insert("warp".to_string(), home.join(".warp").join("rules"));
+        }
+    }
+    
+    // 项目级 Windsurf/Augment rules（依赖 cwd）
+    if let Ok(cwd) = std::env::current_dir() {
+        paths.insert("windsurf".to_string(), cwd.join(".windsurf").join("rules"));
+        paths.insert("augment".to_string(), cwd.join(".augment").join("rules"));
+    }
+    
+    // Kiro 全局 steering 目录
+    if let Some(home) = dirs::home_dir() {
+        paths.insert("kiro".to_string(), home.join(".kiro").join("steering"));
+    }
+    
+    // Antigravity rules 目录
+    if let Ok(ag_manager) = crate::config::antigravity_manager::AntigravityConfigManager::new() {
+        paths.insert("antigravity".to_string(), ag_manager.get_rules_dir().clone());
     }
     
     paths
@@ -845,6 +882,11 @@ pub fn get_managed_rules() -> Vec<ManagedRule> {
                                     codex_enabled: false,
                                     gemini_enabled: false,
                                     cursor_enabled: false,
+                                    windsurf_enabled: false,
+                                    augment_enabled: false,
+                                    warp_enabled: false,
+                                    kiro_enabled: false,
+                                    antigravity_enabled: false,
                                     source_path: Some(path.to_string_lossy().to_string()),
                                 });
                             }
@@ -857,6 +899,11 @@ pub fn get_managed_rules() -> Vec<ManagedRule> {
                                     "codex" => rule.codex_enabled = true,
                                     "gemini" => rule.gemini_enabled = true,
                                     "cursor" => rule.cursor_enabled = true,
+                                    "windsurf" => rule.windsurf_enabled = true,
+                                    "augment" => rule.augment_enabled = true,
+                                    "warp" => rule.warp_enabled = true,
+                                    "kiro" => rule.kiro_enabled = true,
+                                    "antigravity" => rule.antigravity_enabled = true,
                                     _ => {}
                                 }
                             }
@@ -887,6 +934,11 @@ pub fn get_rule_stats() -> RuleStats {
             "codex" => stats.codex_count = count,
             "gemini" => stats.gemini_count = count,
             "cursor" => stats.cursor_count = count,
+            "windsurf" => stats.windsurf_count = count,
+            "augment" => stats.augment_count = count,
+            "warp" => stats.warp_count = count,
+            "kiro" => stats.kiro_count = count,
+            "antigravity" => stats.antigravity_count = count,
             _ => {}
         }
     }

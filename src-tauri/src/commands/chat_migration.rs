@@ -155,6 +155,110 @@ fn get_cursor_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Cursor"]) }
 fn get_windsurf_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Windsurf", "WindSurf"]) }
 fn get_trae_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Trae"]) }
 fn get_trae_cn_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Trae CN", "TraeCN", "trae-cn"]) }
+fn get_kiro_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Kiro"]) }
+fn get_antigravity_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Antigravity"]) }
+fn get_augment_paths() -> Vec<PathBuf> { get_vscode_db_paths(&["Code", "Code - Insiders"]) }
+
+/// 获取 Warp 数据库路径
+fn get_warp_chat_db_path() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+    #[cfg(target_os = "windows")]
+    {
+        let local_app_data = std::env::var("LOCALAPPDATA")
+            .unwrap_or_else(|_| home.join("AppData").join("Local").to_string_lossy().to_string());
+        let db = PathBuf::from(&local_app_data).join("Warp").join("Warp").join("data").join("warp.sqlite");
+        if db.exists() { return Some(db); }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let db = home.join("Library").join("Group Containers").join("2BBY89MBSN.dev.warp")
+            .join("Library").join("Application Support").join("dev.warp.Warp-Stable").join("warp.sqlite");
+        if db.exists() { return Some(db); }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let db = home.join(".local").join("share").join("warp").join("warp.sqlite");
+        if db.exists() { return Some(db); }
+    }
+    None
+}
+
+/// 从 Warp 数据库提取对话
+fn extract_warp_conversations() -> Vec<ExtractedConversation> {
+    let mut conversations = Vec::new();
+    let Some(db_path) = get_warp_chat_db_path() else { return conversations };
+    let Ok(conn) = rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) else { return conversations };
+
+    // 检查表是否存在
+    let has_table = conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_conversations'")
+        .and_then(|mut stmt| stmt.query_row([], |_| Ok(())))
+        .is_ok();
+    if !has_table { return conversations; }
+
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT id, conversation_data FROM agent_conversations WHERE conversation_data IS NOT NULL"
+    ) else { return conversations };
+
+    let rows = match stmt.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let data: String = row.get(1)?;
+        Ok((id, data))
+    }) {
+        Ok(r) => r,
+        Err(_) => return conversations,
+    };
+
+    for row in rows.flatten() {
+        let (conv_id, data_str) = row;
+        let Ok(data) = serde_json::from_str::<serde_json::Value>(&data_str) else { continue };
+
+        let mut messages = Vec::new();
+
+        // 提取对话内容
+        if let Some(turns) = data.get("turns").and_then(|v| v.as_array()) {
+            for turn in turns {
+                let role = turn.get("role").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let content = turn.get("content").and_then(|v| v.as_str())
+                    .or_else(|| turn.get("text").and_then(|v| v.as_str()))
+                    .unwrap_or("");
+                if content.is_empty() { continue; }
+                messages.push(ExtractedMessage {
+                    role: role.to_string(),
+                    content: content.to_string(),
+                    model: turn.get("model").and_then(|v| v.as_str()).map(String::from),
+                    timestamp: None,
+                    tool_use: None,
+                });
+            }
+        }
+
+        if messages.is_empty() { continue; }
+
+        let name = data.get("title").and_then(|v| v.as_str()).map(String::from);
+        let created_at = data.get("created_at").and_then(|v| v.as_i64());
+
+        conversations.push(ExtractedConversation {
+            messages,
+            source: "warp".to_string(),
+            session_id: Some(conv_id),
+            name,
+            created_at,
+        });
+    }
+
+    conversations
+}
+
+/// 统计 Warp 对话数量
+fn count_warp_conversations_chat() -> u32 {
+    let Some(db_path) = get_warp_chat_db_path() else { return 0 };
+    let Ok(conn) = rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) else { return 0 };
+    conn.query_row(
+        "SELECT COUNT(*) FROM agent_conversations WHERE conversation_data IS NOT NULL",
+        [],
+        |row| row.get::<_, i64>(0),
+    ).unwrap_or(0) as u32
+}
 
 fn get_claude_paths() -> Vec<PathBuf> {
     let mut files = Vec::new();
@@ -831,7 +935,7 @@ fn simple_hash(s: &str) -> u64 {
 #[tauri::command]
 pub async fn scan_chat_sources(window: tauri::Window) -> Result<ChatScanResult, String> {
     let mut sources = Vec::new();
-    let total_steps = 7u32;
+    let total_steps = 11u32;
 
     // 1. Cursor
     emit_progress(&window, "scan", "cursor", 1, total_steps, "扫描 Cursor");
@@ -893,7 +997,47 @@ pub async fn scan_chat_sources(window: tauri::Window) -> Result<ChatScanResult, 
         available: !trae_cn_paths.is_empty(),
     });
 
-    // 7. 完成
+    // 7. Kiro
+    emit_progress(&window, "scan", "kiro", 7, total_steps, "扫描 Kiro");
+    let kiro_paths = get_kiro_paths();
+    sources.push(ChatSourceInfo {
+        name: "Kiro".to_string(), key: "kiro".to_string(),
+        path: kiro_paths.first().and_then(|p| p.parent()).and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()),
+        conversation_count: if !kiro_paths.is_empty() { count_vscode_conversations(&kiro_paths) } else { 0 },
+        available: !kiro_paths.is_empty(),
+    });
+
+    // 8. Antigravity
+    emit_progress(&window, "scan", "antigravity", 8, total_steps, "扫描 Antigravity");
+    let antigravity_paths = get_antigravity_paths();
+    sources.push(ChatSourceInfo {
+        name: "Antigravity".to_string(), key: "antigravity".to_string(),
+        path: antigravity_paths.first().and_then(|p| p.parent()).and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()),
+        conversation_count: if !antigravity_paths.is_empty() { count_vscode_conversations(&antigravity_paths) } else { 0 },
+        available: !antigravity_paths.is_empty(),
+    });
+
+    // 9. Warp
+    emit_progress(&window, "scan", "warp", 9, total_steps, "扫描 Warp");
+    let warp_available = get_warp_chat_db_path().is_some();
+    sources.push(ChatSourceInfo {
+        name: "Warp".to_string(), key: "warp".to_string(),
+        path: get_warp_chat_db_path().map(|p| p.to_string_lossy().to_string()),
+        conversation_count: if warp_available { count_warp_conversations_chat() } else { 0 },
+        available: warp_available,
+    });
+
+    // 10. Augment
+    emit_progress(&window, "scan", "augment", 10, total_steps, "扫描 Augment");
+    let augment_paths = get_augment_paths();
+    sources.push(ChatSourceInfo {
+        name: "Augment".to_string(), key: "augment".to_string(),
+        path: augment_paths.first().and_then(|p| p.parent()).and_then(|p| p.parent()).map(|p| p.to_string_lossy().to_string()),
+        conversation_count: if !augment_paths.is_empty() { count_vscode_conversations(&augment_paths) } else { 0 },
+        available: !augment_paths.is_empty(),
+    });
+
+    // 11. 完成
     emit_progress(&window, "scan", "done", total_steps, total_steps, "扫描完成");
     Ok(ChatScanResult { sources })
 }
@@ -902,12 +1046,16 @@ pub async fn scan_chat_sources(window: tauri::Window) -> Result<ChatScanResult, 
 pub async fn extract_conversations(window: tauri::Window, source: String) -> Result<ExtractionResult, String> {
     emit_progress(&window, "extract", &source, 0, 1, &format!("正在提取 {} 对话...", source));
     let conversations = match source.as_str() {
-        "cursor"   => extract_vscode_conversations(&get_cursor_paths(), "cursor"),
-        "claude"   => extract_claude_conversations(&get_claude_paths()),
-        "codex"    => extract_codex_conversations(&get_codex_paths()),
-        "windsurf" => extract_vscode_conversations(&get_windsurf_paths(), "windsurf"),
-        "trae"     => extract_vscode_conversations(&get_trae_paths(), "trae"),
-        "trae_cn"  => extract_vscode_conversations(&get_trae_cn_paths(), "trae-cn"),
+        "cursor"      => extract_vscode_conversations(&get_cursor_paths(), "cursor"),
+        "claude"      => extract_claude_conversations(&get_claude_paths()),
+        "codex"       => extract_codex_conversations(&get_codex_paths()),
+        "windsurf"    => extract_vscode_conversations(&get_windsurf_paths(), "windsurf"),
+        "trae"        => extract_vscode_conversations(&get_trae_paths(), "trae"),
+        "trae_cn"     => extract_vscode_conversations(&get_trae_cn_paths(), "trae-cn"),
+        "kiro"        => extract_vscode_conversations(&get_kiro_paths(), "kiro"),
+        "antigravity" => extract_vscode_conversations(&get_antigravity_paths(), "antigravity"),
+        "warp"        => extract_warp_conversations(),
+        "augment"     => extract_vscode_conversations(&get_augment_paths(), "augment"),
         _ => return Err(format!("不支持的数据源: {}", source)),
     };
     let total = conversations.len() as u32;

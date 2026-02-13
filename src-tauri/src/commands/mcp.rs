@@ -70,6 +70,9 @@ pub struct ManagedMcp {
     pub codex_enabled: bool,
     pub gemini_enabled: bool,
     pub cursor_enabled: bool,
+    pub windsurf_enabled: bool,
+    pub kiro_enabled: bool,
+    pub antigravity_enabled: bool,
 }
 
 /// MCP 统计信息
@@ -80,6 +83,9 @@ pub struct McpStats {
     pub codex_count: usize,
     pub gemini_count: usize,
     pub cursor_count: usize,
+    pub windsurf_count: usize,
+    pub kiro_count: usize,
+    pub antigravity_count: usize,
 }
 
 /// 从命令中提取npm包名
@@ -1080,6 +1086,9 @@ pub fn get_managed_mcps(
             codex_enabled: false,
             gemini_enabled: false,
             cursor_enabled: false,
+            windsurf_enabled: false,
+            kiro_enabled: false,
+            antigravity_enabled: false,
         });
     }
     
@@ -1143,6 +1152,42 @@ pub fn get_managed_mcps(
         }
     }
     
+    // 检查 Windsurf
+    if let Ok(windsurf_manager) = crate::config::windsurf_manager::WindsurfConfigManager::new() {
+        if let Ok(servers) = windsurf_manager.get_mcp_servers() {
+            for name in servers.keys() {
+                all_mcp_names.insert(name.clone());
+                if let Some(mcp) = managed_mcps.get_mut(name) {
+                    mcp.windsurf_enabled = true;
+                }
+            }
+        }
+    }
+    
+    // 检查 Kiro
+    if let Ok(kiro_manager) = crate::config::kiro_manager::KiroConfigManager::new() {
+        if let Ok(servers) = kiro_manager.get_mcp_servers() {
+            for name in servers.keys() {
+                all_mcp_names.insert(name.clone());
+                if let Some(mcp) = managed_mcps.get_mut(name) {
+                    mcp.kiro_enabled = true;
+                }
+            }
+        }
+    }
+    
+    // 检查 Antigravity
+    if let Ok(ag_manager) = crate::config::antigravity_manager::AntigravityConfigManager::new() {
+        if let Ok(servers) = ag_manager.get_mcp_servers() {
+            for name in servers.keys() {
+                all_mcp_names.insert(name.clone());
+                if let Some(mcp) = managed_mcps.get_mut(name) {
+                    mcp.antigravity_enabled = true;
+                }
+            }
+        }
+    }
+    
     let mut result: Vec<ManagedMcp> = managed_mcps.into_values().collect();
     result.sort_by(|a, b| a.name.cmp(&b.name));
     
@@ -1194,6 +1239,27 @@ pub fn get_mcp_stats(
     if let Ok(cursor_manager) = CursorConfigManager::new() {
         if let Ok(servers) = cursor_manager.get_mcp_servers() {
             stats.cursor_count = servers.len();
+        }
+    }
+    
+    // Windsurf
+    if let Ok(windsurf_manager) = crate::config::windsurf_manager::WindsurfConfigManager::new() {
+        if let Ok(count) = windsurf_manager.get_mcp_count() {
+            stats.windsurf_count = count;
+        }
+    }
+    
+    // Kiro
+    if let Ok(kiro_manager) = crate::config::kiro_manager::KiroConfigManager::new() {
+        if let Ok(count) = kiro_manager.get_mcp_count() {
+            stats.kiro_count = count;
+        }
+    }
+    
+    // Antigravity
+    if let Ok(ag_manager) = crate::config::antigravity_manager::AntigravityConfigManager::new() {
+        if let Ok(count) = ag_manager.get_mcp_count() {
+            stats.antigravity_count = count;
         }
     }
     
@@ -1316,6 +1382,85 @@ pub fn toggle_mcp_app(
                     .map_err(|e| AppError::Custom(e))?;
             }
         }
+        "windsurf" => {
+            let windsurf_manager = crate::config::windsurf_manager::WindsurfConfigManager::new()
+                .map_err(|e| AppError::Custom(e))?;
+            
+            if enabled {
+                if let Some(server) = source_server {
+                    use crate::config::windsurf_manager::WindsurfMcpServer;
+                    let windsurf_server = WindsurfMcpServer {
+                        command: server.command.as_ref().and_then(|c| c.first().cloned()),
+                        args: server.command.as_ref()
+                            .map(|c| c.iter().skip(1).cloned().collect())
+                            .unwrap_or_default(),
+                        env: server.environment.clone(),
+                        server_url: server.url.clone(),
+                        headers: server.headers.clone(),
+                        disabled: None,
+                        always_allow: None,
+                    };
+                    windsurf_manager.add_mcp_server(&mcp_name, windsurf_server)
+                        .map_err(|e| AppError::Custom(e))?;
+                }
+            } else {
+                windsurf_manager.remove_mcp_server(&mcp_name)
+                    .map_err(|e| AppError::Custom(e))?;
+            }
+        }
+        "kiro" => {
+            let kiro_manager = crate::config::kiro_manager::KiroConfigManager::new()
+                .map_err(|e| AppError::Custom(e))?;
+            
+            if enabled {
+                if let Some(server) = source_server {
+                    use crate::config::kiro_manager::KiroMcpServer;
+                    let kiro_server = KiroMcpServer {
+                        command: server.command.as_ref().and_then(|c| c.first().cloned()),
+                        args: server.command.as_ref()
+                            .map(|c| c.iter().skip(1).cloned().collect())
+                            .unwrap_or_default(),
+                        env: server.environment.clone(),
+                        url: server.url.clone(),
+                        headers: server.headers.clone(),
+                        disabled: None,
+                        auto_approve: None,
+                        disabled_tools: None,
+                    };
+                    kiro_manager.add_mcp_server(&mcp_name, kiro_server)
+                        .map_err(|e| AppError::Custom(e))?;
+                }
+            } else {
+                kiro_manager.remove_mcp_server(&mcp_name)
+                    .map_err(|e| AppError::Custom(e))?;
+            }
+        }
+        "antigravity" => {
+            let ag_manager = crate::config::antigravity_manager::AntigravityConfigManager::new()
+                .map_err(|e| AppError::Custom(e))?;
+            
+            if enabled {
+                if let Some(server) = source_server {
+                    use crate::config::antigravity_manager::AntigravityMcpServer;
+                    let ag_server = AntigravityMcpServer {
+                        command: server.command.as_ref().and_then(|c| c.first().cloned()),
+                        args: server.command.as_ref()
+                            .map(|c| c.iter().skip(1).cloned().collect())
+                            .unwrap_or_default(),
+                        env: server.environment.clone(),
+                        url: server.url.clone(),
+                        headers: server.headers.clone(),
+                        disabled: None,
+                        auto_approve: None,
+                    };
+                    ag_manager.add_mcp_server(&mcp_name, ag_server)
+                        .map_err(|e| AppError::Custom(e))?;
+                }
+            } else {
+                ag_manager.remove_mcp_server(&mcp_name)
+                    .map_err(|e| AppError::Custom(e))?;
+            }
+        }
         _ => {
             return Err(AppError::Custom(format!("不支持的应用: {}", app)));
         }
@@ -1361,6 +1506,21 @@ pub fn delete_mcp_from_all(
     // 从 Cursor 删除
     if let Ok(cursor_manager) = CursorConfigManager::new() {
         let _ = cursor_manager.remove_mcp_server(&mcp_name);
+    }
+    
+    // 从 Windsurf 删除
+    if let Ok(windsurf_manager) = crate::config::windsurf_manager::WindsurfConfigManager::new() {
+        let _ = windsurf_manager.remove_mcp_server(&mcp_name);
+    }
+    
+    // 从 Kiro 删除
+    if let Ok(kiro_manager) = crate::config::kiro_manager::KiroConfigManager::new() {
+        let _ = kiro_manager.remove_mcp_server(&mcp_name);
+    }
+    
+    // 从 Antigravity 删除
+    if let Ok(ag_manager) = crate::config::antigravity_manager::AntigravityConfigManager::new() {
+        let _ = ag_manager.remove_mcp_server(&mcp_name);
     }
     
     Ok(())
